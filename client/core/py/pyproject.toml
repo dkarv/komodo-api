@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "komodo_api"
+version = "0.0.1"
+authors = [
+  { name="David Punzet", email="punzet.david@gmail.com" },
+]
+description = "Komodo client API"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+dependencies = [
+  "aiohttp",
+  "pydantic",
+]
+
+[project.urls]
+Homepage = "https://github.com/dkarv/komodo-src"
+Issues = "https://github.com/dkarv/komodo-src/issues"
