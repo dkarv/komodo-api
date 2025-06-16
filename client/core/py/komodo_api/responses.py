@@ -1,428 +1,740 @@
 from .types import *
-from abc import ABC, abstractmethod
-from typing import overload
+from typing import TypeVar, Callable
 
 Res = TypeVar('Res')
 
-class AuthApi(ABC):
 
-  @abstractmethod
-  def _auth(self, request: AuthRequest) -> Res: pass
 
-  def auth(self, params: GetLoginOptions) -> GetLoginOptionsResponse:
-    return self.auth(AuthRequestGetLoginOptions(params = params), GetLoginOptionsResponse)
-  def auth(self, params: CreateLocalUser) -> CreateLocalUserResponse:
-    return self.auth(AuthRequestCreateLocalUser(params = params), CreateLocalUserResponse)
-  def auth(self, params: LoginLocalUser) -> LoginLocalUserResponse: 
-    return self.auth(AuthRequestLoginLocalUser(params = params), LoginLocalUserResponse)
-  def auth(self, params: ExchangeForJwt) -> ExchangeForJwtResponse:
-    return self.auth(AuthRequestExchangeForJwt(params = params), ExchangeForJwtResponse)
-  def auth(self, params: GetUser) -> GetUserResponse:
+class AuthApi:
+  def __init__(self, request: Callable[[str, any, type[Res]], Res]):
+    self.request = request
+  async def _auth(self, request: AuthRequest, clz: type[Res]) -> Res:
+    return await self.request("/auth", request, clz)
+
+  def getLoginOptions(self, params: GetLoginOptions) -> GetLoginOptionsResponse:
+    return self._auth(AuthRequestGetLoginOptions(params = params), GetLoginOptionsResponse)
+  def createLocalUser(self, params: CreateLocalUser) -> CreateLocalUserResponse:
+    return self._auth(AuthRequestCreateLocalUser(params = params), CreateLocalUserResponse)
+  def loginLocalUser(self, params: LoginLocalUser) -> LoginLocalUserResponse: 
+    return self._auth(AuthRequestLoginLocalUser(params = params), LoginLocalUserResponse)
+  def exchangeForJwt(self, params: ExchangeForJwt) -> ExchangeForJwtResponse:
+    return self._auth(AuthRequestExchangeForJwt(params = params), ExchangeForJwtResponse)
+  def getUser(self, params: GetUser) -> GetUserResponse:
     return self._auth(AuthRequestGetUser(params = params), GetUserResponse)
 
 
-class UserResponses: pass
-class PushRecentlyViewed(UserResponses, PushRecentlyViewedResponse): pass
-class SetLastSeenUpdate(UserResponses, SetLastSeenUpdateResponse): pass
-class CreateApiKey(UserResponses, CreateApiKeyResponse): pass
-class DeleteApiKey(UserResponses, DeleteApiKeyResponse): pass
+
+class UserApi:
+  def __init__(self, request: Callable[[str, any, type[Res]], Res]):
+    self.request = request
+  async def _user(self, request: UserRequest, clz: type[Res]) -> Res:
+    return await self.request("/user", request, clz)
+
+  def userPushRecentlyViewed(self, params: PushRecentlyViewed) -> PushRecentlyViewedResponse:
+    return self._user(UserRequestPushRecentlyViewed(params = params), PushRecentlyViewedResponse)
+  def userSetLastSeenUpdate(self, params: SetLastSeenUpdate) -> SetLastSeenUpdateResponse:
+    return self._user(UserRequestSetLastSeenUpdate(params = params), SetLastSeenUpdateResponse)
+  def userCreateApiKey(self, params: CreateApiKey) -> CreateApiKeyResponse:
+    return self._user(UserRequestCreateApiKey(params = params), CreateApiKeyResponse)
+  def userDeleteApiKey(self, params: DeleteApiKey) -> DeleteApiKeyResponse:
+    return self._user(UserRequestDeleteApiKey(params = params), DeleteApiKeyResponse)
+  
 
 
+class ReadApi:
+  def __init__(self, request: Callable[[str, any, type[Res]], Res]):
+    self.request = request
+  async def _read(self, request: ReadRequest, clz: type[Res]) -> Res:
+    return await self.request("/read", request, clz)
 
-class ReadResponses: pass
-
-class GetVersion(ReadResponses, GetVersionResponse): pass
-class GetCoreInfo(ReadResponses, GetCoreInfoResponse): pass
-class ListSecrets(ReadResponses, ListSecretsResponse): pass
-class ListGitProvidersFromConfig(ReadResponses, ListGitProvidersFromConfigResponse): pass
-class ListDockerRegistriesFromConfig(ReadResponses, ListDockerRegistriesFromConfigResponse): pass
-
-# ==== USER ====
-class GetUsername(ReadResponses, GetUsernameResponse): pass
-class GetPermission(ReadResponses, GetPermissionResponse): pass
-class FindUser(ReadResponses, FindUserResponse): pass
-class ListUsers(ReadResponses, ListUsersResponse): pass
-class ListApiKeys(ReadResponses, ListApiKeysResponse): pass
-class ListApiKeysForServiceUser(ReadResponses, ListApiKeysForServiceUserResponse): pass
-class ListPermissions(ReadResponses, ListPermissionsResponse): pass
-class ListUserTargetPermissions(ReadResponses, ListUserTargetPermissionsResponse): pass
-
-# ==== USER GROUP ====
-class GetUserGroup(ReadResponses, GetUserGroupResponse): pass
-class ListUserGroups(ReadResponses, ListUserGroupsResponse): pass
-
-# ==== PROCEDURE ====
-class GetProceduresSummary(ReadResponses, GetProceduresSummaryResponse): pass
-class GetProcedure(ReadResponses, GetProcedureResponse): pass
-class GetProcedureActionState(ReadResponses, GetProcedureActionStateResponse): pass
-class ListProcedures(ReadResponses, ListProceduresResponse): pass
-class ListFullProcedures(ReadResponses, ListFullProceduresResponse): pass
-
-# ==== ACTION ====
-class GetActionsSummary(ReadResponses, GetActionsSummaryResponse): pass
-class GetAction(ReadResponses, GetActionResponse): pass
-class GetActionActionState(ReadResponses, GetActionActionStateResponse): pass
-class ListActions(ReadResponses, ListActionsResponse): pass
-class ListFullActions(ReadResponses, ListFullActionsResponse): pass
-
-# ==== SCHEDULE ====
-class ListSchedules(ReadResponses, ListSchedulesResponse): pass
-
-# ==== SERVER ====
-class GetServersSummary(ReadResponses, GetServersSummaryResponse): pass
-class GetServer(ReadResponses, GetServerResponse): pass
-class GetServerState(ReadResponses, GetServerStateResponse): pass
-class GetPeripheryVersion(ReadResponses, GetPeripheryVersionResponse): pass
-class GetDockerContainersSummary(ReadResponses, GetDockerContainersSummaryResponse): pass
-class ListDockerContainers(ReadResponses, ListDockerContainersResponse): pass
-class ListAllDockerContainers(ReadResponses, ListAllDockerContainersResponse): pass
-class InspectDockerContainer(ReadResponses, InspectDockerContainerResponse):pass
-class GetResourceMatchingContainer(ReadResponses, GetResourceMatchingContainerResponse): pass
-class GetContainerLog(ReadResponses, GetContainerLogResponse): pass
-class SearchContainerLog(ReadResponses, SearchContainerLogResponse): pass
-class ListDockerNetworks(ReadResponses, ListDockerNetworksResponse): pass
-class InspectDockerNetwork(ReadResponses, InspectDockerNetworkResponse): pass
-class ListDockerImages(ReadResponses, ListDockerImagesResponse): pass
-class InspectDockerImage(ReadResponses, InspectDockerImageResponse): pass
-class ListDockerImageHistory(ReadResponses, ListDockerImageHistoryResponse): pass
-class ListDockerVolumes(ReadResponses, ListDockerVolumesResponse): pass
-class InspectDockerVolume(ReadResponses, InspectDockerVolumeResponse): pass
-class ListComposeProjects(ReadResponses, ListComposeProjectsResponse): pass
-class GetServerActionState(ReadResponses, GetServerActionStateResponse): pass
-class GetHistoricalServerStats(ReadResponses, GetHistoricalServerStatsResponse): pass
-class ListServers(ReadResponses, ListServersResponse): pass
-class ListFullServers(ReadResponses, ListFullServersResponse): pass
-class ListTerminals(ReadResponses, ListTerminalsResponse): pass
-
-# ==== STACK ====
-class GetStacksSummary(ReadResponses, GetStacksSummaryResponse): pass
-class GetStack(ReadResponses, GetStackResponse): pass
-class GetStackActionState(ReadResponses, GetStackActionStateResponse): pass
-class GetStackWebhooksEnabled(ReadResponses, GetStackWebhooksEnabledResponse): pass
-class GetStackLog(ReadResponses, GetStackLogResponse): pass
-class SearchStackLog(ReadResponses, SearchStackLogResponse): pass
-class InspectStackContainer(ReadResponses, InspectStackContainerResponse): pass
-class ListStacks(ReadResponses, ListStacksResponse): pass
-class ListFullStacks(ReadResponses, ListFullStacksResponse): pass
-class ListStackServices(ReadResponses, ListStackServicesResponse): pass
-class ListCommonStackExtraArgs(ReadResponses, ListCommonStackExtraArgsResponse): pass
-class ListCommonStackBuildExtraArgs(ReadResponses, ListCommonStackBuildExtraArgsResponse): pass
-
+  def getVersion(self, params: GetVersion) -> GetVersionResponse:
+    return self._read(ReadRequestGetVersion(params = params), GetVersionResponse)
+  def getCoreInfo(self, params: GetCoreInfo) -> GetCoreInfoResponse:
+    return self._read(ReadRequestGetCoreInfo(params = params), GetCoreInfoResponse)
+  def listSecrets(self, params: ListSecrets) -> ListSecretsResponse:
+    return self._read(ReadRequestListSecrets(params = params), ListSecretsResponse)
+  def listGitProvidersFromConfig(self, params: ListGitProvidersFromConfig) -> ListGitProvidersFromConfigResponse:
+    return self._read(ReadRequestListGitProvidersFromConfig(params = params), ListGitProvidersFromConfigResponse)
+  def listDockerRegistriesFromConfig(self, params: ListDockerRegistriesFromConfig) -> ListDockerRegistriesFromConfigResponse:
+    return self._read(ReadRequestListDockerRegistriesFromConfig(params = params), ListDockerRegistriesFromConfigResponse)
+  
+  # ==== USER ====
+  def getUsername(self, params: GetUsername) -> GetUsernameResponse:
+    return self._read(ReadRequestGetUsername(params = params), GetUsernameResponse)
+  def getPermission(self, params: GetPermission) -> GetPermissionResponse:
+    return self._read(ReadRequestGetPermission(params = params), GetPermissionResponse)
+  def findUser(self, params: FindUser) -> FindUserResponse:
+    return self._read(ReadRequestFindUser(params = params), FindUserResponse)
+  def listUsers(self, params: ListUsers) -> ListUsersResponse:
+    return self._read(ReadRequestListUsers(params = params), ListUsersResponse)
+  def listApiKeys(self, params: ListApiKeys) -> ListApiKeysResponse:
+    return self._read(ReadRequestListApiKeys(params = params), ListApiKeysResponse)
+  def listApiKeysForServiceUser(self, params: ListApiKeysForServiceUser) -> ListApiKeysForServiceUserResponse:
+    return self._read(ReadRequestListApiKeysForServiceUser(params = params), ListApiKeysForServiceUserResponse)
+  def listPermissions(self, params: ListPermissions) -> ListPermissionsResponse:
+    return self._read(ReadRequestListPermissions(params = params), ListPermissionsResponse)
+  def listUserTargetPermissions(self, params: ListUserTargetPermissions) -> ListUserTargetPermissionsResponse:
+    return self._read(ReadRequestListUserTargetPermissions(params = params), ListUserTargetPermissionsResponse)
+  
+  # ==== USER GROUP ====
+  def getUserGroup(self, params: GetUserGroup) -> GetUserGroupResponse:
+    return self._read(ReadRequestGetUserGroup(params = params), GetUserGroupResponse)
+  def listUserGroups(self, params: ListUserGroups) -> ListUserGroupsResponse:
+    return self._read(ReadRequestListUserGroups(params = params), ListUserGroupsResponse)
+  
+  # ==== PROCEDURE ====
+  def getProceduresSummary(self, params: GetProceduresSummary) -> GetProceduresSummaryResponse:
+    return self._read(ReadRequestGetProceduresSummary(params = params), GetProceduresSummaryResponse)
+  def getProcedure(self, params: GetProcedure) -> GetProcedureResponse:
+    return self._read(ReadRequestGetProcedure(params = params), GetProcedureResponse)
+  def getProcedureActionState(self, params: GetProcedureActionState) -> GetProcedureActionStateResponse:
+    return self._read(ReadRequestGetProcedureActionState(params = params), GetProcedureActionStateResponse)
+  def listProcedures(self, params: ListProcedures) -> ListProceduresResponse:
+    return self._read(ReadRequestListProcedures(params = params), ListProceduresResponse)
+  def listFullProcedures(self, params: ListFullProcedures) -> ListFullProceduresResponse:
+    return self._read(ReadRequestListFullProcedures(params = params), ListFullProceduresResponse)
+  
+  # ==== ACTION ====
+  def getActionsSummary(self, params: GetActionsSummary) -> GetActionsSummaryResponse:
+    return self._read(ReadRequestGetActionsSummary(params = params), GetActionsSummaryResponse)
+  def getAction(self, params: GetAction) -> GetActionResponse:
+    return self._read(ReadRequestGetAction(params = params), GetActionResponse)
+  def getActionActionState(self, params: GetActionActionState) -> GetActionActionStateResponse:
+    return self._read(ReadRequestGetActionActionState(params = params), GetActionActionStateResponse)
+  def listActions(self, params: ListActions) -> ListActionsResponse:
+    return self._read(ReadRequestListActions(params = params), ListActionsResponse)
+  def listFullActions(self, params: ListFullActions) -> ListFullActionsResponse:
+    return self._read(ReadRequestListFullActions(params = params), ListFullActionsResponse)
+  
+  # ==== SCHEDULE ====
+  def listSchedules(self, params: ListSchedules) -> ListSchedulesResponse:
+    return self._read(ReadRequestListSchedules(params = params), ListSchedulesResponse)
+  
+  # ==== SERVER ====
+  def getServersSummary(self, params: GetServersSummary) -> GetServersSummaryResponse:
+    return self._read(ReadRequestGetServersSummary(params = params), GetServersSummaryResponse)
+  def getServer(self, params: GetServer) -> GetServerResponse:
+    return self._read(ReadRequestGetServer(params = params), GetServerResponse)
+  def getServerState(self, params: GetServerState) -> GetServerStateResponse:
+    return self._read(ReadRequestGetServerState(params = params), GetServerStateResponse)
+  def getPeripheryVersion(self, params: GetPeripheryVersion) -> GetPeripheryVersionResponse:
+    return self._read(ReadRequestGetPeripheryVersion(params = params), GetPeripheryVersionResponse)
+  def getDockerContainersSummary(self, params: GetDockerContainersSummary) -> GetDockerContainersSummaryResponse:
+    return self._read(ReadRequestGetDockerContainersSummary(params = params), GetDockerContainersSummaryResponse)
+  def listDockerContainers(self, params: ListDockerContainers) -> ListDockerContainersResponse:
+    return self._read(ReadRequestListDockerContainers(params = params), ListDockerContainersResponse)
+  def listAllDockerContainers(self, params: ListAllDockerContainers) -> ListAllDockerContainersResponse:
+    return self._read(ReadRequestListAllDockerContainers(params = params), ListAllDockerContainersResponse)
+  def inspectDockerContainer(self, params: InspectDockerContainer) -> InspectDockerContainerResponse:
+    return self._read(ReadRequestInspectDockerContainer(params = params), InspectDockerContainerResponse)
+  def getResourceMatchingContainer(self, params: GetResourceMatchingContainer) -> GetResourceMatchingContainerResponse:
+    return self._read(ReadRequestGetResourceMatchingContainer(params = params), GetResourceMatchingContainerResponse)
+  def getContainerLog(self, params: GetContainerLog) -> GetContainerLogResponse:
+    return self._read(ReadRequestGetContainerLog(params = params), GetContainerLogResponse)
+  def searchContainerLog(self, params: SearchContainerLog) -> SearchContainerLogResponse:
+    return self._read(ReadRequestSearchContainerLog(params = params), SearchContainerLogResponse)
+  def listDockerNetworks(self, params: ListDockerNetworks) -> ListDockerNetworksResponse:
+    return self._read(ReadRequestListDockerNetworks(params = params), ListDockerNetworksResponse)
+  def inspectDockerNetwork(self, params: InspectDockerNetwork) -> InspectDockerNetworkResponse:
+    return self._read(ReadRequestInspectDockerNetwork(params = params), InspectDockerNetworkResponse)
+  def listDockerImages(self, params: ListDockerImages) -> ListDockerImagesResponse:
+    return self._read(ReadRequestListDockerImages(params = params), ListDockerImagesResponse)
+  def inspectDockerImage(self, params: InspectDockerImage) -> InspectDockerImageResponse:
+    return self._read(ReadRequestInspectDockerImage(params = params), InspectDockerImageResponse)
+  def listDockerImageHistory(self, params: ListDockerImageHistory) -> ListDockerImageHistoryResponse:
+    return self._read(ReadRequestListDockerImageHistory(params = params), ListDockerImageHistoryResponse)
+  def listDockerVolumes(self, params: ListDockerVolumes) -> ListDockerVolumesResponse:
+    return self._read(ReadRequestListDockerVolumes(params = params), ListDockerVolumesResponse)
+  def inspectDockerVolume(self, params: InspectDockerVolume) -> InspectDockerVolumeResponse:
+    return self._read(ReadRequestInspectDockerVolume(params = params), InspectDockerVolumeResponse)
+  def listComposeProjects(self, params: ListComposeProjects) -> ListComposeProjectsResponse:
+    return self._read(ReadRequestListComposeProjects(params = params), ListComposeProjectsResponse)
+  def getServerActionState(self, params: GetServerActionState) -> GetServerActionStateResponse:
+    return self._read(ReadRequestGetServerActionState(params = params), GetServerActionStateResponse)
+  def getHistoricalServerStats(self, params: GetHistoricalServerStats) -> GetHistoricalServerStatsResponse:
+    return self._read(ReadRequestGetHistoricalServerStats(params = params), GetHistoricalServerStatsResponse)
+  def listServers(self, params: ListServers) -> ListServersResponse:
+    return self._read(ReadRequestListServers(params = params), ListServersResponse)
+  def listFullServers(self, params: ListFullServers) -> ListFullServersResponse:
+    return self._read(ReadRequestListFullServers(params = params), ListFullServersResponse)
+  def listTerminals(self, params: ListTerminals) -> ListTerminalsResponse:
+    return self._read(ReadRequestListTerminals(params = params), ListTerminalsResponse)
+  
+  # ==== STACK ====
+  def getStacksSummary(self, params: GetStacksSummary) -> GetStacksSummaryResponse:
+    return self._read(ReadRequestGetStacksSummary(params = params), GetStacksSummaryResponse)
+  def getStack(self, params: GetStack) -> GetStackResponse:
+    return self._read(ReadRequestGetStack(params = params), GetStackResponse)
+  def getStackActionState(self, params: GetStackActionState) -> GetStackActionStateResponse:
+    return self._read(ReadRequestGetStackActionState(params = params), GetStackActionStateResponse)
+  def getStackWebhooksEnabled(self, params: GetStackWebhooksEnabled) -> GetStackWebhooksEnabledResponse:
+    return self._read(ReadRequestGetStackWebhooksEnabled(params = params), GetStackWebhooksEnabledResponse)
+  def getStackLog(self, params: GetStackLog) -> GetStackLogResponse:
+    return self._read(ReadRequestGetStackLog(params = params), GetStackLogResponse)
+  def searchStackLog(self, params: SearchStackLog) -> SearchStackLogResponse:
+    return self._read(ReadRequestSearchStackLog(params = params), SearchStackLogResponse)
+  def inspectStackContainer(self, params: InspectStackContainer) -> InspectStackContainerResponse:
+    return self._read(ReadRequestInspectStackContainer(params = params), InspectStackContainerResponse)
+  def listStacks(self, params: ListStacks) -> ListStacksResponse:
+    return self._read(ReadRequestListStacks(params = params), ListStacksResponse)
+  def listFullStacks(self, params: ListFullStacks) -> ListFullStacksResponse:
+    return self._read(ReadRequestListFullStacks(params = params), ListFullStacksResponse)
+  def listStackServices(self, params: ListStackServices) -> ListStackServicesResponse:
+    return self._read(ReadRequestListStackServices(params = params), ListStackServicesResponse)
+  def listCommonStackExtraArgs(self, params: ListCommonStackExtraArgs) -> ListCommonStackExtraArgsResponse:
+    return self._read(ReadRequestListCommonStackExtraArgs(params = params), ListCommonStackExtraArgsResponse)
+  def listCommonStackBuildExtraArgs(self, params: ListCommonStackBuildExtraArgs) -> ListCommonStackBuildExtraArgsResponse:
+    return self._read(ReadRequestListCommonStackBuildExtraArgs(params = params), ListCommonStackBuildExtraArgsResponse)
+  
   # ==== DEPLOYMENT ====
-class GetDeploymentsSummary(ReadResponses, GetDeploymentsSummaryResponse): pass
-class GetDeployment(ReadResponses, GetDeploymentResponse): pass
-class GetDeploymentContainer(ReadResponses, GetDeploymentContainerResponse): pass
-class GetDeploymentActionState(ReadResponses, GetDeploymentActionStateResponse): pass
-class GetDeploymentStats(ReadResponses, GetDeploymentStatsResponse): pass
-class GetDeploymentLog(ReadResponses, GetDeploymentLogResponse): pass
-class SearchDeploymentLog(ReadResponses, SearchDeploymentLogResponse): pass
-class InspectDeploymentContainer(ReadResponses, InspectDeploymentContainerResponse): pass
-class ListDeployments(ReadResponses, ListDeploymentsResponse): pass
-class ListFullDeployments(ReadResponses, ListFullDeploymentsResponse): pass
-class ListCommonDeploymentExtraArgs(ReadResponses, ListCommonDeploymentExtraArgsResponse): pass
-
+  def getDeploymentsSummary(self, params: GetDeploymentsSummary) -> GetDeploymentsSummaryResponse:
+    return self._read(ReadRequestGetDeploymentsSummary(params = params), GetDeploymentsSummaryResponse)
+  def getDeployment(self, params: GetDeployment) -> GetDeploymentResponse:
+    return self._read(ReadRequestGetDeployment(params = params), GetDeploymentResponse)
+  def getDeploymentContainer(self, params: GetDeploymentContainer) -> GetDeploymentContainerResponse:
+    return self._read(ReadRequestGetDeploymentContainer(params = params), GetDeploymentContainerResponse)
+  def getDeploymentActionState(self, params: GetDeploymentActionState) -> GetDeploymentActionStateResponse:
+    return self._read(ReadRequestGetDeploymentActionState(params = params), GetDeploymentActionStateResponse)
+  def getDeploymentStats(self, params: GetDeploymentStats) -> GetDeploymentStatsResponse:
+    return self._read(ReadRequestGetDeploymentStats(params = params), GetDeploymentStatsResponse)
+  def getDeploymentLog(self, params: GetDeploymentLog) -> GetDeploymentLogResponse:
+    return self._read(ReadRequestGetDeploymentLog(params = params), GetDeploymentLogResponse)
+  def searchDeploymentLog(self, params: SearchDeploymentLog) -> SearchDeploymentLogResponse:
+    return self._read(ReadRequestSearchDeploymentLog(params = params), SearchDeploymentLogResponse)
+  def inspectDeploymentContainer(self, params: InspectDeploymentContainer) -> InspectDeploymentContainerResponse:
+    return self._read(ReadRequestInspectDeploymentContainer(params = params), InspectDeploymentContainerResponse)
+  def listDeployments(self, params: ListDeployments) -> ListDeploymentsResponse:
+    return self._read(ReadRequestListDeployments(params = params), ListDeploymentsResponse)
+  def listFullDeployments(self, params: ListFullDeployments) -> ListFullDeploymentsResponse:
+    return self._read(ReadRequestListFullDeployments(params = params), ListFullDeploymentsResponse)
+  def listCommonDeploymentExtraArgs(self, params: ListCommonDeploymentExtraArgs) -> ListCommonDeploymentExtraArgsResponse:
+    return self._read(ReadRequestListCommonDeploymentExtraArgs(params = params), ListCommonDeploymentExtraArgsResponse)
+  
   # ==== BUILD ====
-class GetBuildsSummary(ReadResponses, GetBuildsSummaryResponse): pass
-class GetBuild(ReadResponses, GetBuildResponse): pass
-class GetBuildActionState(ReadResponses, GetBuildActionStateResponse): pass
-class GetBuildMonthlyStats(ReadResponses, GetBuildMonthlyStatsResponse): pass
-class GetBuildWebhookEnabled(ReadResponses, GetBuildWebhookEnabledResponse): pass
-class ListBuilds(ReadResponses, ListBuildsResponse): pass
-class ListFullBuilds(ReadResponses, ListFullBuildsResponse): pass
-class ListBuildVersions(ReadResponses, ListBuildVersionsResponse): pass
-class ListCommonBuildExtraArgs(ReadResponses, ListCommonBuildExtraArgsResponse): pass
-
+  def getBuildsSummary(self, params: GetBuildsSummary) -> GetBuildsSummaryResponse:
+    return self._read(ReadRequestGetBuildsSummary(params = params), GetBuildsSummaryResponse)
+  def getBuild(self, params: GetBuild) -> GetBuildResponse:
+    return self._read(ReadRequestGetBuild(params = params), GetBuildResponse)
+  def getBuildActionState(self, params: GetBuildActionState) -> GetBuildActionStateResponse:
+    return self._read(ReadRequestGetBuildActionState(params = params), GetBuildActionStateResponse)
+  def getBuildMonthlyStats(self, params: GetBuildMonthlyStats) -> GetBuildMonthlyStatsResponse:
+    return self._read(ReadRequestGetBuildMonthlyStats(params = params), GetBuildMonthlyStatsResponse)
+  def getBuildWebhookEnabled(self, params: GetBuildWebhookEnabled) -> GetBuildWebhookEnabledResponse:
+    return self._read(ReadRequestGetBuildWebhookEnabled(params = params), GetBuildWebhookEnabledResponse)
+  def listBuilds(self, params: ListBuilds) -> ListBuildsResponse:
+    return self._read(ReadRequestListBuilds(params = params), ListBuildsResponse)
+  def listFullBuilds(self, params: ListFullBuilds) -> ListFullBuildsResponse:
+    return self._read(ReadRequestListFullBuilds(params = params), ListFullBuildsResponse)
+  def listBuildVersions(self, params: ListBuildVersions) -> ListBuildVersionsResponse:
+    return self._read(ReadRequestListBuildVersions(params = params), ListBuildVersionsResponse)
+  def listCommonBuildExtraArgs(self, params: ListCommonBuildExtraArgs) -> ListCommonBuildExtraArgsResponse:
+    return self._read(ReadRequestListCommonBuildExtraArgs(params = params), ListCommonBuildExtraArgsResponse)
+  
   # ==== REPO ====
-class GetReposSummary(ReadResponses, GetReposSummaryResponse): pass
-class GetRepo(ReadResponses, GetRepoResponse): pass
-class GetRepoActionState(ReadResponses, GetRepoActionStateResponse): pass
-class GetRepoWebhooksEnabled(ReadResponses, GetRepoWebhooksEnabledResponse): pass
-class ListRepos(ReadResponses, ListReposResponse): pass
-class ListFullRepos(ReadResponses, ListFullReposResponse): pass
+  def getReposSummary(self, params: GetReposSummary) -> GetReposSummaryResponse:
+    return self._read(ReadRequestGetReposSummary(params = params), GetReposSummaryResponse)
+  def getRepo(self, params: GetRepo) -> GetRepoResponse:
+    return self._read(ReadRequestGetRepo(params = params), GetRepoResponse)
+  def getRepoActionState(self, params: GetRepoActionState) -> GetRepoActionStateResponse:
+    return self._read(ReadRequestGetRepoActionState(params = params), GetRepoActionStateResponse)
+  def getRepoWebhooksEnabled(self, params: GetRepoWebhooksEnabled) -> GetRepoWebhooksEnabledResponse:
+    return self._read(ReadRequestGetRepoWebhooksEnabled(params = params), GetRepoWebhooksEnabledResponse)
+  def listRepos(self, params: ListRepos) -> ListReposResponse:
+    return self._read(ReadRequestListRepos(params = params), ListReposResponse)
+  def listFullRepos(self, params: ListFullRepos) -> ListFullReposResponse:
+    return self._read(ReadRequestListFullRepos(params = params), ListFullReposResponse)
 
   # ==== SYNC ====
-class GetResourceSyncsSummary(ReadResponses, GetResourceSyncsSummaryResponse): pass
-class GetResourceSync(ReadResponses, GetResourceSyncResponse): pass
-class GetResourceSyncActionState(ReadResponses, GetResourceSyncActionStateResponse): pass
-class GetSyncWebhooksEnabled(ReadResponses, GetSyncWebhooksEnabledResponse): pass
-class ListResourceSyncs(ReadResponses, ListResourceSyncsResponse): pass
-class ListFullResourceSyncs(ReadResponses, ListFullResourceSyncsResponse): pass
-
+  def getResourceSyncsSummary(self, params: GetResourceSyncsSummary) -> GetResourceSyncsSummaryResponse:
+    return self._read(ReadRequestGetResourceSyncsSummary(params = params), GetResourceSyncsSummaryResponse)
+  def getResourceSync(self, params: GetResourceSync) -> GetResourceSyncResponse:
+    return self._read(ReadRequestGetResourceSync(params = params), GetResourceSyncResponse)
+  def getResourceSyncActionState(self, params: GetResourceSyncActionState) -> GetResourceSyncActionStateResponse:
+    return self._read(ReadRequestGetResourceSyncActionState(params = params), GetResourceSyncActionStateResponse)
+  def getSyncWebhooksEnabled(self, params: GetSyncWebhooksEnabled) -> GetSyncWebhooksEnabledResponse:
+    return self._read(ReadRequestGetSyncWebhooksEnabled(params = params), GetSyncWebhooksEnabledResponse)
+  def listResourceSyncs(self, params: ListResourceSyncs) -> ListResourceSyncsResponse:
+    return self._read(ReadRequestListResourceSyncs(params = params), ListResourceSyncsResponse)
+  def listFullResourceSyncs(self, params: ListFullResourceSyncs) -> ListFullResourceSyncsResponse:
+    return self._read(ReadRequestListFullResourceSyncs(params = params), ListFullResourceSyncsResponse)
+  
   # ==== BUILDER ====
-class GetBuildersSummary(ReadResponses, GetBuildersSummaryResponse): pass
-class GetBuilder(ReadResponses, GetBuilderResponse): pass
-class ListBuilders(ReadResponses, ListBuildersResponse): pass
-class ListFullBuilders(ReadResponses, ListFullBuildersResponse): pass
-
+  def getBuildersSummary(self, params: GetBuildersSummary) -> GetBuildersSummaryResponse:
+    return self._read(ReadRequestGetBuildersSummary(params = params), GetBuildersSummaryResponse)
+  def getBuilder(self, params: GetBuilder) -> GetBuilderResponse:
+    return self._read(ReadRequestGetBuilder(params = params), GetBuilderResponse)
+  def listBuilders(self, params: ListBuilders) -> ListBuildersResponse:
+    return self._read(ReadRequestListBuilders(params = params), ListBuildersResponse)
+  def listFullBuilders(self, params: ListFullBuilders) -> ListFullBuildersResponse:
+    return self._read(ReadRequestListFullBuilders(params = params), ListFullBuildersResponse)
+  
   # ==== ALERTER ====
-class GetAlertersSummary(ReadResponses, GetAlertersSummaryResponse): pass
-class GetAlerter(ReadResponses, GetAlerterResponse): pass
-class ListAlerters(ReadResponses, ListAlertersResponse): pass
-class ListFullAlerters(ReadResponses, ListFullAlertersResponse): pass
-
+  def getAlertersSummary(self, params: GetAlertersSummary) -> GetAlertersSummaryResponse:
+    return self._read(ReadRequestGetAlertersSummary(params = params), GetAlertersSummaryResponse)
+  def getAlerter(self, params: GetAlerter) -> GetAlerterResponse:
+    return self._read(ReadRequestGetAlerter(params = params), GetAlerterResponse)
+  def listAlerters(self, params: ListAlerters) -> ListAlertersResponse:
+    return self._read(ReadRequestListAlerters(params = params), ListAlertersResponse)
+  def listFullAlerters(self, params: ListFullAlerters) -> ListFullAlertersResponse:
+    return self._read(ReadRequestListFullAlerters(params = params), ListFullAlertersResponse)
+  
   # ==== TOML ====
-class ExportAllResourcesToToml(ReadResponses, ExportAllResourcesToTomlResponse): pass
-class ExportResourcesToToml(ReadResponses, ExportResourcesToTomlResponse): pass
-
+  def exportAllResourcesToToml(self, params: ExportAllResourcesToToml) -> ExportAllResourcesToTomlResponse:
+    return self._read(ReadRequestExportAllResourcesToToml(params = params), ExportAllResourcesToTomlResponse)
+  def exportResourcesToToml(self, params: ExportResourcesToToml) -> ExportResourcesToTomlResponse:
+    return self._read(ReadRequestExportResourcesToToml(params = params), ExportResourcesToTomlResponse)
+  
   # ==== TAG ====
-class GetTag(ReadResponses, GetTagResponse): pass
-class ListTags(ReadResponses, ListTagsResponse): pass
-
+  def getTag(self, params: GetTag) -> GetTagResponse:
+    return self._read(ReadRequestGetTag(params = params), GetTagResponse)
+  def listTags(self, params: ListTags) -> ListTagsResponse:
+    return self._read(ReadRequestListTags(params = params), ListTagsResponse)
+  
   # ==== UPDATE ====
-class GetUpdate(ReadResponses, GetUpdateResponse): pass
-class ListUpdates(ReadResponses, ListUpdatesResponse): pass
+  def getUpdate(self, params: GetUpdate) -> GetUpdateResponse:
+    return self._read(ReadRequestGetUpdate(params = params), GetUpdateResponse)
+  def listUpdates(self, params: ListUpdates) -> ListUpdatesResponse:
+    return self._read(ReadRequestListUpdates(params = params), ListUpdatesResponse)
 
   # ==== ALERT ====
-class ListAlerts(ReadResponses, ListAlertsResponse): pass
-class GetAlert(ReadResponses, GetAlertResponse): pass
+  def listAlerts(self, params: ListAlerts) -> ListAlertsResponse:
+    return self._read(ReadRequestListAlerts(params = params), ListAlertsResponse)
+  def getAlert(self, params: GetAlert) -> GetAlertResponse:
+    return self._read(ReadRequestGetAlert(params = params), GetAlertResponse)
 
   # ==== SERVER STATS ====
-class GetSystemInformation(ReadResponses, GetSystemInformationResponse): pass
-class GetSystemStats(ReadResponses, GetSystemStatsResponse): pass
-class ListSystemProcesses(ReadResponses, ListSystemProcessesResponse): pass
+  def getSystemInformation(self, params: GetSystemInformation) -> GetSystemInformationResponse:
+    return self._read(ReadRequestGetSystemInformation(params = params), GetSystemInformationResponse)
+  def getSystemStats(self, params: GetSystemStats) -> GetSystemStatsResponse:
+    return self._read(ReadRequestGetSystemStats(params = params), GetSystemStatsResponse)
+  def listSystemProcesses(self, params: ListSystemProcesses) -> ListSystemProcessesResponse:
+    return self._read(ReadRequestListSystemProcesses(params = params), ListSystemProcessesResponse)
 
   # ==== VARIABLE ====
-class GetVariable(ReadResponses, GetVariableResponse): pass
-class ListVariables(ReadResponses, ListVariablesResponse): pass
+  def getVariable(self, params: GetVariable) -> GetVariableResponse:
+    return self._read(ReadRequestGetVariable(params = params), GetVariableResponse)
+  def listVariables(self, params: ListVariables) -> ListVariablesResponse:
+    return self._read(ReadRequestListVariables(params = params), ListVariablesResponse)
 
   # ==== PROVIDER ====
-class GetGitProviderAccount(ReadResponses, GetGitProviderAccountResponse): pass
-class ListGitProviderAccounts(ReadResponses, ListGitProviderAccountsResponse): pass
-class GetDockerRegistryAccount(ReadResponses, GetDockerRegistryAccountResponse): pass
-class ListDockerRegistryAccounts(ReadResponses, ListDockerRegistryAccountsResponse): pass
+  def getGitProviderAccount(self, params: GetGitProviderAccount) -> GetGitProviderAccountResponse:
+    return self._read(ReadRequestGetGitProviderAccount(params = params), GetGitProviderAccountResponse)
+  def listGitProviderAccounts(self, params: ListGitProviderAccounts) -> ListGitProviderAccountsResponse:
+    return self._read(ReadRequestListGitProviderAccounts(params = params), ListGitProviderAccountsResponse)
+  def getDockerRegistryAccount(self, params: GetDockerRegistryAccount) -> GetDockerRegistryAccountResponse:
+    return self._read(ReadRequestGetDockerRegistryAccount(params = params), GetDockerRegistryAccountResponse)
+  def listDockerRegistryAccounts(self, params: ListDockerRegistryAccounts) -> ListDockerRegistryAccountsResponse:
+    return self._read(ReadRequestListDockerRegistryAccounts(params = params), ListDockerRegistryAccountsResponse)
 
 
 
-class WriteResponses: pass
+class WriteApi:
+  def __init__(self, request: Callable[[str, any, type[Res]], Res]):
+    self.request = request
+  async def _write(self, request: WriteRequest, clz: type[Res]) -> Res:
+    return await self.request("/write", request, clz)
 
-# ==== USER ====
-class  UpdateUserUsername(WriteResponses, UpdateUserUsername): pass
-class  UpdateUserPassword(WriteResponses, UpdateUserPassword): pass
-class  DeleteUser(WriteResponses, DeleteUser): pass
-
+  # ==== USER ====
+  def updateUserUsername(self, params: UpdateUserUsername) -> UpdateUserUsernameResponse:
+    return self._write(WriteRequestUpdateUserUsername(params = params), UpdateUserUsernameResponse)
+  def updateUserPassword(self, params: UpdateUserPassword) -> UpdateUserPasswordResponse:
+    return self._write(WriteRequestUpdateUserPassword(params = params), UpdateUserPasswordResponse)
+  def deleteUser(self, params: DeleteUser) -> DeleteUserResponse:
+    return self._write(WriteRequestDeleteUser(params = params), DeleteUserResponse)
+  
   # ==== SERVICE USER ====
-class  CreateServiceUser(WriteResponses, CreateServiceUserResponse): pass
-class  UpdateServiceUserDescription(WriteResponses, UpdateServiceUserDescriptionResponse): pass
-class  CreateApiKeyForServiceUser(WriteResponses, CreateApiKeyForServiceUserResponse): pass
-class  DeleteApiKeyForServiceUser(WriteResponses, DeleteApiKeyForServiceUserResponse): pass
-
+  def createServiceUser(self, params: CreateServiceUser) -> CreateServiceUserResponse:
+    return self._write(WriteRequestCreateServiceUser(params = params), CreateServiceUserResponse)
+  def updateServiceUserDescription(self, params: UpdateServiceUserDescription) -> UpdateServiceUserDescriptionResponse:
+    return self._write(WriteRequestUpdateServiceUserDescription(params = params), UpdateServiceUserDescriptionResponse)
+  def createApiKeyForServiceUser(self, params: CreateApiKeyForServiceUser) -> CreateApiKeyForServiceUserResponse:
+    return self._write(WriteRequestCreateApiKeyForServiceUser(params = params), CreateApiKeyForServiceUserResponse)
+  def deleteApiKeyForServiceUser(self, params: DeleteApiKeyForServiceUser) -> DeleteApiKeyForServiceUserResponse:
+    return self._write(WriteRequestDeleteApiKeyForServiceUser(params = params), DeleteApiKeyForServiceUserResponse)
+  
   # ==== USER GROUP ====
-class  CreateUserGroup(WriteResponses, UserGroup): pass
-class  RenameUserGroup(WriteResponses, UserGroup): pass
-class  DeleteUserGroup(WriteResponses, UserGroup): pass
-class  AddUserToUserGroup(WriteResponses, UserGroup): pass
-class  RemoveUserFromUserGroup(WriteResponses, UserGroup): pass
-class  SetUsersInUserGroup(WriteResponses, UserGroup): pass
-class  SetEveryoneUserGroup(WriteResponses, UserGroup): pass
+  def createUserGroup(self, params: CreateUserGroup) -> UserGroup:
+    return self._write(WriteRequestCreateUserGroup(params = params), UserGroup)
+  def renameUserGroup(self, params: RenameUserGroup) -> UserGroup:
+    return self._write(WriteRequestRenameUserGroup(params = params), UserGroup)
+  def deleteUserGroup(self, params: DeleteUserGroup) -> UserGroup:
+    return self._write(WriteRequestDeleteUserGroup(params = params), UserGroup)
+  def addUserToUserGroup(self, params: AddUserToUserGroup) -> UserGroup:
+    return self._write(WriteRequestAddUserToUserGroup(params = params), UserGroup)
+  def removeUserFromUserGroup(self, params: RemoveUserFromUserGroup) -> UserGroup:
+    return self._write(WriteRequestRemoveUserFromUserGroup(params = params), UserGroup)
+  def setUsersInUserGroup(self, params: SetUsersInUserGroup) -> UserGroup:
+    return self._write(WriteRequestSetUsersInUserGroup(params = params), UserGroup)
+  def setEveryoneUserGroup(self, params: SetEveryoneUserGroup) -> UserGroup:
+    return self._write(WriteRequestSetEveryoneUserGroup(params = params), UserGroup)
 
   # ==== PERMISSIONS ====
-class  UpdateUserAdmin(WriteResponses, UpdateUserAdminResponse): pass
-class  UpdateUserBasePermissions(WriteResponses, UpdateUserBasePermissionsResponse): pass
-class  UpdatePermissionOnResourceType(WriteResponses, UpdatePermissionOnResourceTypeResponse): pass
-class  UpdatePermissionOnTarget(WriteResponses, UpdatePermissionOnTargetResponse): pass
-
+  def updateUserAdmin(self, params: UpdateUserAdmin) -> UpdateUserAdminResponse:
+    return self._write(WriteRequestUpdateUserAdmin(params = params), UpdateUserAdminResponse)
+  def updateUserBasePermissions(self, params: UpdateUserBasePermissions) -> UpdateUserBasePermissionsResponse:
+    return self._write(WriteRequestUpdateUserBasePermissions(params = params), UpdateUserBasePermissionsResponse)
+  def updatePermissionOnResourceType(self, params: UpdatePermissionOnResourceType) -> UpdatePermissionOnResourceTypeResponse:
+    return self._write(WriteRequestUpdatePermissionOnResourceType(params = params), UpdatePermissionOnResourceTypeResponse)
+  def updatePermissionOnTarget(self, params: UpdatePermissionOnTarget) -> UpdatePermissionOnTargetResponse:
+    return self._write(WriteRequestUpdatePermissionOnTarget(params = params), UpdatePermissionOnTargetResponse)
+  
   # ==== DESCRIPTION ====
-class  UpdateDescription(WriteResponses, UpdateDescriptionResponse): pass
-
+  def updateDescription(self, params: UpdateDescription) -> UpdateDescriptionResponse:
+    return self._write(WriteRequestUpdateDescription(params = params), UpdateDescriptionResponse)
+  
   # ==== SERVER ====
-class  CreateServer(WriteResponses, Server): pass
-class  DeleteServer(WriteResponses, Server): pass
-class UpdateServer(WriteResponses, Server): pass
-class  RenameServer(WriteResponses, Update): pass
-class  CreateNetwork(WriteResponses, Update): pass
-class  CreateTerminal(WriteResponses, NoData): pass
-class  DeleteTerminal(WriteResponses, NoData): pass
-class  DeleteAllTerminals(WriteResponses, NoData): pass
+  def createServer(self, params: CreateServer) -> Server:
+    return self._write(WriteRequestCreateServer(params = params), Server)
+  def deleteServer(self, params: DeleteServer) -> Server:
+    return self._write(WriteRequestDeleteServer(params = params), Server)
+  def updateServer(self, params: UpdateServer) -> Server:
+    return self._write(WriteRequestUpdateServer(params = params), Server)
+  def renameServer(self, params: RenameServer) -> Update:
+    return self._write(WriteRequestRenameServer(params = params), Update)
+  def createNetwork(self, params: CreateNetwork) -> Update:
+    return self._write(WriteRequestCreateNetwork(params = params), Update)
+  def createTerminal(self, params: CreateTerminal) -> NoData:
+    return self._write(WriteRequestCreateTerminal(params = params), NoData)
+  def deleteTerminal(self, params: DeleteTerminal) -> NoData:
+    return self._write(WriteRequestDeleteTerminal(params = params), NoData)
+  def deleteAllTerminals(self, params: DeleteAllTerminals) -> NoData:
+    return self._write(WriteRequestDeleteAllTerminals(params = params), NoData)
 
   # ==== STACK ====
-class  CreateStack(WriteResponses, Stack): pass
-class  CopyStack(WriteResponses, Stack): pass
-class  DeleteStack(WriteResponses, Stack): pass
-class  UpdateStack(WriteResponses, Stack): pass
-class  RenameStack(WriteResponses, Update): pass
-class  WriteStackFileContents(WriteResponses, Update): pass
-class  RefreshStackCache(WriteResponses, NoData): pass
-class  CreateStackWebhook(WriteResponses, CreateStackWebhookResponse): pass
-class  DeleteStackWebhook(WriteResponses, DeleteStackWebhookResponse): pass
-
+  def createStack(self, params: CreateStack) -> Stack:
+    return self._write(WriteRequestCreateStack(params = params), Stack)
+  def copyStack(self, params: CopyStack) -> Stack:
+    return self._write(WriteRequestCopyStack(params = params), Stack)
+  def deleteStack(self, params: DeleteStack) -> Stack:
+    return self._write(WriteRequestDeleteStack(params = params), Stack)
+  def updateStack(self, params: UpdateStack) -> Stack:
+    return self._write(WriteRequestUpdateStack(params = params), Stack)
+  def renameStack(self, params: RenameStack) -> Update:
+    return self._write(WriteRequestRenameStack(params = params), Update)
+  def writeStackFileContents(self, params: WriteStackFileContents) -> Update:
+    return self._write(WriteRequestWriteStackFileContents(params = params), Update)
+  def refreshStackCache(self, params: RefreshStackCache) -> NoData:
+    return self._write(WriteRequestRefreshStackCache(params = params), NoData)
+  def createStackWebhook(self, params: CreateStackWebhook) -> CreateStackWebhookResponse:
+    return self._write(WriteRequestCreateStackWebhook(params = params), CreateStackWebhookResponse)
+  def deleteStackWebhook(self, params: DeleteStackWebhook) -> DeleteStackWebhookResponse:
+    return self._write(WriteRequestDeleteStackWebhook(params = params), DeleteStackWebhookResponse)
+  
   # ==== DEPLOYMENT ====
-class  CreateDeployment(WriteResponses, Deployment): pass
-class  CopyDeployment(WriteResponses, Deployment): pass
-class  CreateDeploymentFromContainer(WriteResponses, Deployment): pass
-class  DeleteDeployment(WriteResponses, Deployment): pass
-class  UpdateDeployment(WriteResponses, Deployment): pass
-class  RenameDeployment(WriteResponses, Update): pass
-
+  def createDeployment(self, params: CreateDeployment) -> Deployment:
+    return self._write(WriteRequestCreateDeployment(params = params), Deployment)
+  def copyDeployment(self, params: CopyDeployment) -> Deployment:
+    return self._write(WriteRequestCopyDeployment(params = params), Deployment)
+  def createDeploymentFromContainer(self, params: CreateDeploymentFromContainer) -> Deployment:
+    return self._write(WriteRequestCreateDeploymentFromContainer(params = params), Deployment)
+  def deleteDeployment(self, params: DeleteDeployment) -> Deployment:
+    return self._write(WriteRequestDeleteDeployment(params = params), Deployment)
+  def updateDeployment(self, params: UpdateDeployment) -> Deployment:
+    return self._write(WriteRequestUpdateDeployment(params = params), Deployment)
+  def renameDeployment(self, params: RenameDeployment) -> Update:
+    return self._write(WriteRequestRenameDeployment(params = params), Update)
+  
   # ==== BUILD ====
-class  CreateBuild(WriteResponses, Build): pass
-class  CopyBuild(WriteResponses, Build): pass
-class  DeleteBuild(WriteResponses, Build): pass
-class  UpdateBuild(WriteResponses, Build): pass
-class  RenameBuild(WriteResponses, Update): pass
-class  WriteBuildFileContents(WriteResponses, Update): pass
-class  RefreshBuildCache(WriteResponses, NoData): pass
-class  CreateBuildWebhook(WriteResponses, CreateBuildWebhookResponse): pass
-class  DeleteBuildWebhook(WriteResponses, DeleteBuildWebhookResponse): pass
-
+  def createBuild(self, params: CreateBuild) -> Build:
+    return self._write(WriteRequestCreateBuild(params = params), Build)
+  def copyBuild(self, params: CopyBuild) -> Build:
+    return self._write(WriteRequestCopyBuild(params = params), Build)
+  def deleteBuild(self, params: DeleteBuild) -> Build:
+    return self._write(WriteRequestDeleteBuild(params = params), Build)
+  def updateBuild(self, params: UpdateBuild) -> Build:
+    return self._write(WriteRequestUpdateBuild(params = params), Build)
+  def refreshBuildCache(self, params: RefreshBuildCache) -> NoData:
+    return self._write(WriteRequestRefreshBuildCache(params = params), NoData)
+  def createBuildWebhook(self, params: CreateBuildWebhook) -> CreateBuildWebhookResponse:
+    return self._write(WriteRequestCreateBuildWebhook(params = params), CreateBuildWebhookResponse)
+  def deleteBuildWebhook(self, params: DeleteBuildWebhook) -> DeleteBuildWebhookResponse:
+    return self._write(WriteRequestDeleteBuildWebhook(params = params), DeleteBuildWebhookResponse)
+  
   # ==== BUILDER ====
-class  CreateBuilder(WriteResponses, Builder): pass
-class  CopyBuilder(WriteResponses, Builder): pass
-class  DeleteBuilder(WriteResponses, Builder): pass
-class  UpdateBuilder(WriteResponses, Builder): pass
-class  RenameBuilder(WriteResponses, Update): pass
-
+  def createBuilder(self, params: CreateBuilder) -> Builder:
+    return self._write(WriteRequestCreateBuilder(params = params), Builder)
+  def copyBuilder(self, params: CopyBuilder) -> Builder:
+    return self._write(WriteRequestCopyBuilder(params = params), Builder)
+  def deleteBuilder(self, params: DeleteBuilder) -> Builder:
+    return self._write(WriteRequestDeleteBuilder(params = params), Builder)
+  def updateBuilder(self, params: UpdateBuilder) -> Builder:
+    return self._write(WriteRequestUpdateBuilder(params = params), Builder)
+  def renameBuilder(self, params: RenameBuilder) -> Update:
+    return self._write(WriteRequestRenameBuilder(params = params), Update)
+  
   # ==== REPO ====
-class  CreateRepo(WriteResponses, Repo): pass
-class  CopyRepo(WriteResponses, Repo): pass
-class  DeleteRepo(WriteResponses, Repo): pass
-class  UpdateRepo(WriteResponses, Repo): pass
-class  RenameRepo(WriteResponses, Update): pass
-class  RefreshRepoCache(WriteResponses, NoData): pass
-class  CreateRepoWebhook(WriteResponses, CreateRepoWebhookResponse): pass
-class  DeleteRepoWebhook(WriteResponses, DeleteRepoWebhookResponse): pass
-
+  def createRepo(self, params: CreateRepo) -> Repo:
+    return self._write(WriteRequestCreateRepo(params = params), Repo)
+  def copyRepo(self, params: CopyRepo) -> Repo:
+    return self._write(WriteRequestCopyRepo(params = params), Repo)
+  def deleteRepo(self, params: DeleteRepo) -> Repo:
+    return self._write(WriteRequestDeleteRepo(params = params), Repo)
+  def updateRepo(self, params: UpdateRepo) -> Repo:
+    return self._write(WriteRequestUpdateRepo(params = params), Repo)
+  def renameRepo(self, params: RenameRepo) -> Update:
+    return self._write(WriteRequestRenameRepo(params = params), Update)
+  def refreshRepoCache(self, params: RefreshRepoCache) -> NoData:
+    return self._write(WriteRequestRefreshRepoCache(params = params), NoData)
+  def createRepoWebhook(self, params: CreateRepoWebhook) -> CreateRepoWebhookResponse:
+    return self._write(WriteRequestCreateRepoWebhook(params = params), CreateRepoWebhookResponse)
+  def deleteRepoWebhook(self, params: DeleteRepoWebhook) -> DeleteRepoWebhookResponse:
+    return self._write(WriteRequestDeleteRepoWebhook(params = params), DeleteRepoWebhookResponse)
+  
   # ==== ALERTER ====
-class  CreateAlerter(WriteResponses, Alerter): pass
-class  CopyAlerter(WriteResponses, Alerter): pass
-class  DeleteAlerter(WriteResponses, Alerter): pass
-class  UpdateAlerter(WriteResponses, Alerter): pass
-class  RenameAlerter(WriteResponses, Update): pass
-
+  def createAlerter(self, params: CreateAlerter) -> Alerter:
+    return self._write(WriteRequestCreateAlerter(params = params), Alerter)
+  def copyAlerter(self, params: CopyAlerter) -> Alerter:
+    return self._write(WriteRequestCopyAlerter(params = params), Alerter)
+  def deleteAlerter(self, params: DeleteAlerter) -> Alerter:
+    return self._write(WriteRequestDeleteAlerter(params = params), Alerter)
+  def updateAlerter(self, params: UpdateAlerter) -> Alerter:
+    return self._write(WriteRequestUpdateAlerter(params = params), Alerter)
+  def renameAlerter(self, params: RenameAlerter) -> Update:
+    return self._write(WriteRequestRenameAlerter(params = params), Update)
+  
   # ==== PROCEDURE ====
-class  CreateProcedure(WriteResponses, Procedure): pass
-class  CopyProcedure(WriteResponses, Procedure): pass
-class DeleteProcedure(WriteResponses, Procedure): pass
-class  UpdateProcedure(WriteResponses, Procedure): pass
-class  RenameProcedure(WriteResponses, Update): pass
-
+  def createProcedure(self, params: CreateProcedure) -> Procedure:
+    return self._write(WriteRequestCreateProcedure(params = params), Procedure)
+  def copyProcedure(self, params: CopyProcedure) -> Procedure:
+    return self._write(WriteRequestCopyProcedure(params = params), Procedure)
+  def deleteProcedure(self, params: DeleteProcedure) -> Procedure:
+    return self._write(WriteRequestDeleteProcedure(params = params), Procedure)
+  def updateProcedure(self, params: UpdateProcedure) -> Procedure:
+    return self._write(WriteRequestUpdateProcedure(params = params), Procedure)
+  def renameProcedure(self, params: RenameProcedure) -> Update:
+    return self._write(WriteRequestRenameProcedure(params = params), Update)
+  
   # ==== ACTION ====
-class  CreateAction(WriteResponses, Action): pass
-class  CopyAction(WriteResponses, Action): pass
-class  DeleteAction(WriteResponses, Action): pass
-class  UpdateAction(WriteResponses, Action): pass
-class  RenameAction(WriteResponses, Update): pass
+  def createAction(self, params: CreateAction) -> Action:
+    return self._write(WriteRequestCreateAction(params = params), Action)
+  def copyAction(self, params: CopyAction) -> Action:
+    return self._write(WriteRequestCopyAction(params = params), Action)
+  def deleteAction(self, params: DeleteAction) -> Action:
+    return self._write(WriteRequestDeleteAction(params = params), Action)
+  def updateAction(self, params: UpdateAction) -> Action:
+    return self._write(WriteRequestUpdateAction(params = params), Action)
+  def renameAction(self, params: RenameAction) -> Update:
+    return self._write(WriteRequestRenameAction(params = params), Update)
 
   # ==== SYNC ====
-class  CreateResourceSync(WriteResponses, ResourceSync): pass
-class  CopyResourceSync(WriteResponses, ResourceSync): pass
-class  DeleteResourceSync(WriteResponses, ResourceSync): pass
-class  UpdateResourceSync(WriteResponses, ResourceSync): pass
-class  RenameResourceSync(WriteResponses, Update): pass
-class  CommitSync(WriteResponses, ResourceSync): pass
-class  WriteSyncFileContents(WriteResponses, Update): pass
-class  RefreshResourceSyncPending(WriteResponses, ResourceSync): pass
-class  CreateSyncWebhook(WriteResponses, CreateSyncWebhookResponse): pass
-class  DeleteSyncWebhook(WriteResponses, DeleteSyncWebhookResponse): pass
+  def createResourceSync(self, params: CreateResourceSync) -> ResourceSync:
+    return self._write(WriteRequestCreateResourceSync(params = params), ResourceSync)
+  def copyResourceSync(self, params: CopyResourceSync) -> ResourceSync:
+    return self._write(WriteRequestCopyResourceSync(params = params), ResourceSync)
+  def deleteResourceSync(self, params: DeleteResourceSync) -> ResourceSync:
+    return self._write(WriteRequestDeleteResourceSync(params = params), ResourceSync)
+  def updateResourceSync(self, params: UpdateResourceSync) -> ResourceSync:
+    return self._write(WriteRequestUpdateResourceSync(params = params), ResourceSync)
+  def renameResourceSync(self, params: RenameResourceSync) -> Update:
+    return self._write(WriteRequestRenameResourceSync(params = params), Update)
+  def commitSync(self, params: CommitSync) -> ResourceSync:
+    return self._write(WriteRequestCommitSync(params = params), ResourceSync)
+  def writeSyncFileContents(self, params: WriteSyncFileContents) -> Update:
+    return self._write(WriteRequestWriteSyncFileContents(params = params), Update)
+  def refreshResourceSyncPending(self, params: RefreshResourceSyncPending) -> ResourceSync:
+    return self._write(WriteRequestRefreshResourceSyncPending(params = params), ResourceSync)
+  def createSyncWebhook(self, params: CreateSyncWebhook) -> CreateSyncWebhookResponse:
+    return self._write(WriteRequestCreateSyncWebhook(params = params), CreateSyncWebhookResponse)
+  def deleteSyncWebhook(self, params: DeleteSyncWebhook) -> DeleteSyncWebhookResponse:
+    return self._write(WriteRequestDeleteSyncWebhook(params = params), DeleteSyncWebhookResponse)
 
   # ==== TAG ====
-class  CreateTag(WriteResponses, Tag): pass
-class  DeleteTag(WriteResponses, Tag): pass
-class  RenameTag(WriteResponses, Tag): pass
-class  UpdateTagColor(WriteResponses, Tag): pass
-class  UpdateTagsOnResource(WriteResponses, UpdateTagsOnResourceResponse): pass
-
+  def createTag(self, params: CreateTag) -> Tag:
+    return self._write(WriteRequestCreateTag(params = params), Tag)
+  def deleteTag(self, params: DeleteTag) -> Tag:
+    return self._write(WriteRequestDeleteTag(params = params), Tag)
+  def renameTag(self, params: RenameTag) -> Tag:
+    return self._write(WriteRequestRenameTag(params = params), Tag)
+  def updateTagColor(self, params: UpdateTagColor) -> Tag:
+    return self._write(WriteRequestUpdateTagColor(params = params), Tag)
+  def updateTagsOnResource(self, params: UpdateTagsOnResource) -> UpdateTagsOnResourceResponse:
+    return self._write(WriteRequestUpdateTagsOnResource(params = params), UpdateTagsOnResourceResponse)
+  
   # ==== VARIABLE ====
-class  CreateVariable(WriteResponses, CreateVariableResponse): pass
-class  UpdateVariableValue(WriteResponses, UpdateVariableValueResponse): pass
-class  UpdateVariableDescription(WriteResponses, UpdateVariableDescriptionResponse): pass
-class  UpdateVariableIsSecret(WriteResponses, UpdateVariableIsSecretResponse): pass
-class  DeleteVariable(WriteResponses, DeleteVariableResponse): pass
-
+  def createVariable(self, params: CreateVariable) -> CreateVariableResponse:
+    return self._write(WriteRequestCreateVariable(params = params), CreateVariableResponse)
+  def updateVariableValue(self, params: UpdateVariableValue) -> UpdateVariableValueResponse:
+    return self._write(WriteRequestUpdateVariableValue(params = params), UpdateVariableValueResponse)
+  def updateVariableDescription(self, params: UpdateVariableDescription) -> UpdateVariableDescriptionResponse:
+    return self._write(WriteRequestUpdateVariableDescription(params = params), UpdateVariableDescriptionResponse)
+  def updateVariableIsSecret(self, params: UpdateVariableIsSecret) -> UpdateVariableIsSecretResponse:
+    return self._write(WriteRequestUpdateVariableIsSecret(params = params), UpdateVariableIsSecretResponse)
+  def deleteVariable(self, params: DeleteVariable) -> DeleteVariableResponse:
+    return self._write(WriteRequestDeleteVariable(params = params), DeleteVariableResponse)
+  
   # ==== PROVIDERS ====
-class  CreateGitProviderAccount(WriteResponses, CreateGitProviderAccountResponse): pass
-class  UpdateGitProviderAccount(WriteResponses, UpdateGitProviderAccountResponse): pass
-class  DeleteGitProviderAccount(WriteResponses, DeleteGitProviderAccountResponse): pass
-class  CreateDockerRegistryAccount(WriteResponses, CreateDockerRegistryAccountResponse): pass
-class  UpdateDockerRegistryAccount(WriteResponses, UpdateDockerRegistryAccountResponse): pass
-class  DeleteDockerRegistryAccount(WriteResponses, DeleteDockerRegistryAccountResponse): pass
+  def createGitProviderAccount(self, params: CreateGitProviderAccount) -> CreateGitProviderAccountResponse:
+    return self._write(WriteRequestCreateGitProviderAccount(params = params), CreateGitProviderAccountResponse)
+  def updateGitProviderAccount(self, params: UpdateGitProviderAccount) -> UpdateGitProviderAccountResponse:
+    return self._write(WriteRequestUpdateGitProviderAccount(params = params), UpdateGitProviderAccountResponse)
+  def deleteGitProviderAccount(self, params: DeleteGitProviderAccount) -> DeleteGitProviderAccountResponse:
+    return self._write(WriteRequestDeleteGitProviderAccount(params = params), DeleteGitProviderAccountResponse)
+  def createDockerRegistryAccount(self, params: CreateDockerRegistryAccount) -> CreateDockerRegistryAccountResponse:
+    return self._write(WriteRequestCreateDockerRegistryAccount(params = params), CreateDockerRegistryAccountResponse)
+  def updateDockerRegistryAccount(self, params: UpdateDockerRegistryAccount) -> UpdateDockerRegistryAccountResponse:
+    return self._write(WriteRequestUpdateDockerRegistryAccount(params = params), UpdateDockerRegistryAccountResponse)
+  def deleteDockerRegistryAccount(self, params: DeleteDockerRegistryAccount) -> DeleteDockerRegistryAccountResponse:
+    return self._write(WriteRequestDeleteDockerRegistryAccount(params = params), DeleteDockerRegistryAccountResponse)
 
 
 
-class ExecuteResponses: pass
+class ExecuteApi:
+  def __init__(self, request: Callable[[str, any, type[Res]], Res]):
+    self.request = request
+  async def _execute(self, request: ExecuteRequest, clz: type[Res]) -> Res:
+    return await self.request("/execute", request, clz)
 
   # ==== SERVER ====
-class  StartContainer(ExecuteResponses, Update): pass
-class  RestartContainer(ExecuteResponses, Update): pass
-class  PauseContainer(ExecuteResponses, Update): pass
-class UnpauseContainer(ExecuteResponses, Update): pass
-class  StopContainer(ExecuteResponses, Update): pass
-class  DestroyContainer(ExecuteResponses, Update): pass
-class  StartAllContainers(ExecuteResponses, Update): pass
-class  RestartAllContainers(ExecuteResponses, Update): pass
-class  PauseAllContainers(ExecuteResponses, Update): pass
-class  UnpauseAllContainers(ExecuteResponses, Update): pass
-class  StopAllContainers(ExecuteResponses, Update): pass
-class  PruneContainers(ExecuteResponses, Update): pass
-class  DeleteNetwork(ExecuteResponses, Update): pass
-class  PruneNetworks(ExecuteResponses, Update): pass
-class  DeleteImage(ExecuteResponses, Update): pass
-class  PruneImages(ExecuteResponses, Update): pass
-class  DeleteVolume(ExecuteResponses, Update): pass
-class  PruneVolumes(ExecuteResponses, Update): pass
-class  PruneDockerBuilders(ExecuteResponses, Update): pass
-class  PruneBuildx(ExecuteResponses, Update): pass
-class  PruneSystem(ExecuteResponses, Update): pass
+  def startContainer(self, params: StartContainer) -> Update:
+    return self._execute(ExecuteRequestStartContainer(params = params))
+  def restartContainer(self, params: RestartContainer) -> Update:
+    return self._execute(ExecuteRequestRestartContainer(params = params))
+  def pauseContainer(self, params: PauseContainer) -> Update:
+    return self._execute(ExecuteRequestPauseContainer(params = params))
+  def unpauseContainer(self, params: UnpauseContainer) -> Update:
+    return self._execute(ExecuteRequestUnpauseContainer(params = params))
+  def stopContainer(self, params: StopContainer) -> Update:
+    return self._execute(ExecuteRequestStopContainer(params = params))
+  def destroyContainer(self, params: DestroyContainer) -> Update:
+    return self._execute(ExecuteRequestDestroyContainer(params = params))
+  def startAllContainers(self, params: StartAllContainers) -> Update:
+    return self._execute(ExecuteRequestStartAllContainers(params = params))
+  def restartAllContainers(self, params: RestartAllContainers) -> Update:
+    return self._execute(ExecuteRequestRestartAllContainers(params = params))
+  def pauseAllContainers(self, params: PauseAllContainers) -> Update:
+    return self._execute(ExecuteRequestPauseAllContainers(params = params))
+  def unpauseAllContainers(self, params: UnpauseAllContainers) -> Update:
+    return self._execute(ExecuteRequestUnpauseAllContainers(params = params))
+  def stopAllContainers(self, params: StopAllContainers) -> Update:
+    return self._execute(ExecuteRequestStopAllContainers(params = params))
+  def pruneContainers(self, params: PruneContainers) -> Update:
+    return self._execute(ExecuteRequestPruneContainers(params = params))
+  def deleteNetwork(self, params: DeleteNetwork) -> Update:
+    return self._execute(ExecuteRequestDeleteNetwork(params = params))
+  def pruneNetworks(self, params: PruneNetworks) -> Update:
+    return self._execute(ExecuteRequestPruneNetworks(params = params))
+  def deleteImage(self, params: DeleteImage) -> Update:
+    return self._execute(ExecuteRequestDeleteImage(params = params))
+  def pruneImages(self, params: PruneImages) -> Update:
+    return self._execute(ExecuteRequestPruneImages(params = params))
+  def deleteVolume(self, params: DeleteVolume) -> Update:
+    return self._execute(ExecuteRequestDeleteVolume(params = params))
+  def pruneVolumes(self, params: PruneVolumes) -> Update:
+    return self._execute(ExecuteRequestPruneVolumes(params = params))
+  def pruneDockerBuilders(self, params: PruneDockerBuilders) -> Update:
+    return self._execute(ExecuteRequestPruneDockerBuilders(params = params))
+  def pruneBuildx(self, params: PruneBuildx) -> Update:
+    return self._execute(ExecuteRequestPruneBuildx(params = params))
+  def pruneSystem(self, params: PruneSystem) -> Update:
+    return self._execute(ExecuteRequestPruneSystem(params = params))
 
   # ==== STACK ====
-class  DeployStack(ExecuteResponses, Update): pass
-class  BatchDeployStack(ExecuteResponses, BatchExecutionResponse): pass
-class  DeployStackIfChanged(ExecuteResponses, Update): pass
-class  BatchDeployStackIfChanged(ExecuteResponses, BatchExecutionResponse): pass
-class  PullStack(ExecuteResponses, Update): pass
-class  BatchPullStack(ExecuteResponses, BatchExecutionResponse): pass
-class  StartStack(ExecuteResponses, Update): pass
-class  RestartStack(ExecuteResponses, Update): pass
-class  StopStack(ExecuteResponses, Update): pass
-class  PauseStack(ExecuteResponses, Update): pass
-class  UnpauseStack(ExecuteResponses, Update): pass
-class  DestroyStack(ExecuteResponses, Update): pass
-class  BatchDestroyStack(ExecuteResponses, BatchExecutionResponse): pass
-
+  def deployStack(self, params: DeployStack) -> Update:
+    return self._execute(ExecuteRequestDeployStack(params = params))
+  def batchDeployStack(self, params: BatchDeployStack) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchDeployStack(params = params))
+  def deployStackIfChanged(self, params: DeployStackIfChanged) -> Update:
+    return self._execute(ExecuteRequestDeployStackIfChanged(params = params))
+  def batchDeployStackIfChanged(self, params: BatchDeployStackIfChanged) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchDeployStackIfChanged(params = params))
+  def pullStack(self, params: PullStack) -> Update:
+    return self._execute(ExecuteRequestPullStack(params = params))
+  def batchPullStack(self, params: BatchPullStack) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchPullStack(params = params))
+  def startStack(self, params: StartStack) -> Update:
+    return self._execute(ExecuteRequestStartStack(params = params))
+  def restartStack(self, params: RestartStack) -> Update:
+    return self._execute(ExecuteRequestRestartStack(params = params))
+  def stopStack(self, params: StopStack) -> Update:
+    return self._execute(ExecuteRequestStopStack(params = params))
+  def pauseStack(self, params: PauseStack) -> Update:
+    return self._execute(ExecuteRequestPauseStack(params = params))
+  def unpauseStack(self, params: UnpauseStack) -> Update:
+    return self._execute(ExecuteRequestUnpauseStack(params = params))
+  def destroyStack(self, params: DestroyStack) -> Update:
+    return self._execute(ExecuteRequestDestroyStack(params = params))
+  def batchDestroyStack(self, params: BatchDestroyStack) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchDestroyStack(params = params))
+  
   # ==== DEPLOYMENT ====
-class  Deploy(ExecuteResponses, Update): pass
-class  BatchDeploy(ExecuteResponses, BatchExecutionResponse): pass
-class  PullDeployment(ExecuteResponses, Update): pass
-class  StartDeployment(ExecuteResponses, Update): pass
-class  RestartDeployment(ExecuteResponses, Update): pass
-class  PauseDeployment(ExecuteResponses, Update): pass
-class  UnpauseDeployment(ExecuteResponses, Update): pass
-class  StopDeployment(ExecuteResponses, Update): pass
-class  DestroyDeployment(ExecuteResponses, Update): pass
-class  BatchDestroyDeployment(ExecuteResponses, BatchExecutionResponse): pass
-
+  def deploy(self, params: Deploy) -> Update:
+    return self._execute(ExecuteRequestDeploy(params = params))
+  def batchDeploy(self, params: BatchDeploy) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchDeploy(params = params))
+  def pullDeployment(self, params: PullDeployment) -> Update:
+    return self._execute(ExecuteRequestPullDeployment(params = params))
+  def startDeployment(self, params: StartDeployment) -> Update:
+    return self._execute(ExecuteRequestStartDeployment(params = params))
+  def restartDeployment(self, params: RestartDeployment) -> Update:
+    return self._execute(ExecuteRequestRestartDeployment(params = params))
+  def pauseDeployment(self, params: PauseDeployment) -> Update:
+    return self._execute(ExecuteRequestPauseDeployment(params = params))
+  def unpauseDeployment(self, params: UnpauseDeployment) -> Update:
+    return self._execute(ExecuteRequestUnpauseDeployment(params = params))
+  def stopDeployment(self, params: StopDeployment) -> Update:
+    return self._execute(ExecuteRequestStopDeployment(params = params))
+  def destroyDeployment(self, params: DestroyDeployment) -> Update:
+    return self._execute(ExecuteRequestDestroyDeployment(params = params))
+  def batchDestroyDeployment(self, params: BatchDestroyDeployment) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchDestroyDeployment(params = params))
+  
   # ==== BUILD ====
-class  RunBuild(ExecuteResponses, Update): pass
-class  BatchRunBuild(ExecuteResponses, BatchExecutionResponse): pass
-class  CancelBuild(ExecuteResponses, Update): pass
-
+  def runBuild(self, params: RunBuild) -> Update:
+    return self._execute(ExecuteRequestRunBuild(params = params))
+  def batchRunBuild(self, params: BatchRunBuild) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchRunBuild(params = params))
+  def cancelBuild(self, params: CancelBuild) -> Update:
+    return self._execute(ExecuteRequestCancelBuild(params = params))
+  
   # ==== REPO ====
-class  CloneRepo(ExecuteResponses, Update): pass
-class  BatchCloneRepo(ExecuteResponses, BatchExecutionResponse): pass
-class  PullRepo(ExecuteResponses, Update): pass
-class  BatchPullRepo(ExecuteResponses, BatchExecutionResponse): pass
-class  BuildRepo(ExecuteResponses, Update): pass
-class  BatchBuildRepo(ExecuteResponses, BatchExecutionResponse): pass
-class  CancelRepoBuild(ExecuteResponses, Update): pass
-
+  def cloneRepo(self, params: CloneRepo) -> Update:
+    return self._execute(ExecuteRequestCloneRepo(params = params))
+  def batchCloneRepo(self, params: BatchCloneRepo) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchCloneRepo(params = params))
+  def pullRepo(self, params: PullRepo) -> Update:
+    return self._execute(ExecuteRequestPullRepo(params = params))
+  def batchPullRepo(self, params: BatchPullRepo) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchPullRepo(params = params))
+  def buildRepo(self, params: BuildRepo) -> Update:
+    return self._execute(ExecuteRequestBuildRepo(params = params))
+  def batchBuildRepo(self, params: BatchBuildRepo) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchBuildRepo(params = params))
+  def cancelRepoBuild(self, params: CancelRepoBuild) -> Update:
+    return self._execute(ExecuteRequestCancelRepoBuild(params = params))
+  
   # ==== PROCEDURE ====
-class  RunProcedure(ExecuteResponses, Update): pass
-class  BatchRunProcedure(ExecuteResponses, BatchExecutionResponse): pass
-
+  def runProcedure(self, params: RunProcedure) -> Update:
+    return self._execute(ExecuteRequestRunProcedure(params = params))
+  def batchRunProcedure(self, params: BatchRunProcedure) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchRunProcedure(params = params))
+  
   # ==== ACTION ====
-class  RunAction(ExecuteResponses, Update): pass
-class  BatchRunAction(ExecuteResponses, BatchExecutionResponse): pass
-
+  def runAction(self, params: RunAction) -> Update:
+    return self._execute(ExecuteRequestRunAction(params = params))
+  def batchRunAction(self, params: BatchRunAction) -> BatchExecutionResponse:
+    return self._execute(ExecuteRequestBatchRunAction(params = params))
+  
   # ==== SYNC ====
-class  RunSync(ExecuteResponses, Update): pass
-
+  def runSync(self, params: RunSync) -> Update:
+    return self._execute(ExecuteRequestRunSync(params = params))
+  
   # ==== STACK Service ====
-class  DeployStackService(ExecuteResponses, Update): pass
-class  StartStackService(ExecuteResponses, Update): pass
-class  RestartStackService(ExecuteResponses, Update): pass
-class  StopStackService(ExecuteResponses, Update): pass
-class  PauseStackService(ExecuteResponses, Update): pass
-class  UnpauseStackService(ExecuteResponses, Update): pass
-class  DestroyStackService(ExecuteResponses, Update): pass
-
+  # Not sure where these types are
+  #def deployStackService(self, params: DeployStackService) -> Update:
+  #  return self._execute(ExecuteRequestDeployStackService(params = params))
+  #def startStackService(self, params: StartStackService) -> Update:
+  #  return self._execute(ExecuteRequestStartStackService(params = params))
+  #def restartStackService(self, params: RestartStackService) -> Update:
+  #  return self._execute(ExecuteRequestRestartStackService(params = params))
+  #def stopStackService(self, params: StopStackService) -> Update:
+  #  return self._execute(ExecuteRequestStopStackService(params = params))
+  #def pauseStackService(self, params: PauseStackService) -> Update:
+  #  return self._execute(ExecuteRequestPauseStackService(params = params))
+  #def unpauseStackService(self, params: UnpauseStackService) -> Update:
+  #  return self._execute(ExecuteRequestUnpauseStackService(params = params))
+  #def destroyStackService(self, params: DestroyStackService) -> Update:
+  #  return self._execute(ExecuteRequestDestroyStackService(params = params))
+  
   # ==== ALERTER ====
-class  TestAlerter(ExecuteResponses, Update): pass
+  def testAlerter(self, params: TestAlerter) -> Update:
+    return self._execute(ExecuteRequestTestAlerter(params = params))

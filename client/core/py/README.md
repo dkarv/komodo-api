@@ -7,22 +7,20 @@ pip install komodo_dkarv
 ```
 
 ```py
-# TODO adjust example
-import { KomodoClient, Types } from "komodo_client";
+from komodo_api.lib import KomodoClient, ApiKeyInitOptions
+from komodo_api.types import *
 
-const komodo = KomodoClient("https://demo.komo.do", {
-  type: "api-key",
-  params: {
-    key: "your_key",
-    secret: "your secret",
-  },
-});
-
-// Inferred as Types.StackListItem[]
-const stacks = await komodo.read("ListStacks", {});
-
-// Inferred as Types.Stack
-const stack = await komodo.read("GetStack", {
-  stack: stacks[0].name,
-});
+api = KomodoClient(
+    url = "https://demo.komo.do/",
+    options = ApiKeyInitOptions(
+        key = "your-key",
+        secret = "your-secret",
+    ))
+    
+print(await api.auth.getUser(GetUser()))
+print(await api.auth.getLoginOptions(GetLoginOptions()))
+print(await api.read.listAlerts(ListAlerts()))
+print(await api.read.listServers(ListServers()))
+print(await api.read.listStacks(ListStacks()))
+print(await api.read.listUpdates(ListUpdates()))
 ```

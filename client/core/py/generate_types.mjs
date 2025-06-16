@@ -38,6 +38,18 @@ function moveToEndOfFile(lines, searchString) {
   }
 }
 
+function fixResourceTarget(lines) {
+  // I don't know what is wrong with ResourceTargetVariant, commenting it
+  return lines
+    .map(line => {
+      if (line.includes('ResourceTargetVariant')) {
+        return "#" + line;
+      } else {
+        return line;
+      }
+    });
+}
+
 function fix_types() {
   const types_path = __dirname + "/komodo_api/types.py";
   const contents = readFileSync(types_path);
@@ -47,8 +59,6 @@ function fix_types() {
     .replaceAll("I64 = number", 'I64 = int')
     .replaceAll("U64 = number", 'U64 = int')
     .replaceAll("Usize = number", 'Usize = int')
-    // Not sure where this Variant is coming from
-    .replaceAll("ResourceTargetVariant", "ResourceTarget")
     // Wrong escape in comment
     .replaceAll('"\\^','"\\\\^')
     // IndexMap and IndexSet don't exist
@@ -65,6 +75,7 @@ function fix_types() {
   moveToEndOfFile(lines, "_PartialUrlBuilderConfig = UrlBuilderConfig");
 
   lines = fixMongoDocument(lines);
+  lines = fixResourceTarget(lines);
 
   writeFileSync(types_path, lines.join("\n"));
 }

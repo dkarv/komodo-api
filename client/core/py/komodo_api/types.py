@@ -165,7 +165,7 @@ class ResourceListItem(BaseModel, Generic[Info]):
     """
     The resource id
     """
-    resource_type: ResourceTarget = Field(alias="type")
+#    resource_type: ResourceTargetVariant = Field(alias="type")
     """
     The resource type, ie `Server` or `Deployment`
     """
@@ -1644,11 +1644,11 @@ class User(BaseModel):
     """
     When the user last opened updates dropdown.
     """
-    recents: Optional[Dict[ResourceTarget, List[str]]] = Field(default=None)
+#    recents: Optional[Dict[ResourceTargetVariant, List[str]]] = Field(default=None)
     """
     Recently viewed ids
     """
-    all: Optional[Mapping[ResourceTarget, PermissionLevelAndSpecifics]] = Field(default=None)
+#    all: Optional[Mapping[ResourceTargetVariant, PermissionLevelAndSpecifics]] = Field(default=None)
     """
     Give the user elevated permissions on all resources of a certain type
     """
@@ -2374,7 +2374,7 @@ class AlertDataScheduleRunInner(BaseModel):
     """
     Generated type representing the anonymous struct variant `ScheduleRun` of the `AlertData` Rust enum
     """
-    resource_type: ResourceTarget
+#    resource_type: ResourceTargetVariant
     """
     Procedure or Action
     """
@@ -3711,7 +3711,7 @@ class UserGroup(BaseModel):
     """
     User ids of group members
     """
-    all: Optional[Mapping[ResourceTarget, PermissionLevelAndSpecifics]] = Field(default=None)
+#    all: Optional[Mapping[ResourceTargetVariant, PermissionLevelAndSpecifics]] = Field(default=None)
     """
     Give the user group elevated permissions on all resources of a certain type
     """
@@ -9964,7 +9964,7 @@ class UserGroupToml(BaseModel):
     """
     Users in the group
     """
-    all: Optional[Mapping[ResourceTarget, PermissionLevelAndSpecifics]] = Field(default=None)
+#    all: Optional[Mapping[ResourceTargetVariant, PermissionLevelAndSpecifics]] = Field(default=None)
     """
     Give the user group elevated permissions on all resources of a certain type
     """
@@ -10079,7 +10079,7 @@ class RunSync(BaseModel):
     """
     Id or name
     """
-    resource_type: Optional[ResourceTarget] = Field(default=None)
+#    resource_type: Optional[ResourceTargetVariant] = Field(default=None)
     """
     Only execute sync on a specific resource type.
     Combine with `resource_id` to specify resource.
@@ -10638,7 +10638,7 @@ class UpdatePermissionOnResourceType(BaseModel):
     """
     Specify the user or user group.
     """
-    resource_type: ResourceTarget
+#    resource_type: ResourceTargetVariant
     """
     The resource type: eg. Server, Build, Deployment, etc.
     """

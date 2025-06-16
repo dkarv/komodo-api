@@ -1,24 +1,15 @@
 from .responses import (
   AuthApi,
-  ExecuteResponses, 
-  ReadResponses, 
-  UserResponses, 
-  WriteResponses,
+  ExecuteApi, 
+  ReadApi, 
+  UserApi, 
+  WriteApi,
 )
 
 from .types import (
   AuthRequest, 
-  BatchExecutionResponse, 
-  ConnectContainerExecQuery, 
-  ConnectDeploymentExecQuery, 
-  ConnectStackExecQuery, 
-  ConnectTerminalQuery,
   ExecuteRequest,
-  ExecuteTerminalBody,
   ReadRequest,
-  Update,
-  UpdateListItem,
-  UpdateStatus,
   UserRequest,
   WriteRequest,
   WsLoginMessage,
@@ -29,6 +20,7 @@ import asyncio
 import json
 from typing import Any, Callable, Dict, Optional, Union, TypeVar
 from enum import Enum
+from pydantic import TypeAdapter
 
 class InitOptions:
   type_: str
@@ -59,16 +51,26 @@ class CancelToken:
 
 
 class KomodoClient(AuthApi):
+  auth: AuthApi
+  read: ReadApi
+  write: WriteApi
+  user: UserApi
+  execute: ExecuteApi
+    
   def __init__(self, url: str, options: InitOptions):
     self.url = url
     self.state = options
+
+    self.auth = AuthApi(self.request)
+    self.read = ReadApi(self.request)
+    self.write = WriteApi(self.request)
+    self.user = UserApi(self.request)
+    self.execute = ExecuteApi(self.request)
 
   Req = TypeVar('Req')
   Res = TypeVar('Res')
 
   async def request(self, path: str, request: Req, clz: type[Res]) -> Res:
-        print(f"Clz: {clz}")
-        print(f"Self.Res: {self.Res}")
         headers = {
             "content-type": "application/json",
             **({"authorization": self.state.jwt} if self.state.type_ == "jwt" else {}),
@@ -83,30 +85,18 @@ class KomodoClient(AuthApi):
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{self.url}{path}", data=request.model_dump_json(), headers=headers
+                f"{self.url}{path}", data=request.model_dump_json(exclude_none=True), headers=headers
             ) as response:
                 if response.status == 200:
                     text = await response.text()
-                    print(f"Response text: {text}")
-                    return clz.model_validate_json(text)
+                    try:
+                        return TypeAdapter(clz).validate_json(text)
+                    except Exception as e:
+                        raise Exception(f"Failed to parse response: {e}\nResponse text: {text}")
                 else:
-                    raise Exception(f"Request failed with status {response.status}")
+                    raise Exception(f"Request failed with status {response.status} and body: {await response.text()}")
 
-  async def _auth(self, request: AuthRequest, clz: type[Res]) -> Res:
-    return await self.request("/auth", request, clz)
-
-#  async def user(self, type_: str, params: Dict[str, Any]) -> Any:
-#    return await self.request("/user", params)
-
-#  async def read(self, type_: str, params: Dict[str, Any]) -> Any:
-#    return await self.request("/read", params)
-
-#  async def write(self, type_: str, params: Dict[str, Any]) -> Any:
-#    return await self.request("/write", params)
-
-#  async def execute(self, type_: str, params: Dict[str, Any]) -> Any:
-#    return await self.request("/execute", params)
-
+  # CAUTION: completely untested!
   async def poll_update_until_complete(self, update_id: str) -> Any:
         while True:
             await asyncio.sleep(1)
@@ -114,6 +104,7 @@ class KomodoClient(AuthApi):
             if update["status"] == "Complete":
                 return update
 
+  # CAUTION: completely untested!
   async def execute_and_poll(self, type_: str, params: Dict[str, Any]) -> Any:
         res = await self.execute(type_, params)
         if isinstance(res, list):
@@ -127,10 +118,12 @@ class KomodoClient(AuthApi):
         else:
             return await self.poll_update_until_complete(res["_id"]["$oid"])
 
+  # CAUTION: completely untested!
   async def core_version(self) -> str:
         res = await self.read("GetVersion", {})
         return res["version"]
 
+  # CAUTION: completely untested!
   async def get_update_websocket(
         self,
         on_update: Callable[[Dict[str, Any]], None],
@@ -162,6 +155,7 @@ class KomodoClient(AuthApi):
             if on_close:
                 on_close()
 
+  # CAUTION: completely untested!
   async def subscribe_to_update_websocket(
         self,
         on_update: Callable[[Dict[str, Any]], None],
