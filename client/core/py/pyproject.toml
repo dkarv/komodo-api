@@ -3,7 +3,7 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "komodo_api"
+name = "komodo-api"
 version = "0.0.1"
 authors = [
   { name="David Punzet", email="punzet.david@gmail.com" },
@@ -23,5 +23,5 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/dkarv/komodo-src"
-Issues = "https://github.com/dkarv/komodo-src/issues"
+Homepage = "https://github.com/dkarv/komodo-api"
+Issues = "https://github.com/dkarv/komodo-api/issues"

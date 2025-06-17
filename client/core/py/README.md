@@ -3,7 +3,7 @@
 _A system to build and deploy software across many servers_. [https://komo.do](https://komo.do)
 
 ```sh
-pip install komodo_dkarv
+pip install komodo-api
 ```
 
 ```py
