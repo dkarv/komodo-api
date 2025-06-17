@@ -362,7 +362,7 @@ class AlerterConfig(BaseModel):
     
     Default: Custom endpoint `http://localhost:7000`
     """
-    alert_types: Optional[List[AlertDataVariant]] = Field(default=None)
+    alert_types: Optional[List[AlertData]] = Field(default=None)
     """
     Only send specific alert types.
     If empty, will send all alert types.
@@ -384,7 +384,7 @@ class AlerterListItemInfo(BaseModel):
     """
     Whether alerter is enabled for sending alerts
     """
-    endpoint_type: AlerterEndpointVariant
+    endpoint_type: AlerterEndpoint
     """
     The type of the alerter, eg. `Slack`, `Custom`
     """
@@ -399,7 +399,7 @@ class AlerterQuerySpecifics(BaseModel):
     - `Some(true)`: Only include alerts with `enabled: true`
     - `Some(false)`: Only include alerts with `enabled: false`
     """
-    types: List[AlerterEndpointVariant]
+    types: List[AlerterEndpoint]
     """
     Only include alerters with these endpoint types.
     If empty, don't filter by enpoint type.
@@ -2109,7 +2109,7 @@ class AlertDataServerDiskInner(BaseModel):
     """
     The region of the server
     """
-    path: PathBuf
+    path: str
     """
     The mount path of the disk
     """
@@ -3518,7 +3518,7 @@ class SingleDiskUsage(BaseModel):
     """
     Info for a single disk mounted on the system.
     """
-    mount: PathBuf
+    mount: str
     """
     The mount point of the disk
     """
@@ -10221,7 +10221,7 @@ class ServerHealth(BaseModel):
     """
     cpu: ServerHealthState
     mem: ServerHealthState
-    disks: Dict[PathBuf, ServerHealthState]
+    disks: Dict[str, ServerHealthState]
 
 class SetEveryoneUserGroup(BaseModel):
     """

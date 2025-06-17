@@ -38,18 +38,6 @@ function moveToEndOfFile(lines, searchString) {
   }
 }
 
-function fixResourceTarget(lines) {
-  // I don't know what is wrong with ResourceTargetVariant, commenting it
-  return lines
-    .map(line => {
-      if (line.includes('ResourceTargetVariant')) {
-        return "#" + line;
-      } else {
-        return line;
-      }
-    });
-}
-
 function fix_types() {
   const types_path = __dirname + "/komodo_api/types.py";
   const contents = readFileSync(types_path);
@@ -66,6 +54,10 @@ function fix_types() {
       "from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set")
     .replaceAll("IndexMap", "Mapping")
     .replaceAll("IndexSet", "Set")
+    .replaceAll("AlertDataVariant", "AlertData")
+    .replaceAll("AlerterEndpointVariant", "AlerterEndpoint")
+    .replaceAll("ResourceTargetVariant", "ResourceTarget")
+    .replaceAll("PathBuf", "str")
     // TODO look into proper Partial
     .replace(/Partial\[(\w+)\]/g, '$1')
     .split("\n");
