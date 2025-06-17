@@ -67,7 +67,6 @@ function fix_types() {
   moveToEndOfFile(lines, "_PartialUrlBuilderConfig = UrlBuilderConfig");
 
   lines = fixMongoDocument(lines);
-  lines = fixResourceTarget(lines);
 
   writeFileSync(types_path, lines.join("\n"));
 }
