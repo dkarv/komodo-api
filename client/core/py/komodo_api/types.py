@@ -165,7 +165,7 @@ class ResourceListItem(BaseModel, Generic[Info]):
     """
     The resource id
     """
-    resource_type: ResourceTarget = Field(alias="type")
+    resource_type: ResourceTargetTypes = Field(alias="type")
     """
     The resource type, ie `Server` or `Deployment`
     """
@@ -351,6 +351,71 @@ class ResourceTargetResourceSync(BaseModel):
 
 # Used to reference a specific resource across all resource types
 ResourceTarget = Union[ResourceTargetSystem, ResourceTargetServer, ResourceTargetStack, ResourceTargetDeployment, ResourceTargetBuild, ResourceTargetRepo, ResourceTargetProcedure, ResourceTargetAction, ResourceTargetBuilder, ResourceTargetAlerter, ResourceTargetResourceSync]
+class MaintenanceScheduleType(str, Enum):
+    """
+    Types of maintenance schedules
+    """
+    DAILY = "Daily"
+    """
+    Daily at the specified time
+    """
+    WEEKLY = "Weekly"
+    """
+    Weekly on the specified day and time
+    """
+    ONETIME = "OneTime"
+    """
+    One-time maintenance on a specific date and time
+    """
+class MaintenanceWindow(BaseModel):
+    """
+    Represents a scheduled maintenance window
+    """
+    name: str
+    """
+    Name for the maintenance window (required)
+    """
+    description: Optional[str] = Field(default=None)
+    """
+    Description of what maintenance is performed (optional)
+    """
+    schedule_type: Optional[MaintenanceScheduleType] = Field(default=None)
+    """
+    The type of maintenance schedule:
+    - Daily (default)
+    - Weekly
+    - OneTime
+    """
+    day_of_week: Optional[str] = Field(default=None)
+    """
+    For Weekly schedules: Specify the day of the week (Monday, Tuesday, etc.)
+    """
+    date: Optional[str] = Field(default=None)
+    """
+    For OneTime window: ISO 8601 date format (YYYY-MM-DD)
+    """
+    hour: Optional[int] = Field(default=None)
+    """
+    Start hour in 24-hour format (0-23) (optional, defaults to 0)
+    """
+    minute: Optional[int] = Field(default=None)
+    """
+    Start minute (0-59) (optional, defaults to 0)
+    """
+    duration_minutes: int
+    """
+    Duration of the maintenance window in minutes (required)
+    """
+    timezone: Optional[str] = Field(default=None)
+    """
+    Timezone for maintenance window specificiation.
+    If empty, will use Core timezone.
+    """
+    enabled: bool
+    """
+    Whether this maintenance window is currently enabled
+    """
+
 class AlerterConfig(BaseModel):
     enabled: Optional[bool] = Field(default=None)
     """
@@ -362,7 +427,7 @@ class AlerterConfig(BaseModel):
     
     Default: Custom endpoint `http://localhost:7000`
     """
-    alert_types: Optional[List[AlertData]] = Field(default=None)
+    alert_types: Optional[List[AlertDataTypes]] = Field(default=None)
     """
     Only send specific alert types.
     If empty, will send all alert types.
@@ -376,6 +441,10 @@ class AlerterConfig(BaseModel):
     """
     DON'T send alerts on these resources.
     """
+    maintenance_windows: Optional[List[MaintenanceWindow]] = Field(default=None)
+    """
+    Scheduled maintenance windows during which alerts will be suppressed.
+    """
 
 Alerter = Resource[AlerterConfig, None]
 
@@ -384,7 +453,7 @@ class AlerterListItemInfo(BaseModel):
     """
     Whether alerter is enabled for sending alerts
     """
-    endpoint_type: AlerterEndpoint
+    endpoint_type: AlerterEndpointTypes
     """
     The type of the alerter, eg. `Slack`, `Custom`
     """
@@ -399,7 +468,7 @@ class AlerterQuerySpecifics(BaseModel):
     - `Some(true)`: Only include alerts with `enabled: true`
     - `Some(false)`: Only include alerts with `enabled: false`
     """
-    types: List[AlerterEndpoint]
+    types: List[AlerterEndpointTypes]
     """
     Only include alerters with these endpoint types.
     If empty, don't filter by enpoint type.
@@ -726,6 +795,10 @@ class BuildConfig(BaseModel):
     """
     Configure quick links that are displayed in the resource header
     """
+    linked_repo: Optional[str] = Field(default=None)
+    """
+    Choose a Komodo Repo (Resource) to source the build files.
+    """
     git_provider: str
     """
     The git provider domain. Default: github.com
@@ -910,6 +983,14 @@ class BuildListItemInfo(BaseModel):
     files_on_host: bool
     """
     Whether build is in files on host mode.
+    """
+    dockerfile_contents: bool
+    """
+    Whether build has UI defined dockerfile contents
+    """
+    linked_repo: str
+    """
+    Linked repo, if one is attached.
     """
     git_provider: str
     """
@@ -1644,11 +1725,11 @@ class User(BaseModel):
     """
     When the user last opened updates dropdown.
     """
-    recents: Optional[Dict[ResourceTarget, List[str]]] = Field(default=None)
+    recents: Optional[Dict[ResourceTargetTypes, List[str]]] = Field(default=None)
     """
     Recently viewed ids
     """
-    all: Optional[Mapping[ResourceTarget, PermissionLevelAndSpecifics]] = Field(default=None)
+    all: Optional[Mapping[ResourceTargetTypes, PermissionLevelAndSpecifics]] = Field(default=None)
     """
     Give the user elevated permissions on all resources of a certain type
     """
@@ -2374,7 +2455,7 @@ class AlertDataScheduleRunInner(BaseModel):
     """
     Generated type representing the anonymous struct variant `ScheduleRun` of the `AlertData` Rust enum
     """
-    resource_type: ResourceTarget
+    resource_type: ResourceTargetTypes
     """
     Procedure or Action
     """
@@ -2699,6 +2780,10 @@ class RepoConfig(BaseModel):
     path: Optional[str] = Field(default=None)
     """
     Explicitly specify the folder to clone the repo in.
+    - If absolute (has leading '/')
+    - Used directly as the path
+    - If relative
+    - Taken relative to Periphery `repo_dir` (ie `${root_directory}/repos`)
     """
     webhook_enabled: bool
     """
@@ -2783,6 +2868,10 @@ GetResourceSyncActionStateResponse = ResourceSyncActionState
 class ResourceSyncConfig(BaseModel):
     """
     The sync configuration.
+    """
+    linked_repo: Optional[str] = Field(default=None)
+    """
+    Choose a Komodo Repo (Resource) to source the sync files.
     """
     git_provider: str
     """
@@ -3167,6 +3256,10 @@ class ServerConfig(BaseModel):
     """
     The percentage threshhold which triggers CRITICAL state for DISK.
     """
+    maintenance_windows: Optional[List[MaintenanceWindow]] = Field(default=None)
+    """
+    Scheduled maintenance windows during which alerts will be suppressed.
+    """
 
 Server = Resource[ServerConfig, None]
 
@@ -3243,6 +3336,10 @@ class StackConfig(BaseModel):
     """
     Whether to skip secret interpolation into the stack environment variables.
     """
+    linked_repo: Optional[str] = Field(default=None)
+    """
+    Choose a Komodo Repo (Resource) to source the compose files.
+    """
     git_provider: str
     """
     The git provider domain. Default: github.com
@@ -3263,7 +3360,8 @@ class StackConfig(BaseModel):
     """
     repo: Optional[str] = Field(default=None)
     """
-    The Github repo used as the source of the build.
+    The repo used as the source of the build.
+    {namespace}/{repo_name}
     """
     branch: str
     """
@@ -3272,6 +3370,10 @@ class StackConfig(BaseModel):
     commit: Optional[str] = Field(default=None)
     """
     Optionally set a specific commit hash.
+    """
+    clone_path: Optional[str] = Field(default=None)
+    """
+    Optionally set a specific clone path
     """
     reclone: Optional[bool] = Field(default=None)
     """
@@ -3711,7 +3813,7 @@ class UserGroup(BaseModel):
     """
     User ids of group members
     """
-    all: Optional[Mapping[ResourceTarget, PermissionLevelAndSpecifics]] = Field(default=None)
+    all: Optional[Mapping[ResourceTargetTypes, PermissionLevelAndSpecifics]] = Field(default=None)
     """
     Give the user group elevated permissions on all resources of a certain type
     """
@@ -5570,6 +5672,10 @@ class ResourceSyncListItemInfo(BaseModel):
     """
     Resource paths to the files.
     """
+    linked_repo: str
+    """
+    Linked repo, if one is attached.
+    """
     git_provider: str
     """
     The git provider domain.
@@ -5678,6 +5784,10 @@ class ServerListItemInfo(BaseModel):
     address: str
     """
     Address of the server.
+    """
+    version: str
+    """
+    The Komodo Periphery version of the server.
     """
     send_unreachable_alerts: bool
     """
@@ -5796,6 +5906,10 @@ class StackListItemInfo(BaseModel):
     file_contents: bool
     """
     Whether stack has file contents defined.
+    """
+    linked_repo: str
+    """
+    Linked repo, if one is attached.
     """
     git_provider: str
     """
@@ -6491,7 +6605,7 @@ class ConnectContainerExecQuery(BaseModel):
     """
     shell: str
     """
-    The shell to connect to
+    The shell to use (eg. `sh` or `bash`)
     """
 
 class ConnectDeploymentExecQuery(BaseModel):
@@ -6506,7 +6620,7 @@ class ConnectDeploymentExecQuery(BaseModel):
     """
     shell: str
     """
-    The shell to connect to
+    The shell to use (eg. `sh` or `bash`)
     """
 
 class ConnectStackExecQuery(BaseModel):
@@ -6525,7 +6639,7 @@ class ConnectStackExecQuery(BaseModel):
     """
     shell: str
     """
-    The shell to connect to
+    The shell to use (eg. `sh` or `bash`)
     """
 
 class ConnectTerminalQuery(BaseModel):
@@ -7569,6 +7683,68 @@ class ExchangeForJwt(BaseModel):
     The 'exchange token'
     """
 
+class ExecuteContainerExecBody(BaseModel):
+    """
+    Execute a command in the given containers shell.
+    TODO: Document calling.
+    """
+    server: str
+    """
+    Server Id or name
+    """
+    container: str
+    """
+    The container name
+    """
+    shell: str
+    """
+    The shell to use (eg. `sh` or `bash`)
+    """
+    command: str
+    """
+    The command to execute.
+    """
+
+class ExecuteDeploymentExecBody(BaseModel):
+    """
+    Execute a command in the given containers shell.
+    TODO: Document calling.
+    """
+    deployment: str
+    """
+    Deployment Id or name
+    """
+    shell: str
+    """
+    The shell to use (eg. `sh` or `bash`)
+    """
+    command: str
+    """
+    The command to execute.
+    """
+
+class ExecuteStackExecBody(BaseModel):
+    """
+    Execute a command in the given containers shell.
+    TODO: Document calling.
+    """
+    stack: str
+    """
+    Stack Id or name
+    """
+    service: str
+    """
+    The service name to connect to
+    """
+    shell: str
+    """
+    The shell to use (eg. `sh` or `bash`)
+    """
+    command: str
+    """
+    The command to execute.
+    """
+
 class ExecuteTerminalBody(BaseModel):
     """
     Execute a terminal command on the given server.
@@ -7912,6 +8088,10 @@ class GetCoreInfoResponse(BaseModel):
     disable_websocket_reconnect: bool
     """
     Whether to disable websocket automatic reconnect.
+    """
+    timezone: str
+    """
+    TZ identifier Core is using, if manually set.
     """
 
 class GetDeployment(BaseModel):
@@ -9964,7 +10144,7 @@ class UserGroupToml(BaseModel):
     """
     Users in the group
     """
-    all: Optional[Mapping[ResourceTarget, PermissionLevelAndSpecifics]] = Field(default=None)
+    all: Optional[Mapping[ResourceTargetTypes, PermissionLevelAndSpecifics]] = Field(default=None)
     """
     Give the user group elevated permissions on all resources of a certain type
     """
@@ -10079,7 +10259,7 @@ class RunSync(BaseModel):
     """
     Id or name
     """
-    resource_type: Optional[ResourceTarget] = Field(default=None)
+    resource_type: Optional[ResourceTargetTypes] = Field(default=None)
     """
     Only execute sync on a specific resource type.
     Combine with `resource_id` to specify resource.
@@ -10638,7 +10818,7 @@ class UpdatePermissionOnResourceType(BaseModel):
     """
     Specify the user or user group.
     """
-    resource_type: ResourceTarget
+    resource_type: ResourceTargetTypes
     """
     The resource type: eg. Server, Build, Deployment, etc.
     """
@@ -10992,6 +11172,17 @@ class AuthRequestGetUser(BaseModel):
     params: GetUser
 
 AuthRequest = Union[AuthRequestGetLoginOptions, AuthRequestCreateLocalUser, AuthRequestLoginLocalUser, AuthRequestExchangeForJwt, AuthRequestGetUser]
+class DayOfWeek(str, Enum):
+    """
+    Days of the week
+    """
+    MONDAY = "Monday"
+    TUESDAY = "Tuesday"
+    WEDNESDAY = "Wednesday"
+    THURSDAY = "Thursday"
+    FRIDAY = "Friday"
+    SATURDAY = "Saturday"
+    SUNDAY = "Sunday"
 class ExecuteRequestTypes(str, Enum):
     START_CONTAINER = "StartContainer"
     RESTART_CONTAINER = "RestartContainer"
@@ -11295,6 +11486,166 @@ class ExecuteRequestRunSync(BaseModel):
     params: RunSync
 
 ExecuteRequest = Union[ExecuteRequestStartContainer, ExecuteRequestRestartContainer, ExecuteRequestPauseContainer, ExecuteRequestUnpauseContainer, ExecuteRequestStopContainer, ExecuteRequestDestroyContainer, ExecuteRequestStartAllContainers, ExecuteRequestRestartAllContainers, ExecuteRequestPauseAllContainers, ExecuteRequestUnpauseAllContainers, ExecuteRequestStopAllContainers, ExecuteRequestPruneContainers, ExecuteRequestDeleteNetwork, ExecuteRequestPruneNetworks, ExecuteRequestDeleteImage, ExecuteRequestPruneImages, ExecuteRequestDeleteVolume, ExecuteRequestPruneVolumes, ExecuteRequestPruneDockerBuilders, ExecuteRequestPruneBuildx, ExecuteRequestPruneSystem, ExecuteRequestDeployStack, ExecuteRequestBatchDeployStack, ExecuteRequestDeployStackIfChanged, ExecuteRequestBatchDeployStackIfChanged, ExecuteRequestPullStack, ExecuteRequestBatchPullStack, ExecuteRequestStartStack, ExecuteRequestRestartStack, ExecuteRequestStopStack, ExecuteRequestPauseStack, ExecuteRequestUnpauseStack, ExecuteRequestDestroyStack, ExecuteRequestBatchDestroyStack, ExecuteRequestDeploy, ExecuteRequestBatchDeploy, ExecuteRequestPullDeployment, ExecuteRequestStartDeployment, ExecuteRequestRestartDeployment, ExecuteRequestPauseDeployment, ExecuteRequestUnpauseDeployment, ExecuteRequestStopDeployment, ExecuteRequestDestroyDeployment, ExecuteRequestBatchDestroyDeployment, ExecuteRequestRunBuild, ExecuteRequestBatchRunBuild, ExecuteRequestCancelBuild, ExecuteRequestCloneRepo, ExecuteRequestBatchCloneRepo, ExecuteRequestPullRepo, ExecuteRequestBatchPullRepo, ExecuteRequestBuildRepo, ExecuteRequestBatchBuildRepo, ExecuteRequestCancelRepoBuild, ExecuteRequestRunProcedure, ExecuteRequestBatchRunProcedure, ExecuteRequestRunAction, ExecuteRequestBatchRunAction, ExecuteRequestTestAlerter, ExecuteRequestRunSync]
+class IanaTimezone(str, Enum):
+    """
+    One representative IANA zone for each distinct base UTC offset in the tz database.
+    https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+    
+    The `serde`/`strum` renames ensure the canonical identifier is used
+    when serializing or parsing from a string such as `"Etc/UTC"`.
+    """
+    ETCGMTMINUS12 = "Etc/GMT+12"
+    """
+    UTC−12:00
+    """
+    PACIFICPAGOPAGO = "Pacific/Pago_Pago"
+    """
+    UTC−11:00
+    """
+    PACIFICHONOLULU = "Pacific/Honolulu"
+    """
+    UTC−10:00
+    """
+    PACIFICMARQUESAS = "Pacific/Marquesas"
+    """
+    UTC−09:30
+    """
+    AMERICAANCHORAGE = "America/Anchorage"
+    """
+    UTC−09:00
+    """
+    AMERICALOSANGELES = "America/Los_Angeles"
+    """
+    UTC−08:00
+    """
+    AMERICADENVER = "America/Denver"
+    """
+    UTC−07:00
+    """
+    AMERICACHICAGO = "America/Chicago"
+    """
+    UTC−06:00
+    """
+    AMERICANEWYORK = "America/New_York"
+    """
+    UTC−05:00
+    """
+    AMERICAHALIFAX = "America/Halifax"
+    """
+    UTC−04:00
+    """
+    AMERICASTJOHNS = "America/St_Johns"
+    """
+    UTC−03:30
+    """
+    AMERICASAOPAULO = "America/Sao_Paulo"
+    """
+    UTC−03:00
+    """
+    AMERICANORONHA = "America/Noronha"
+    """
+    UTC−02:00
+    """
+    ATLANTICAZORES = "Atlantic/Azores"
+    """
+    UTC−01:00
+    """
+    ETCUTC = "Etc/UTC"
+    """
+    UTC±00:00
+    """
+    EUROPEBERLIN = "Europe/Berlin"
+    """
+    UTC+01:00
+    """
+    EUROPEBUCHAREST = "Europe/Bucharest"
+    """
+    UTC+02:00
+    """
+    EUROPEMOSCOW = "Europe/Moscow"
+    """
+    UTC+03:00
+    """
+    ASIATEHRAN = "Asia/Tehran"
+    """
+    UTC+03:30
+    """
+    ASIADUBAI = "Asia/Dubai"
+    """
+    UTC+04:00
+    """
+    ASIAKABUL = "Asia/Kabul"
+    """
+    UTC+04:30
+    """
+    ASIAKARACHI = "Asia/Karachi"
+    """
+    UTC+05:00
+    """
+    ASIAKOLKATA = "Asia/Kolkata"
+    """
+    UTC+05:30
+    """
+    ASIAKATHMANDU = "Asia/Kathmandu"
+    """
+    UTC+05:45
+    """
+    ASIADHAKA = "Asia/Dhaka"
+    """
+    UTC+06:00
+    """
+    ASIAYANGON = "Asia/Yangon"
+    """
+    UTC+06:30
+    """
+    ASIABANGKOK = "Asia/Bangkok"
+    """
+    UTC+07:00
+    """
+    ASIASHANGHAI = "Asia/Shanghai"
+    """
+    UTC+08:00
+    """
+    AUSTRALIAEUCLA = "Australia/Eucla"
+    """
+    UTC+08:45
+    """
+    ASIATOKYO = "Asia/Tokyo"
+    """
+    UTC+09:00
+    """
+    AUSTRALIAADELAIDE = "Australia/Adelaide"
+    """
+    UTC+09:30
+    """
+    AUSTRALIASYDNEY = "Australia/Sydney"
+    """
+    UTC+10:00
+    """
+    AUSTRALIALORDHOWE = "Australia/Lord_Howe"
+    """
+    UTC+10:30
+    """
+    PACIFICPORTMORESBY = "Pacific/Port_Moresby"
+    """
+    UTC+11:00
+    """
+    PACIFICAUCKLAND = "Pacific/Auckland"
+    """
+    UTC+12:00
+    """
+    PACIFICCHATHAM = "Pacific/Chatham"
+    """
+    UTC+12:45
+    """
+    PACIFICTONGATAPU = "Pacific/Tongatapu"
+    """
+    UTC+13:00
+    """
+    PACIFICKIRITIMATI = "Pacific/Kiritimati"
+    """
+    UTC+14:00
+    """
 class ImageRegistryLegacy1_14Types(str, Enum):
     NONE = "None"
     STANDARD = "Standard"

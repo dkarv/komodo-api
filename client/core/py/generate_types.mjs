@@ -54,9 +54,9 @@ function fix_types() {
       "from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set")
     .replaceAll("IndexMap", "Mapping")
     .replaceAll("IndexSet", "Set")
-    .replaceAll("AlertDataVariant", "AlertData")
-    .replaceAll("AlerterEndpointVariant", "AlerterEndpoint")
-    .replaceAll("ResourceTargetVariant", "ResourceTarget")
+    .replaceAll("AlertDataVariant", "AlertDataTypes")
+    .replaceAll("AlerterEndpointVariant", "AlerterEndpointTypes")
+    .replaceAll("ResourceTargetVariant", "ResourceTargetTypes")
     .replaceAll("PathBuf", "str")
     // TODO look into proper Partial
     .replace(/Partial\[(\w+)\]/g, '$1')
