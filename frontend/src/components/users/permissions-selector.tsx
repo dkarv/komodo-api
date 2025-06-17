@@ -64,8 +64,8 @@ const ALL_PERMISSIONS_BY_TYPE: {
     Types.SpecificPermission.Attach,
     Types.SpecificPermission.Inspect,
     Types.SpecificPermission.Logs,
-    Types.SpecificPermission.Processes,
     Types.SpecificPermission.Terminal,
+    Types.SpecificPermission.Processes,
   ],
   Stack: [
     Types.SpecificPermission.Inspect,
@@ -77,6 +77,8 @@ const ALL_PERMISSIONS_BY_TYPE: {
     Types.SpecificPermission.Logs,
     Types.SpecificPermission.Terminal,
   ],
+  Build: [Types.SpecificPermission.Attach],
+  Repo: [Types.SpecificPermission.Attach],
   Builder: [Types.SpecificPermission.Attach],
 };
 
