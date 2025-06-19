@@ -66,13 +66,13 @@ class KomodoClient(AuthApi):
         self.url = url
         headers = {
             "content-type": "application/json",
-            **({"authorization": self.state.jwt} if self.state.type_ == "jwt" else {}),
+            **({"authorization": options.jwt} if options.type_ == "jwt" else {}),
             **(
                 {
-                    "x-api-key": self.state.key,
-                    "x-api-secret": self.state.secret,
+                    "x-api-key": options.key,
+                    "x-api-secret": options.secret,
                 }
-                if self.state.type_ == "api-key"
+                if options.type_ == "api-key"
                 else {}
             ),
         }
