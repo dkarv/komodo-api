@@ -15,13 +15,17 @@ from .types import (
     WsLoginMessage,
 )
 
+from .exceptions import KomodoException
+
 import aiohttp
 import asyncio
 import json
 from typing import Any, Callable, Dict, Optional, Union, TypeVar
 from enum import Enum
 from pydantic import TypeAdapter
+import logging
 
+_logger = logging.getLogger(__name__)
 
 class InitOptions:
     type_: str
@@ -103,6 +107,7 @@ class KomodoClient(AuthApi):
         ) as response:
             if response.status == 200:
                 text = await response.text()
+                _logger.debug(f"Response: {text}")
                 try:
                     return TypeAdapter(clz).validate_json(text)
                 except Exception as e:
@@ -110,9 +115,9 @@ class KomodoClient(AuthApi):
                         f"Failed to parse response: {e}\nResponse text: {text}"
                     )
             else:
-                raise Exception(
-                    f"Request failed with status {response.status} and body: {await response.text()}"
-                )
+                error = await response.json()
+                _logger.warn(f"Api error {error}")
+                raise KomodoException(error, response.status)
 
     # CAUTION: completely untested!
     async def poll_update_until_complete(self, update_id: str) -> Any:
