@@ -1244,210 +1244,193 @@ class ExecuteApi:
 
     # ==== SERVER ====
     def startContainer(self, params: StartContainer) -> Update:
-        return self._execute(ExecuteRequestStartContainer(params=params))
+        return self._execute(ExecuteRequestStartContainer(params=params), Update)
 
     def restartContainer(self, params: RestartContainer) -> Update:
-        return self._execute(ExecuteRequestRestartContainer(params=params))
+        return self._execute(ExecuteRequestRestartContainer(params=params), Update)
 
     def pauseContainer(self, params: PauseContainer) -> Update:
-        return self._execute(ExecuteRequestPauseContainer(params=params))
+        return self._execute(ExecuteRequestPauseContainer(params=params), Update)
 
     def unpauseContainer(self, params: UnpauseContainer) -> Update:
-        return self._execute(ExecuteRequestUnpauseContainer(params=params))
+        return self._execute(ExecuteRequestUnpauseContainer(params=params), Update)
 
     def stopContainer(self, params: StopContainer) -> Update:
-        return self._execute(ExecuteRequestStopContainer(params=params))
+        return self._execute(ExecuteRequestStopContainer(params=params), Update)
 
     def destroyContainer(self, params: DestroyContainer) -> Update:
-        return self._execute(ExecuteRequestDestroyContainer(params=params))
+        return self._execute(ExecuteRequestDestroyContainer(params=params), Update)
 
     def startAllContainers(self, params: StartAllContainers) -> Update:
-        return self._execute(ExecuteRequestStartAllContainers(params=params))
+        return self._execute(ExecuteRequestStartAllContainers(params=params), Update)
 
     def restartAllContainers(self, params: RestartAllContainers) -> Update:
-        return self._execute(ExecuteRequestRestartAllContainers(params=params))
+        return self._execute(ExecuteRequestRestartAllContainers(params=params), Update)
 
     def pauseAllContainers(self, params: PauseAllContainers) -> Update:
-        return self._execute(ExecuteRequestPauseAllContainers(params=params))
+        return self._execute(ExecuteRequestPauseAllContainers(params=params), Update)
 
     def unpauseAllContainers(self, params: UnpauseAllContainers) -> Update:
-        return self._execute(ExecuteRequestUnpauseAllContainers(params=params))
+        return self._execute(ExecuteRequestUnpauseAllContainers(params=params), Update)
 
     def stopAllContainers(self, params: StopAllContainers) -> Update:
-        return self._execute(ExecuteRequestStopAllContainers(params=params))
+        return self._execute(ExecuteRequestStopAllContainers(params=params), Update)
 
     def pruneContainers(self, params: PruneContainers) -> Update:
-        return self._execute(ExecuteRequestPruneContainers(params=params))
+        return self._execute(ExecuteRequestPruneContainers(params=params), Update)
 
     def deleteNetwork(self, params: DeleteNetwork) -> Update:
-        return self._execute(ExecuteRequestDeleteNetwork(params=params))
+        return self._execute(ExecuteRequestDeleteNetwork(params=params), Update)
 
     def pruneNetworks(self, params: PruneNetworks) -> Update:
-        return self._execute(ExecuteRequestPruneNetworks(params=params))
+        return self._execute(ExecuteRequestPruneNetworks(params=params), Update)
 
     def deleteImage(self, params: DeleteImage) -> Update:
-        return self._execute(ExecuteRequestDeleteImage(params=params))
+        return self._execute(ExecuteRequestDeleteImage(params=params), Update)
 
     def pruneImages(self, params: PruneImages) -> Update:
-        return self._execute(ExecuteRequestPruneImages(params=params))
+        return self._execute(ExecuteRequestPruneImages(params=params), Update)
 
     def deleteVolume(self, params: DeleteVolume) -> Update:
-        return self._execute(ExecuteRequestDeleteVolume(params=params))
+        return self._execute(ExecuteRequestDeleteVolume(params=params), Update)
 
     def pruneVolumes(self, params: PruneVolumes) -> Update:
-        return self._execute(ExecuteRequestPruneVolumes(params=params))
+        return self._execute(ExecuteRequestPruneVolumes(params=params), Update)
 
     def pruneDockerBuilders(self, params: PruneDockerBuilders) -> Update:
-        return self._execute(ExecuteRequestPruneDockerBuilders(params=params))
+        return self._execute(ExecuteRequestPruneDockerBuilders(params=params), Update)
 
     def pruneBuildx(self, params: PruneBuildx) -> Update:
-        return self._execute(ExecuteRequestPruneBuildx(params=params))
+        return self._execute(ExecuteRequestPruneBuildx(params=params), Update)
 
     def pruneSystem(self, params: PruneSystem) -> Update:
-        return self._execute(ExecuteRequestPruneSystem(params=params))
+        return self._execute(ExecuteRequestPruneSystem(params=params), Update)
 
     # ==== STACK ====
     def deployStack(self, params: DeployStack) -> Update:
-        return self._execute(ExecuteRequestDeployStack(params=params))
+        return self._execute(ExecuteRequestDeployStack(params=params), Update)
 
     def batchDeployStack(self, params: BatchDeployStack) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchDeployStack(params=params))
+        return self._execute(ExecuteRequestBatchDeployStack(params=params), BatchExecutionResponse)
 
     def deployStackIfChanged(self, params: DeployStackIfChanged) -> Update:
-        return self._execute(ExecuteRequestDeployStackIfChanged(params=params))
+        return self._execute(ExecuteRequestDeployStackIfChanged(params=params), Update)
 
     def batchDeployStackIfChanged(
         self, params: BatchDeployStackIfChanged
     ) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchDeployStackIfChanged(params=params))
+        return self._execute(ExecuteRequestBatchDeployStackIfChanged(params=params), BatchExecutionResponse)
 
     def pullStack(self, params: PullStack) -> Update:
-        return self._execute(ExecuteRequestPullStack(params=params))
+        return self._execute(ExecuteRequestPullStack(params=params), Update)
 
     def batchPullStack(self, params: BatchPullStack) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchPullStack(params=params))
+        return self._execute(ExecuteRequestBatchPullStack(params=params), BatchExecutionResponse)
 
     def startStack(self, params: StartStack) -> Update:
-        return self._execute(ExecuteRequestStartStack(params=params))
+        return self._execute(ExecuteRequestStartStack(params=params), Update)
 
     def restartStack(self, params: RestartStack) -> Update:
-        return self._execute(ExecuteRequestRestartStack(params=params))
+        return self._execute(ExecuteRequestRestartStack(params=params), Update)
 
     def stopStack(self, params: StopStack) -> Update:
-        return self._execute(ExecuteRequestStopStack(params=params))
+        return self._execute(ExecuteRequestStopStack(params=params), Update)
 
     def pauseStack(self, params: PauseStack) -> Update:
-        return self._execute(ExecuteRequestPauseStack(params=params))
+        return self._execute(ExecuteRequestPauseStack(params=params), Update)
 
     def unpauseStack(self, params: UnpauseStack) -> Update:
-        return self._execute(ExecuteRequestUnpauseStack(params=params))
+        return self._execute(ExecuteRequestUnpauseStack(params=params), Update)
 
     def destroyStack(self, params: DestroyStack) -> Update:
-        return self._execute(ExecuteRequestDestroyStack(params=params))
+        return self._execute(ExecuteRequestDestroyStack(params=params), Update)
 
     def batchDestroyStack(self, params: BatchDestroyStack) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchDestroyStack(params=params))
+        return self._execute(ExecuteRequestBatchDestroyStack(params=params), BatchExecutionResponse)
 
     # ==== DEPLOYMENT ====
     def deploy(self, params: Deploy) -> Update:
-        return self._execute(ExecuteRequestDeploy(params=params))
+        return self._execute(ExecuteRequestDeploy(params=params), Update)
 
     def batchDeploy(self, params: BatchDeploy) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchDeploy(params=params))
+        return self._execute(ExecuteRequestBatchDeploy(params=params), BatchExecutionResponse)
 
     def pullDeployment(self, params: PullDeployment) -> Update:
-        return self._execute(ExecuteRequestPullDeployment(params=params))
+        return self._execute(ExecuteRequestPullDeployment(params=params), Update)
 
     def startDeployment(self, params: StartDeployment) -> Update:
-        return self._execute(ExecuteRequestStartDeployment(params=params))
+        return self._execute(ExecuteRequestStartDeployment(params=params), Update)
 
     def restartDeployment(self, params: RestartDeployment) -> Update:
-        return self._execute(ExecuteRequestRestartDeployment(params=params))
+        return self._execute(ExecuteRequestRestartDeployment(params=params), Update)
 
     def pauseDeployment(self, params: PauseDeployment) -> Update:
-        return self._execute(ExecuteRequestPauseDeployment(params=params))
+        return self._execute(ExecuteRequestPauseDeployment(params=params), Update)
 
     def unpauseDeployment(self, params: UnpauseDeployment) -> Update:
-        return self._execute(ExecuteRequestUnpauseDeployment(params=params))
+        return self._execute(ExecuteRequestUnpauseDeployment(params=params), Update)
 
     def stopDeployment(self, params: StopDeployment) -> Update:
-        return self._execute(ExecuteRequestStopDeployment(params=params))
+        return self._execute(ExecuteRequestStopDeployment(params=params), Update)
 
     def destroyDeployment(self, params: DestroyDeployment) -> Update:
-        return self._execute(ExecuteRequestDestroyDeployment(params=params))
+        return self._execute(ExecuteRequestDestroyDeployment(params=params), Update)
 
     def batchDestroyDeployment(
         self, params: BatchDestroyDeployment
     ) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchDestroyDeployment(params=params))
+        return self._execute(ExecuteRequestBatchDestroyDeployment(params=params), BatchExecutionResponse)
 
     # ==== BUILD ====
     def runBuild(self, params: RunBuild) -> Update:
-        return self._execute(ExecuteRequestRunBuild(params=params))
+        return self._execute(ExecuteRequestRunBuild(params=params), Update)
 
     def batchRunBuild(self, params: BatchRunBuild) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchRunBuild(params=params))
+        return self._execute(ExecuteRequestBatchRunBuild(params=params), BatchExecutionResponse)
 
     def cancelBuild(self, params: CancelBuild) -> Update:
-        return self._execute(ExecuteRequestCancelBuild(params=params))
+        return self._execute(ExecuteRequestCancelBuild(params=params), Update)
 
     # ==== REPO ====
     def cloneRepo(self, params: CloneRepo) -> Update:
-        return self._execute(ExecuteRequestCloneRepo(params=params))
+        return self._execute(ExecuteRequestCloneRepo(params=params), Update)
 
     def batchCloneRepo(self, params: BatchCloneRepo) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchCloneRepo(params=params))
+        return self._execute(ExecuteRequestBatchCloneRepo(params=params), BatchExecutionResponse)
 
     def pullRepo(self, params: PullRepo) -> Update:
-        return self._execute(ExecuteRequestPullRepo(params=params))
+        return self._execute(ExecuteRequestPullRepo(params=params), Update)
 
     def batchPullRepo(self, params: BatchPullRepo) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchPullRepo(params=params))
+        return self._execute(ExecuteRequestBatchPullRepo(params=params), BatchExecutionResponse)
 
     def buildRepo(self, params: BuildRepo) -> Update:
-        return self._execute(ExecuteRequestBuildRepo(params=params))
+        return self._execute(ExecuteRequestBuildRepo(params=params), Update)
 
     def batchBuildRepo(self, params: BatchBuildRepo) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchBuildRepo(params=params))
+        return self._execute(ExecuteRequestBatchBuildRepo(params=params), BatchExecutionResponse)
 
     def cancelRepoBuild(self, params: CancelRepoBuild) -> Update:
-        return self._execute(ExecuteRequestCancelRepoBuild(params=params))
+        return self._execute(ExecuteRequestCancelRepoBuild(params=params), Update)
 
     # ==== PROCEDURE ====
     def runProcedure(self, params: RunProcedure) -> Update:
-        return self._execute(ExecuteRequestRunProcedure(params=params))
+        return self._execute(ExecuteRequestRunProcedure(params=params), Update)
 
     def batchRunProcedure(self, params: BatchRunProcedure) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchRunProcedure(params=params))
+        return self._execute(ExecuteRequestBatchRunProcedure(params=params), BatchExecutionResponse)
 
     # ==== ACTION ====
     def runAction(self, params: RunAction) -> Update:
-        return self._execute(ExecuteRequestRunAction(params=params))
+        return self._execute(ExecuteRequestRunAction(params=params), Update)
 
     def batchRunAction(self, params: BatchRunAction) -> BatchExecutionResponse:
-        return self._execute(ExecuteRequestBatchRunAction(params=params))
+        return self._execute(ExecuteRequestBatchRunAction(params=params), BatchExecutionResponse)
 
     # ==== SYNC ====
     def runSync(self, params: RunSync) -> Update:
-        return self._execute(ExecuteRequestRunSync(params=params))
-
-    # ==== STACK Service ====
-    # Not sure where these types are
-    # def deployStackService(self, params: DeployStackService) -> Update:
-    #  return self._execute(ExecuteRequestDeployStackService(params = params))
-    # def startStackService(self, params: StartStackService) -> Update:
-    #  return self._execute(ExecuteRequestStartStackService(params = params))
-    # def restartStackService(self, params: RestartStackService) -> Update:
-    #  return self._execute(ExecuteRequestRestartStackService(params = params))
-    # def stopStackService(self, params: StopStackService) -> Update:
-    #  return self._execute(ExecuteRequestStopStackService(params = params))
-    # def pauseStackService(self, params: PauseStackService) -> Update:
-    #  return self._execute(ExecuteRequestPauseStackService(params = params))
-    # def unpauseStackService(self, params: UnpauseStackService) -> Update:
-    #  return self._execute(ExecuteRequestUnpauseStackService(params = params))
-    # def destroyStackService(self, params: DestroyStackService) -> Update:
-    #  return self._execute(ExecuteRequestDestroyStackService(params = params))
+        return self._execute(ExecuteRequestRunSync(params=params), Update)
 
     # ==== ALERTER ====
     def testAlerter(self, params: TestAlerter) -> Update:
-        return self._execute(ExecuteRequestTestAlerter(params=params))
+        return self._execute(ExecuteRequestTestAlerter(params=params), Update)
