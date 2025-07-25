@@ -29,7 +29,6 @@ jobs:
     - name: Install dependencies
       working-directory: client/core/py
       run: |
-        cd client/core/py
         python -m pip install --upgrade pip
         pip install build
     - name: Build package
