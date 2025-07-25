@@ -36,7 +36,6 @@ jobs:
       working-directory: client/core/py
       run: python -m build
     - name: Publish package
-      working-directory: client/core/py
       uses: pypa/gh-action-pypi-publish@release/
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
