@@ -1,13 +1,11 @@
 use komodo_client::entities::{
-  FileContents, SearchCombinator,
+  FileContents, RepoExecutionResponse, SearchCombinator,
   repo::Repo,
   stack::{ComposeProject, Stack, StackServiceNames},
   update::Log,
 };
 use resolver_api::Resolve;
 use serde::{Deserialize, Serialize};
-
-use super::git::RepoActionResponse;
 
 /// List the compose project names that are on the host.
 /// List running `docker compose ls`
@@ -115,7 +113,7 @@ pub struct WriteComposeContentsToHost {
 /// Write and commit compose contents.
 /// Only works with git repo based stacks.
 #[derive(Debug, Clone, Serialize, Deserialize, Resolve)]
-#[response(RepoActionResponse)]
+#[response(RepoExecutionResponse)]
 #[error(serror::Error)]
 pub struct WriteCommitComposeContents {
   /// The stack to write to.
@@ -152,11 +150,19 @@ pub struct ComposePull {
   pub git_token: Option<String>,
   /// If provided, use it to login in. Otherwise check periphery local registry providers.
   pub registry_token: Option<String>,
+  /// Propogate any secret replacers from core interpolation.
+  #[serde(default)]
+  pub replacers: Vec<(String, String)>,
 }
 
 /// Response for [ComposePull]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComposePullResponse {
+  /// If any of the required files are missing, they will be here.
+  pub missing_files: Vec<String>,
+  /// The error in getting remote file contents at the path, or null
+  pub remote_errors: Vec<FileContents>,
+  /// The logs produced by the pull
   pub logs: Vec<Log>,
 }
 

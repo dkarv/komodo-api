@@ -18,14 +18,19 @@ import {
   stroke_color_class_by_intention,
 } from "@lib/color";
 import { DeploymentTable } from "./table";
-import { DeleteResource, NewResource, ResourceLink } from "../common";
+import {
+  DeleteResource,
+  NewResource,
+  ResourceLink,
+  ResourcePageHeader,
+} from "../common";
 import { RunBuild } from "../build/actions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@ui/tabs";
 import { DeploymentConfig } from "./config";
 import { DashboardPieChart } from "@pages/home/dashboard";
 import {
+  ContainerPortsTableView,
   DockerResourceLink,
-  ResourcePageHeader,
   StatusBadge,
 } from "@components/util";
 import { GroupActions } from "@components/group-actions";
@@ -297,6 +302,23 @@ export const DeploymentComponents: RequiredResourceComponents = {
         />
       );
     },
+    Ports: ({ id }) => {
+      const deployment = useDeployment(id);
+      const container = useRead(
+        "ListDockerContainers",
+        {
+          server: deployment?.info.server_id!,
+        },
+        { refetchInterval: 10_000, enabled: !!deployment?.info.server_id }
+      ).data?.find((container) => container.name === deployment?.name);
+      if (!container) return null;
+      return (
+        <ContainerPortsTableView
+          ports={container?.ports}
+          server_id={deployment?.info.server_id}
+        />
+      );
+    },
   },
 
   Status: {
@@ -332,7 +354,7 @@ export const DeploymentComponents: RequiredResourceComponents = {
         icon={<DeploymentIcon id={id} size={8} />}
         type="Deployment"
         id={id}
-        name={deployment?.name}
+        resource={deployment}
         state={
           deployment?.info.state === Types.DeploymentState.NotDeployed
             ? "Not Deployed"

@@ -8,6 +8,7 @@ use crate::entities::{I64, Usize};
 
 use super::{ContainerConfig, GraphDriverData, PortBinding};
 
+/// Container summary returned by container list apis.
 #[typeshare]
 #[derive(
   Debug, Clone, Default, PartialEq, Serialize, Deserialize,
@@ -37,8 +38,12 @@ pub struct ContainerListItem {
   pub network_mode: Option<String>,
   /// The network names attached to container
   pub networks: Vec<String>,
+  /// Port mappings for the container
+  pub ports: Vec<Port>,
   /// The volume names attached to container
   pub volumes: Vec<String>,
+  /// The container stats, if they can be retreived.
+  pub stats: Option<ContainerStats>,
   /// The labels attached to container.
   /// It's too big to send with container list,
   /// can get it using InspectContainer
@@ -1151,7 +1156,7 @@ pub struct EndpointIpamConfig {
 }
 
 #[typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContainerStats {
   #[serde(alias = "Name")]
   pub name: String,

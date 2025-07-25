@@ -1,3 +1,4 @@
+import { UsableResource } from "@types";
 import { Types } from "komodo_client";
 
 export const fmt_date = (d: Date) => {
@@ -97,6 +98,13 @@ export function format_size_bytes(size_bytes: number) {
   }
 }
 
+export function fmt_resource_type(type: UsableResource) {
+  if (type === "ResourceSync") {
+    return "Resource Sync";
+  }
+  return type;
+}
+
 export function fmt_utc_offset(tz: Types.IanaTimezone): string {
   switch (tz) {
     case Types.IanaTimezone.EtcGmtMinus12:
@@ -176,4 +184,8 @@ export function fmt_utc_offset(tz: Types.IanaTimezone): string {
     case Types.IanaTimezone.PacificKiritimati:
       return "UTC+14:00";
   }
+}
+
+export function fmt_port_mount(port: Types.Port) {
+  return `${port.IP ? port.IP + ":" : ""}${port.PublicPort ?? "NONE"}:${port.PrivatePort ?? "NONE"}${port.Type ? "/" + port.Type : ""}`;
 }

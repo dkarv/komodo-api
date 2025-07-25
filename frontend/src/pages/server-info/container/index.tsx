@@ -1,14 +1,20 @@
 import { Section } from "@components/layouts";
-import { ResourceLink } from "@components/resources/common";
+import { ResourceLink, ResourcePageHeader } from "@components/resources/common";
 import { useServer } from "@components/resources/server";
 import {
   ConfirmButton,
+  ContainerPortLink,
   DOCKER_LINK_ICONS,
   DockerLabelsSection,
   DockerResourceLink,
-  ResourcePageHeader,
 } from "@components/util";
-import { useLocalStorage, useRead, useSetTitle, useWrite } from "@lib/hooks";
+import {
+  useContainerPortsMap,
+  useLocalStorage,
+  useRead,
+  useSetTitle,
+  useWrite,
+} from "@lib/hooks";
 import { Button } from "@ui/button";
 import { DataTable } from "@ui/data-table";
 import {
@@ -62,6 +68,7 @@ const ContainerPageInner = ({
     },
     { refetchInterval: 10_000 }
   ).data?.find((container) => container.name === container_name);
+  const ports_map = useContainerPortsMap(list_container?.ports ?? []);
 
   const state = list_container?.state ?? Types.ContainerStateStatusEnum.Empty;
   const intention = container_state_intention(state);
@@ -93,6 +100,7 @@ const ContainerPageInner = ({
                   size={8}
                 />
               }
+              resource={undefined}
               name={container_name}
               state={state}
               status={list_container?.status}
@@ -132,6 +140,16 @@ const ContainerPageInner = ({
                       server_id={id}
                       name={volume}
                       muted
+                    />
+                  </Fragment>
+                ))}
+                {Object.keys(ports_map).map((host_port) => (
+                  <Fragment key={host_port}>
+                    |
+                    <ContainerPortLink
+                      host_port={host_port}
+                      ports={ports_map[host_port]}
+                      server_id={id}
                     />
                   </Fragment>
                 ))}

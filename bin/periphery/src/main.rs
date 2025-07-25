@@ -9,9 +9,11 @@ use axum_server::tls_rustls::RustlsConfig;
 use config::periphery_config;
 
 mod api;
+mod build;
 mod compose;
 mod config;
 mod docker;
+mod git;
 mod helpers;
 mod ssl;
 mod stats;
@@ -30,7 +32,8 @@ async fn app() -> anyhow::Result<()> {
     info!("{:?}", config.sanitized());
   }
 
-  stats::spawn_system_stats_polling_thread();
+  stats::spawn_polling_thread();
+  docker::stats::spawn_polling_thread();
 
   let addr = format!(
     "{}:{}",

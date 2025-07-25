@@ -8,8 +8,6 @@ export interface MongoIdObj {
 
 export type MongoId = MongoIdObj;
 
-export type I64 = number;
-
 /** The levels of permission that a User or UserGroup can have on a resource. */
 export enum PermissionLevel {
 	/** No permissions. */
@@ -27,6 +25,8 @@ export interface PermissionLevelAndSpecifics {
 	specific: Array<SpecificPermission>;
 }
 
+export type I64 = number;
+
 export interface Resource<Config, Info> {
 	/**
 	 * The Mongo ID of the resource.
@@ -41,8 +41,8 @@ export interface Resource<Config, Info> {
 	name: string;
 	/** A description for the resource */
 	description?: string;
-	/** When description last updated */
-	updated_at?: I64;
+	/** Mark resource as a template */
+	template?: boolean;
 	/** Tag Ids */
 	tags?: string[];
 	/** Resource-specific information (not user configurable). */
@@ -54,6 +54,8 @@ export interface Resource<Config, Info> {
 	 * resource.
 	 */
 	base_permission?: PermissionLevelAndSpecifics | PermissionLevel;
+	/** When description last updated */
+	updated_at?: I64;
 }
 
 export enum ScheduleFormat {
@@ -129,6 +131,8 @@ export interface ResourceListItem<Info> {
 	type: ResourceTarget["type"];
 	/** The resource name */
 	name: string;
+	/** Whether resource is a template */
+	template: boolean;
 	/** Tag Ids */
 	tags: string[];
 	/** Resource specific info */
@@ -165,7 +169,16 @@ export interface ActionListItemInfo {
 
 export type ActionListItem = ResourceListItem<ActionListItemInfo>;
 
-export enum TagBehavior {
+export enum TemplatesQueryBehavior {
+	/** Include templates in results. Default. */
+	Include = "Include",
+	/** Exclude templates from results. */
+	Exclude = "Exclude",
+	/** Results *only* includes templates. */
+	Only = "Only",
+}
+
+export enum TagQueryBehavior {
 	/** Returns resources which have strictly all the tags */
 	All = "All",
 	/** Returns resources which have one or more of the tags */
@@ -175,10 +188,11 @@ export enum TagBehavior {
 /** Passing empty Vec is the same as not filtering by that field */
 export interface ResourceQuery<T> {
 	names?: string[];
+	templates?: TemplatesQueryBehavior;
 	/** Pass Vec of tag ids or tag names */
 	tags?: string[];
 	/** 'All' or 'Any' */
-	tag_behavior?: TagBehavior;
+	tag_behavior?: TagQueryBehavior;
 	specific?: T;
 }
 
@@ -2271,26 +2285,47 @@ export interface SingleDiskUsage {
 }
 
 export enum Timelength {
+	/** `1-sec` */
 	OneSecond = "1-sec",
+	/** `5-sec` */
 	FiveSeconds = "5-sec",
+	/** `10-sec` */
 	TenSeconds = "10-sec",
+	/** `15-sec` */
 	FifteenSeconds = "15-sec",
+	/** `30-sec` */
 	ThirtySeconds = "30-sec",
+	/** `1-min` */
 	OneMinute = "1-min",
+	/** `2-min` */
 	TwoMinutes = "2-min",
+	/** `5-min` */
 	FiveMinutes = "5-min",
+	/** `10-min` */
 	TenMinutes = "10-min",
+	/** `15-min` */
 	FifteenMinutes = "15-min",
+	/** `30-min` */
 	ThirtyMinutes = "30-min",
+	/** `1-hr` */
 	OneHour = "1-hr",
+	/** `2-hr` */
 	TwoHours = "2-hr",
+	/** `6-hr` */
 	SixHours = "6-hr",
+	/** `8-hr` */
 	EightHours = "8-hr",
+	/** `12-hr` */
 	TwelveHours = "12-hr",
+	/** `1-day` */
 	OneDay = "1-day",
+	/** `3-day` */
 	ThreeDay = "3-day",
+	/** `1-wk` */
 	OneWeek = "1-wk",
+	/** `2-wk` */
 	TwoWeeks = "2-wk",
+	/** `30-day` */
 	ThirtyDays = "30-day",
 }
 
@@ -3242,6 +3277,25 @@ export type ListActionsResponse = ActionListItem[];
 
 export type ListAlertersResponse = AlerterListItem[];
 
+export enum PortTypeEnum {
+	EMPTY = "",
+	TCP = "tcp",
+	UDP = "udp",
+	SCTP = "sctp",
+}
+
+/** An open port on a container */
+export interface Port {
+	/** Host IP address that the container's port is mapped to */
+	IP?: string;
+	/** Port on the container */
+	PrivatePort?: number;
+	/** Port exposed on the host */
+	PublicPort?: number;
+	Type?: PortTypeEnum;
+}
+
+/** Container summary returned by container list apis. */
 export interface ContainerListItem {
 	/** The Server which holds the container. */
 	server_id?: string;
@@ -3267,8 +3321,12 @@ export interface ContainerListItem {
 	network_mode?: string;
 	/** The network names attached to container */
 	networks: string[];
+	/** Port mappings for the container */
+	ports: Port[];
 	/** The volume names attached to container */
 	volumes: string[];
+	/** The container stats, if they can be retreived. */
+	stats?: ContainerStats;
 	/**
 	 * The labels attached to container.
 	 * It's too big to send with container list,
@@ -3871,8 +3929,6 @@ export interface StackQuerySpecifics {
 
 export type StackQuery = ResourceQuery<StackQuerySpecifics>;
 
-export type UpdateDescriptionResponse = NoData;
-
 export type UpdateDockerRegistryAccountResponse = DockerRegistryAccount;
 
 export type UpdateGitProviderAccountResponse = GitProviderAccount;
@@ -3883,9 +3939,9 @@ export type UpdatePermissionOnTargetResponse = NoData;
 
 export type UpdateProcedureResponse = Procedure;
 
-export type UpdateServiceUserDescriptionResponse = User;
+export type UpdateResourceMetaResponse = NoData;
 
-export type UpdateTagsOnResourceResponse = NoData;
+export type UpdateServiceUserDescriptionResponse = User;
 
 export type UpdateUserAdminResponse = NoData;
 
@@ -4250,31 +4306,6 @@ export interface CancelRepoBuild {
 	repo: string;
 }
 
-export interface CloneArgs {
-	/** Resource name (eg Build name, Repo name) */
-	name: string;
-	/** Git provider domain. Default: `github.com` */
-	provider: string;
-	/** Use https (vs http). */
-	https: boolean;
-	/** Full repo identifier. {namespace}/{repo_name} */
-	repo?: string;
-	/** Git Branch. Default: `main` */
-	branch: string;
-	/** Specific commit hash. Optional */
-	commit?: string;
-	/** Use PERIPHERY_BUILD_DIR as the parent folder for the clone. */
-	is_build: boolean;
-	/** The clone destination path */
-	destination?: string;
-	/** Command to run after the repo has been cloned */
-	on_clone?: SystemCommand;
-	/** Command to run after the repo has been pulled */
-	on_pull?: SystemCommand;
-	/** Configure the account used to access repo (if private) */
-	account?: string;
-}
-
 /**
  * Clones the target repo. Response: [Update].
  * 
@@ -4354,6 +4385,214 @@ export interface ConnectTerminalQuery {
 	 * Create a terminal using [CreateTerminal][super::write::server::CreateTerminal]
 	 */
 	terminal: string;
+}
+
+/** Blkio stats entry.  This type is Linux-specific and omitted for Windows containers. */
+export interface ContainerBlkioStatEntry {
+	major?: U64;
+	minor?: U64;
+	op?: string;
+	value?: U64;
+}
+
+/**
+ * BlkioStats stores all IO service stats for data read and write.
+ * This type is Linux-specific and holds many fields that are specific to cgroups v1.
+ * On a cgroup v2 host, all fields other than `io_service_bytes_recursive` are omitted or `null`.
+ * This type is only populated on Linux and omitted for Windows containers.
+ */
+export interface ContainerBlkioStats {
+	io_service_bytes_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	io_serviced_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	io_queue_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	io_service_time_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	io_wait_time_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	io_merged_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	io_time_recursive?: ContainerBlkioStatEntry[];
+	/**
+	 * This field is only available when using Linux containers with cgroups v1.
+	 * It is omitted or `null` when using cgroups v2.
+	 */
+	sectors_recursive?: ContainerBlkioStatEntry[];
+}
+
+/** All CPU stats aggregated since container inception. */
+export interface ContainerCpuUsage {
+	/** Total CPU time consumed in nanoseconds (Linux) or 100's of nanoseconds (Windows). */
+	total_usage?: U64;
+	/**
+	 * Total CPU time (in nanoseconds) consumed per core (Linux).
+	 * This field is Linux-specific when using cgroups v1.
+	 * It is omitted when using cgroups v2 and Windows containers.
+	 */
+	percpu_usage?: U64[];
+	/**
+	 * Time (in nanoseconds) spent by tasks of the cgroup in kernel mode (Linux),
+	 * or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).
+	 * Not populated for Windows containers using Hyper-V isolation.
+	 */
+	usage_in_kernelmode?: U64;
+	/**
+	 * Time (in nanoseconds) spent by tasks of the cgroup in user mode (Linux),
+	 * or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).
+	 * Not populated for Windows containers using Hyper-V isolation.
+	 */
+	usage_in_usermode?: U64;
+}
+
+/**
+ * CPU throttling stats of the container.
+ * This type is Linux-specific and omitted for Windows containers.
+ */
+export interface ContainerThrottlingData {
+	/** Number of periods with throttling active. */
+	periods?: U64;
+	/** Number of periods when the container hit its throttling limit. */
+	throttled_periods?: U64;
+	/** Aggregated time (in nanoseconds) the container was throttled for. */
+	throttled_time?: U64;
+}
+
+/** CPU related info of the container */
+export interface ContainerCpuStats {
+	/** All CPU stats aggregated since container inception. */
+	cpu_usage?: ContainerCpuUsage;
+	/**
+	 * System Usage.
+	 * This field is Linux-specific and omitted for Windows containers.
+	 */
+	system_cpu_usage?: U64;
+	/**
+	 * Number of online CPUs.
+	 * This field is Linux-specific and omitted for Windows containers.
+	 */
+	online_cpus?: number;
+	/**
+	 * CPU throttling stats of the container.
+	 * This type is Linux-specific and omitted for Windows containers.
+	 */
+	throttling_data?: ContainerThrottlingData;
+}
+
+/**
+ * Aggregates all memory stats since container inception on Linux.
+ * Windows returns stats for commit and private working set only.
+ */
+export interface ContainerMemoryStats {
+	/**
+	 * Current `res_counter` usage for memory.
+	 * This field is Linux-specific and omitted for Windows containers.
+	 */
+	usage?: U64;
+	/**
+	 * Maximum usage ever recorded.
+	 * This field is Linux-specific and only supported on cgroups v1.
+	 * It is omitted when using cgroups v2 and for Windows containers.
+	 */
+	max_usage?: U64;
+	/**
+	 * All the stats exported via memory.stat. when using cgroups v2.
+	 * This field is Linux-specific and omitted for Windows containers.
+	 */
+	stats?: Record<string, U64>;
+	/** Number of times memory usage hits limits.  This field is Linux-specific and only supported on cgroups v1. It is omitted when using cgroups v2 and for Windows containers. */
+	failcnt?: U64;
+	/** This field is Linux-specific and omitted for Windows containers. */
+	limit?: U64;
+	/**
+	 * Committed bytes.
+	 * This field is Windows-specific and omitted for Linux containers.
+	 */
+	commitbytes?: U64;
+	/**
+	 * Peak committed bytes.
+	 * This field is Windows-specific and omitted for Linux containers.
+	 */
+	commitpeakbytes?: U64;
+	/**
+	 * Private working set.
+	 * This field is Windows-specific and omitted for Linux containers.
+	 */
+	privateworkingset?: U64;
+}
+
+/** Aggregates the network stats of one container */
+export interface ContainerNetworkStats {
+	/** Bytes received. Windows and Linux. */
+	rx_bytes?: U64;
+	/** Packets received. Windows and Linux. */
+	rx_packets?: U64;
+	/**
+	 * Received errors. Not used on Windows.
+	 * This field is Linux-specific and always zero for Windows containers.
+	 */
+	rx_errors?: U64;
+	/** Incoming packets dropped. Windows and Linux. */
+	rx_dropped?: U64;
+	/** Bytes sent. Windows and Linux. */
+	tx_bytes?: U64;
+	/** Packets sent. Windows and Linux. */
+	tx_packets?: U64;
+	/**
+	 * Sent errors. Not used on Windows.
+	 * This field is Linux-specific and always zero for Windows containers.
+	 */
+	tx_errors?: U64;
+	/** Outgoing packets dropped. Windows and Linux. */
+	tx_dropped?: U64;
+	/**
+	 * Endpoint ID. Not used on Linux.
+	 * This field is Windows-specific and omitted for Linux containers.
+	 */
+	endpoint_id?: string;
+	/**
+	 * Instance ID. Not used on Linux.
+	 * This field is Windows-specific and omitted for Linux containers.
+	 */
+	instance_id?: string;
+}
+
+/** PidsStats contains Linux-specific stats of a container's process-IDs (PIDs).  This type is Linux-specific and omitted for Windows containers. */
+export interface ContainerPidsStats {
+	/** Current is the number of PIDs in the cgroup. */
+	current?: U64;
+	/** Limit is the hard limit on the number of pids in the cgroup. A \"Limit\" of 0 means that there is no limit. */
+	limit?: U64;
+}
+
+/**
+ * StorageStats is the disk I/O stats for read/write on Windows.
+ * This type is Windows-specific and omitted for Linux containers.
+ */
+export interface ContainerStorageStats {
+	read_count_normalized?: U64;
+	read_size_bytes?: U64;
+	write_count_normalized?: U64;
+	write_size_bytes?: U64;
 }
 
 export interface Conversion {
@@ -4448,6 +4687,17 @@ export interface CopyResourceSync {
 	/** The name of the new sync. */
 	name: string;
 	/** The id of the sync to copy. */
+	id: string;
+}
+
+/**
+ * Creates a new server with given `name` and the configuration
+ * of the server at the given `id`. Response: [Server].
+ */
+export interface CopyServer {
+	/** The name of the new server. */
+	name: string;
+	/** The id of the server to copy. */
 	id: string;
 }
 
@@ -5285,6 +5535,50 @@ export interface ExportResourcesToToml {
 export interface FindUser {
 	/** Id or username */
 	user: string;
+}
+
+/** Statistics sample for a container. */
+export interface FullContainerStats {
+	/** Name of the container */
+	name: string;
+	/** ID of the container */
+	id?: string;
+	/**
+	 * Date and time at which this sample was collected.
+	 * The value is formatted as [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) with nano-seconds.
+	 */
+	read?: string;
+	/**
+	 * Date and time at which this first sample was collected.
+	 * This field is not propagated if the \"one-shot\" option is set.
+	 * If the \"one-shot\" option is set, this field may be omitted, empty,
+	 * or set to a default date (`0001-01-01T00:00:00Z`).
+	 * The value is formatted as [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) with nano-seconds.
+	 */
+	preread?: string;
+	/**
+	 * PidsStats contains Linux-specific stats of a container's process-IDs (PIDs).
+	 * This type is Linux-specific and omitted for Windows containers.
+	 */
+	pids_stats?: ContainerPidsStats;
+	/**
+	 * BlkioStats stores all IO service stats for data read and write.
+	 * This type is Linux-specific and holds many fields that are specific to cgroups v1.
+	 * On a cgroup v2 host, all fields other than `io_service_bytes_recursive` are omitted or `null`.
+	 * This type is only populated on Linux and omitted for Windows containers.
+	 */
+	blkio_stats?: ContainerBlkioStats;
+	/**
+	 * The number of processors on the system.
+	 * This field is Windows-specific and always zero for Linux containers.
+	 */
+	num_procs?: number;
+	storage_stats?: ContainerStorageStats;
+	cpu_stats?: ContainerCpuStats;
+	precpu_stats?: ContainerCpuStats;
+	memory_stats?: ContainerMemoryStats;
+	/** Network statistics for the container per interface.  This field is omitted if the container has no networking enabled. */
+	networks?: ContainerNetworkStats;
 }
 
 /** Get a specific action. Response: [Action]. */
@@ -6498,7 +6792,7 @@ export interface ListSchedules {
 	/** Pass Vec of tag ids or tag names */
 	tags?: string[];
 	/** 'All' or 'Any' */
-	tag_behavior?: TagBehavior;
+	tag_behavior?: TagQueryBehavior;
 }
 
 /**
@@ -6745,24 +7039,6 @@ export interface PermissionToml {
 	level?: PermissionLevel;
 	/** Any [SpecificPermissions](SpecificPermission) on the resource */
 	specific?: Array<SpecificPermission>;
-}
-
-export enum PortTypeEnum {
-	EMPTY = "",
-	TCP = "tcp",
-	UDP = "udp",
-	SCTP = "sctp",
-}
-
-/** An open port on a container */
-export interface Port {
-	/** Host IP address that the container's port is mapped to */
-	IP?: string;
-	/** Port on the container */
-	PrivatePort?: number;
-	/** Port exposed on the host */
-	PublicPort?: number;
-	Type?: PortTypeEnum;
 }
 
 /**
@@ -7042,11 +7318,66 @@ export interface RenameUserGroup {
 	name: string;
 }
 
+export enum DefaultRepoFolder {
+	/** /${root_directory}/stacks */
+	Stacks = "Stacks",
+	/** /${root_directory}/builds */
+	Builds = "Builds",
+	/** /${root_directory}/repos */
+	Repos = "Repos",
+	/**
+	 * If the repo is only cloned
+	 * in the core repo cache (resource sync),
+	 * this isn't relevant.
+	 */
+	NotApplicable = "NotApplicable",
+}
+
+export interface RepoExecutionArgs {
+	/** Resource name (eg Build name, Repo name) */
+	name: string;
+	/** Git provider domain. Default: `github.com` */
+	provider: string;
+	/** Use https (vs http). */
+	https: boolean;
+	/** Configure the account used to access repo (if private) */
+	account?: string;
+	/**
+	 * Full repo identifier. {namespace}/{repo_name}
+	 * Its optional to force checking and produce error if not defined.
+	 */
+	repo?: string;
+	/** Git Branch. Default: `main` */
+	branch: string;
+	/** Specific commit hash. Optional */
+	commit?: string;
+	/** The clone destination path */
+	destination?: string;
+	/**
+	 * The default folder to use.
+	 * Depends on the resource type.
+	 */
+	default_folder: DefaultRepoFolder;
+}
+
+export interface RepoExecutionResponse {
+	/** Response logs */
+	logs: Log[];
+	/** Absolute path to the repo root on the host. */
+	path: string;
+	/** Latest short commit hash, if it could be retrieved */
+	commit_hash?: string;
+	/** Latest commit message, if it could be retrieved */
+	commit_message?: string;
+}
+
 export interface ResourceToml<PartialConfig> {
 	/** The resource name. Required */
 	name: string;
 	/** The resource description. Optional. */
 	description?: string;
+	/** Mark resource as a template */
+	template?: boolean;
 	/** Tag ids or names. Optional */
 	tags?: string[];
 	/**
@@ -7573,17 +7904,6 @@ export interface UpdateDeployment {
 }
 
 /**
- * Update a resources description.
- * Response: [NoData].
- */
-export interface UpdateDescription {
-	/** The target resource to set description for. */
-	target: ResourceTarget;
-	/** The new description. */
-	description: string;
-}
-
-/**
  * **Admin only.** Update a docker registry account.
  * Response: [DockerRegistryAccount].
  */
@@ -7669,6 +7989,33 @@ export interface UpdateRepo {
 }
 
 /**
+ * Update a resources common meta fields.
+ * - description
+ * - template
+ * - tags
+ * Response: [NoData].
+ */
+export interface UpdateResourceMeta {
+	/** The target resource to set update meta. */
+	target: ResourceTarget;
+	/**
+	 * New description to set,
+	 * or null for no update
+	 */
+	description?: string;
+	/**
+	 * New template value (true or false),
+	 * or null for no update
+	 */
+	template?: boolean;
+	/**
+	 * The exact tags to set,
+	 * or null for no update
+	 */
+	tags?: string[];
+}
+
+/**
  * Update the sync at the given id, and return the updated sync.
  * Response: [ResourceSync].
  * 
@@ -7739,16 +8086,6 @@ export interface UpdateTagColor {
 	tag: string;
 	/** The new color for the tag. */
 	color: TagColor;
-}
-
-/**
- * Update the tags on a resource.
- * Response: [NoData]
- */
-export interface UpdateTagsOnResource {
-	target: ResourceTarget;
-	/** Tag Ids */
-	tags: string[];
 }
 
 /**
@@ -8219,8 +8556,9 @@ export type WriteRequest =
 	| { type: "UpdateUserBasePermissions", params: UpdateUserBasePermissions }
 	| { type: "UpdatePermissionOnResourceType", params: UpdatePermissionOnResourceType }
 	| { type: "UpdatePermissionOnTarget", params: UpdatePermissionOnTarget }
-	| { type: "UpdateDescription", params: UpdateDescription }
+	| { type: "UpdateResourceMeta", params: UpdateResourceMeta }
 	| { type: "CreateServer", params: CreateServer }
+	| { type: "CopyServer", params: CopyServer }
 	| { type: "DeleteServer", params: DeleteServer }
 	| { type: "UpdateServer", params: UpdateServer }
 	| { type: "RenameServer", params: RenameServer }
@@ -8294,7 +8632,6 @@ export type WriteRequest =
 	| { type: "DeleteTag", params: DeleteTag }
 	| { type: "RenameTag", params: RenameTag }
 	| { type: "UpdateTagColor", params: UpdateTagColor }
-	| { type: "UpdateTagsOnResource", params: UpdateTagsOnResource }
 	| { type: "CreateVariable", params: CreateVariable }
 	| { type: "UpdateVariableValue", params: UpdateVariableValue }
 	| { type: "UpdateVariableDescription", params: UpdateVariableDescription }

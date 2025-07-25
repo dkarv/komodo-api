@@ -29,13 +29,22 @@ export var ActionState;
     /** Currently running */
     ActionState["Running"] = "Running";
 })(ActionState || (ActionState = {}));
-export var TagBehavior;
-(function (TagBehavior) {
+export var TemplatesQueryBehavior;
+(function (TemplatesQueryBehavior) {
+    /** Include templates in results. Default. */
+    TemplatesQueryBehavior["Include"] = "Include";
+    /** Exclude templates from results. */
+    TemplatesQueryBehavior["Exclude"] = "Exclude";
+    /** Results *only* includes templates. */
+    TemplatesQueryBehavior["Only"] = "Only";
+})(TemplatesQueryBehavior || (TemplatesQueryBehavior = {}));
+export var TagQueryBehavior;
+(function (TagQueryBehavior) {
     /** Returns resources which have strictly all the tags */
-    TagBehavior["All"] = "All";
+    TagQueryBehavior["All"] = "All";
     /** Returns resources which have one or more of the tags */
-    TagBehavior["Any"] = "Any";
-})(TagBehavior || (TagBehavior = {}));
+    TagQueryBehavior["Any"] = "Any";
+})(TagQueryBehavior || (TagQueryBehavior = {}));
 /** Types of maintenance schedules */
 export var MaintenanceScheduleType;
 (function (MaintenanceScheduleType) {
@@ -238,26 +247,47 @@ export var SeverityLevel;
 })(SeverityLevel || (SeverityLevel = {}));
 export var Timelength;
 (function (Timelength) {
+    /** `1-sec` */
     Timelength["OneSecond"] = "1-sec";
+    /** `5-sec` */
     Timelength["FiveSeconds"] = "5-sec";
+    /** `10-sec` */
     Timelength["TenSeconds"] = "10-sec";
+    /** `15-sec` */
     Timelength["FifteenSeconds"] = "15-sec";
+    /** `30-sec` */
     Timelength["ThirtySeconds"] = "30-sec";
+    /** `1-min` */
     Timelength["OneMinute"] = "1-min";
+    /** `2-min` */
     Timelength["TwoMinutes"] = "2-min";
+    /** `5-min` */
     Timelength["FiveMinutes"] = "5-min";
+    /** `10-min` */
     Timelength["TenMinutes"] = "10-min";
+    /** `15-min` */
     Timelength["FifteenMinutes"] = "15-min";
+    /** `30-min` */
     Timelength["ThirtyMinutes"] = "30-min";
+    /** `1-hr` */
     Timelength["OneHour"] = "1-hr";
+    /** `2-hr` */
     Timelength["TwoHours"] = "2-hr";
+    /** `6-hr` */
     Timelength["SixHours"] = "6-hr";
+    /** `8-hr` */
     Timelength["EightHours"] = "8-hr";
+    /** `12-hr` */
     Timelength["TwelveHours"] = "12-hr";
+    /** `1-day` */
     Timelength["OneDay"] = "1-day";
+    /** `3-day` */
     Timelength["ThreeDay"] = "3-day";
+    /** `1-wk` */
     Timelength["OneWeek"] = "1-wk";
+    /** `2-wk` */
     Timelength["TwoWeeks"] = "2-wk";
+    /** `30-day` */
     Timelength["ThirtyDays"] = "30-day";
 })(Timelength || (Timelength = {}));
 export var TagColor;
@@ -412,6 +442,13 @@ export var ClusterVolumePublishStatusStateEnum;
     ClusterVolumePublishStatusStateEnum["PendingNodeUnpublish"] = "pending-node-unpublish";
     ClusterVolumePublishStatusStateEnum["PendingControllerUnpublish"] = "pending-controller-unpublish";
 })(ClusterVolumePublishStatusStateEnum || (ClusterVolumePublishStatusStateEnum = {}));
+export var PortTypeEnum;
+(function (PortTypeEnum) {
+    PortTypeEnum["EMPTY"] = "";
+    PortTypeEnum["TCP"] = "tcp";
+    PortTypeEnum["UDP"] = "udp";
+    PortTypeEnum["SCTP"] = "sctp";
+})(PortTypeEnum || (PortTypeEnum = {}));
 export var ProcedureState;
 (function (ProcedureState) {
     /** Last run successful */
@@ -517,13 +554,21 @@ export var TerminalRecreateMode;
     /** Only kill and recreate if the command is different. */
     TerminalRecreateMode["DifferentCommand"] = "DifferentCommand";
 })(TerminalRecreateMode || (TerminalRecreateMode = {}));
-export var PortTypeEnum;
-(function (PortTypeEnum) {
-    PortTypeEnum["EMPTY"] = "";
-    PortTypeEnum["TCP"] = "tcp";
-    PortTypeEnum["UDP"] = "udp";
-    PortTypeEnum["SCTP"] = "sctp";
-})(PortTypeEnum || (PortTypeEnum = {}));
+export var DefaultRepoFolder;
+(function (DefaultRepoFolder) {
+    /** /${root_directory}/stacks */
+    DefaultRepoFolder["Stacks"] = "Stacks";
+    /** /${root_directory}/builds */
+    DefaultRepoFolder["Builds"] = "Builds";
+    /** /${root_directory}/repos */
+    DefaultRepoFolder["Repos"] = "Repos";
+    /**
+     * If the repo is only cloned
+     * in the core repo cache (resource sync),
+     * this isn't relevant.
+     */
+    DefaultRepoFolder["NotApplicable"] = "NotApplicable";
+})(DefaultRepoFolder || (DefaultRepoFolder = {}));
 export var SearchCombinator;
 (function (SearchCombinator) {
     SearchCombinator["Or"] = "Or";
