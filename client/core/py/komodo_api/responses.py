@@ -879,14 +879,17 @@ class WriteApi:
         )
 
     # ==== DESCRIPTION ====
-    def updateDescription(self, params: UpdateDescription) -> UpdateDescriptionResponse:
+    def updateResourceMeta(self, params: UpdateResourceMeta) -> UpdateResourceMetaResponse:
         return self._write(
-            WriteRequestUpdateDescription(params=params), UpdateDescriptionResponse
+            WriteRequestUpdateResourceMeta(params=params), UpdateResourceMetaResponse
         )
 
     # ==== SERVER ====
     def createServer(self, params: CreateServer) -> Server:
         return self._write(WriteRequestCreateServer(params=params), Server)
+
+    def copyServer(self, params: CopyServer) -> Server:
+        return self._write(WriteRequestCopyServer(params=params), Server)
 
     def deleteServer(self, params: DeleteServer) -> Server:
         return self._write(WriteRequestDeleteServer(params=params), Server)
@@ -1142,14 +1145,6 @@ class WriteApi:
 
     def updateTagColor(self, params: UpdateTagColor) -> Tag:
         return self._write(WriteRequestUpdateTagColor(params=params), Tag)
-
-    def updateTagsOnResource(
-        self, params: UpdateTagsOnResource
-    ) -> UpdateTagsOnResourceResponse:
-        return self._write(
-            WriteRequestUpdateTagsOnResource(params=params),
-            UpdateTagsOnResourceResponse,
-        )
 
     # ==== VARIABLE ====
     def createVariable(self, params: CreateVariable) -> CreateVariableResponse:

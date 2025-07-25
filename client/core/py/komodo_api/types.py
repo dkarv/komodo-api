@@ -20,8 +20,6 @@ class MongoIdObj(BaseModel):
 
 MongoId = MongoIdObj
 
-I64 = int
-
 class PermissionLevel(str, Enum):
     """
     The levels of permission that a User or UserGroup can have on a resource.
@@ -46,6 +44,8 @@ class PermissionLevelAndSpecifics(BaseModel):
     level: PermissionLevel
     specific: Set[SpecificPermission]
 
+I64 = int
+
 class Resource(BaseModel, Generic[Config, Info]):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -64,9 +64,9 @@ class Resource(BaseModel, Generic[Config, Info]):
     """
     A description for the resource
     """
-    updated_at: Optional[I64] = Field(default=None)
+    template: Optional[bool] = Field(default=None)
     """
-    When description last updated
+    Mark resource as a template
     """
     tags: Optional[List[str]] = Field(default=None)
     """
@@ -84,6 +84,10 @@ class Resource(BaseModel, Generic[Config, Info]):
     """
     Set a base permission level that all users will have on the
     resource.
+    """
+    updated_at: Optional[I64] = Field(default=None)
+    """
+    When description last updated
     """
 
 class ScheduleFormat(str, Enum):
@@ -173,6 +177,10 @@ class ResourceListItem(BaseModel, Generic[Info]):
     """
     The resource name
     """
+    template: bool
+    """
+    Whether resource is a template
+    """
     tags: List[str]
     """
     Tag Ids
@@ -221,7 +229,20 @@ class ActionListItemInfo(BaseModel):
 
 ActionListItem = ResourceListItem[ActionListItemInfo]
 
-class TagBehavior(str, Enum):
+class TemplatesQueryBehavior(str, Enum):
+    INCLUDE = "Include"
+    """
+    Include templates in results. Default.
+    """
+    EXCLUDE = "Exclude"
+    """
+    Exclude templates from results.
+    """
+    ONLY = "Only"
+    """
+    Results *only* includes templates.
+    """
+class TagQueryBehavior(str, Enum):
     ALL = "All"
     """
     Returns resources which have strictly all the tags
@@ -235,11 +256,12 @@ class ResourceQuery(BaseModel, Generic[T]):
     Passing empty Vec is the same as not filtering by that field
     """
     names: Optional[List[str]] = Field(default=None)
+    templates: Optional[TemplatesQueryBehavior] = Field(default=None)
     tags: Optional[List[str]] = Field(default=None)
     """
     Pass Vec of tag ids or tag names
     """
-    tag_behavior: Optional[TagBehavior] = Field(default=None)
+    tag_behavior: Optional[TagQueryBehavior] = Field(default=None)
     """
     'All' or 'Any'
     """
@@ -3639,26 +3661,89 @@ class SingleDiskUsage(BaseModel):
 
 class Timelength(str, Enum):
     ONESECOND = "1-sec"
+    """
+    `1-sec`
+    """
     FIVESECONDS = "5-sec"
+    """
+    `5-sec`
+    """
     TENSECONDS = "10-sec"
+    """
+    `10-sec`
+    """
     FIFTEENSECONDS = "15-sec"
+    """
+    `15-sec`
+    """
     THIRTYSECONDS = "30-sec"
+    """
+    `30-sec`
+    """
     ONEMINUTE = "1-min"
+    """
+    `1-min`
+    """
     TWOMINUTES = "2-min"
+    """
+    `2-min`
+    """
     FIVEMINUTES = "5-min"
+    """
+    `5-min`
+    """
     TENMINUTES = "10-min"
+    """
+    `10-min`
+    """
     FIFTEENMINUTES = "15-min"
+    """
+    `15-min`
+    """
     THIRTYMINUTES = "30-min"
+    """
+    `30-min`
+    """
     ONEHOUR = "1-hr"
+    """
+    `1-hr`
+    """
     TWOHOURS = "2-hr"
+    """
+    `2-hr`
+    """
     SIXHOURS = "6-hr"
+    """
+    `6-hr`
+    """
     EIGHTHOURS = "8-hr"
+    """
+    `8-hr`
+    """
     TWELVEHOURS = "12-hr"
+    """
+    `12-hr`
+    """
     ONEDAY = "1-day"
+    """
+    `1-day`
+    """
     THREEDAY = "3-day"
+    """
+    `3-day`
+    """
     ONEWEEK = "1-wk"
+    """
+    `1-wk`
+    """
     TWOWEEKS = "2-wk"
+    """
+    `2-wk`
+    """
     THIRTYDAYS = "30-day"
+    """
+    `30-day`
+    """
 class SystemStats(BaseModel):
     """
     Realtime system stats data.
@@ -5169,7 +5254,35 @@ ListActionsResponse = List[ActionListItem]
 
 ListAlertersResponse = List[AlerterListItem]
 
+class PortTypeEnum(str, Enum):
+    EMPTY = ""
+    TCP = "tcp"
+    UDP = "udp"
+    SCTP = "sctp"
+class Port(BaseModel):
+    """
+    An open port on a container
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    ip: Optional[str] = Field(alias="IP", default=None)
+    """
+    Host IP address that the container's port is mapped to
+    """
+    private_port: Optional[int] = Field(alias="PrivatePort", default=None)
+    """
+    Port on the container
+    """
+    public_port: Optional[int] = Field(alias="PublicPort", default=None)
+    """
+    Port exposed on the host
+    """
+    typ: Optional[PortTypeEnum] = Field(alias="Type", default=None)
+
 class ContainerListItem(BaseModel):
+    """
+    Container summary returned by container list apis.
+    """
     server_id: Optional[str] = Field(default=None)
     """
     The Server which holds the container.
@@ -5218,9 +5331,17 @@ class ContainerListItem(BaseModel):
     """
     The network names attached to container
     """
+    ports: List[Port]
+    """
+    Port mappings for the container
+    """
     volumes: List[str]
     """
     The volume names attached to container
+    """
+    stats: Optional[ContainerStats] = Field(default=None)
+    """
+    The container stats, if they can be retreived.
     """
     labels: Optional[Dict[str, str]] = Field(default=None)
     """
@@ -6102,8 +6223,6 @@ class StackQuerySpecifics(BaseModel):
 
 StackQuery = ResourceQuery[StackQuerySpecifics]
 
-UpdateDescriptionResponse = NoData
-
 UpdateDockerRegistryAccountResponse = DockerRegistryAccount
 
 UpdateGitProviderAccountResponse = GitProviderAccount
@@ -6114,9 +6233,9 @@ UpdatePermissionOnTargetResponse = NoData
 
 UpdateProcedureResponse = Procedure
 
-UpdateServiceUserDescriptionResponse = User
+UpdateResourceMetaResponse = NoData
 
-UpdateTagsOnResourceResponse = NoData
+UpdateServiceUserDescriptionResponse = User
 
 UpdateUserAdminResponse = NoData
 
@@ -6516,52 +6635,6 @@ class CancelRepoBuild(BaseModel):
     Can be id or name
     """
 
-class CloneArgs(BaseModel):
-    name: str
-    """
-    Resource name (eg Build name, Repo name)
-    """
-    provider: str
-    """
-    Git provider domain. Default: `github.com`
-    """
-    https: bool
-    """
-    Use https (vs http).
-    """
-    repo: Optional[str] = Field(default=None)
-    """
-    Full repo identifier. {namespace}/{repo_name}
-    """
-    branch: str
-    """
-    Git Branch. Default: `main`
-    """
-    commit: Optional[str] = Field(default=None)
-    """
-    Specific commit hash. Optional
-    """
-    is_build: bool
-    """
-    Use PERIPHERY_BUILD_DIR as the parent folder for the clone.
-    """
-    destination: Optional[str] = Field(default=None)
-    """
-    The clone destination path
-    """
-    on_clone: Optional[SystemCommand] = Field(default=None)
-    """
-    Command to run after the repo has been cloned
-    """
-    on_pull: Optional[SystemCommand] = Field(default=None)
-    """
-    Command to run after the repo has been pulled
-    """
-    account: Optional[str] = Field(default=None)
-    """
-    Configure the account used to access repo (if private)
-    """
-
 class CloneRepo(BaseModel):
     """
     Clones the target repo. Response: [Update].
@@ -6658,6 +6731,245 @@ class ConnectTerminalQuery(BaseModel):
     the call will fail.
     Create a terminal using [CreateTerminal][super::write::server::CreateTerminal]
     """
+
+class ContainerBlkioStatEntry(BaseModel):
+    """
+    Blkio stats entry.  This type is Linux-specific and omitted for Windows containers.
+    """
+    major: Optional[U64] = Field(default=None)
+    minor: Optional[U64] = Field(default=None)
+    op: Optional[str] = Field(default=None)
+    value: Optional[U64] = Field(default=None)
+
+class ContainerBlkioStats(BaseModel):
+    """
+    BlkioStats stores all IO service stats for data read and write.
+    This type is Linux-specific and holds many fields that are specific to cgroups v1.
+    On a cgroup v2 host, all fields other than `io_service_bytes_recursive` are omitted or `null`.
+    This type is only populated on Linux and omitted for Windows containers.
+    """
+    io_service_bytes_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    io_serviced_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+    io_queue_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+    io_service_time_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+    io_wait_time_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+    io_merged_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+    io_time_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+    sectors_recursive: Optional[List[ContainerBlkioStatEntry]] = Field(default=None)
+    """
+    This field is only available when using Linux containers with cgroups v1.
+    It is omitted or `null` when using cgroups v2.
+    """
+
+class ContainerCpuUsage(BaseModel):
+    """
+    All CPU stats aggregated since container inception.
+    """
+    total_usage: Optional[U64] = Field(default=None)
+    """
+    Total CPU time consumed in nanoseconds (Linux) or 100's of nanoseconds (Windows).
+    """
+    percpu_usage: Optional[List[U64]] = Field(default=None)
+    """
+    Total CPU time (in nanoseconds) consumed per core (Linux).
+    This field is Linux-specific when using cgroups v1.
+    It is omitted when using cgroups v2 and Windows containers.
+    """
+    usage_in_kernelmode: Optional[U64] = Field(default=None)
+    """
+    Time (in nanoseconds) spent by tasks of the cgroup in kernel mode (Linux),
+    or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).
+    Not populated for Windows containers using Hyper-V isolation.
+    """
+    usage_in_usermode: Optional[U64] = Field(default=None)
+    """
+    Time (in nanoseconds) spent by tasks of the cgroup in user mode (Linux),
+    or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).
+    Not populated for Windows containers using Hyper-V isolation.
+    """
+
+class ContainerThrottlingData(BaseModel):
+    """
+    CPU throttling stats of the container.
+    This type is Linux-specific and omitted for Windows containers.
+    """
+    periods: Optional[U64] = Field(default=None)
+    """
+    Number of periods with throttling active.
+    """
+    throttled_periods: Optional[U64] = Field(default=None)
+    """
+    Number of periods when the container hit its throttling limit.
+    """
+    throttled_time: Optional[U64] = Field(default=None)
+    """
+    Aggregated time (in nanoseconds) the container was throttled for.
+    """
+
+class ContainerCpuStats(BaseModel):
+    """
+    CPU related info of the container
+    """
+    cpu_usage: Optional[ContainerCpuUsage] = Field(default=None)
+    """
+    All CPU stats aggregated since container inception.
+    """
+    system_cpu_usage: Optional[U64] = Field(default=None)
+    """
+    System Usage.
+    This field is Linux-specific and omitted for Windows containers.
+    """
+    online_cpus: Optional[int] = Field(default=None)
+    """
+    Number of online CPUs.
+    This field is Linux-specific and omitted for Windows containers.
+    """
+    throttling_data: Optional[ContainerThrottlingData] = Field(default=None)
+    """
+    CPU throttling stats of the container.
+    This type is Linux-specific and omitted for Windows containers.
+    """
+
+class ContainerMemoryStats(BaseModel):
+    """
+    Aggregates all memory stats since container inception on Linux.
+    Windows returns stats for commit and private working set only.
+    """
+    usage: Optional[U64] = Field(default=None)
+    """
+    Current `res_counter` usage for memory.
+    This field is Linux-specific and omitted for Windows containers.
+    """
+    max_usage: Optional[U64] = Field(default=None)
+    """
+    Maximum usage ever recorded.
+    This field is Linux-specific and only supported on cgroups v1.
+    It is omitted when using cgroups v2 and for Windows containers.
+    """
+    stats: Optional[Dict[str, U64]] = Field(default=None)
+    """
+    All the stats exported via memory.stat. when using cgroups v2.
+    This field is Linux-specific and omitted for Windows containers.
+    """
+    failcnt: Optional[U64] = Field(default=None)
+    """
+    Number of times memory usage hits limits.  This field is Linux-specific and only supported on cgroups v1. It is omitted when using cgroups v2 and for Windows containers.
+    """
+    limit: Optional[U64] = Field(default=None)
+    """
+    This field is Linux-specific and omitted for Windows containers.
+    """
+    commitbytes: Optional[U64] = Field(default=None)
+    """
+    Committed bytes.
+    This field is Windows-specific and omitted for Linux containers.
+    """
+    commitpeakbytes: Optional[U64] = Field(default=None)
+    """
+    Peak committed bytes.
+    This field is Windows-specific and omitted for Linux containers.
+    """
+    privateworkingset: Optional[U64] = Field(default=None)
+    """
+    Private working set.
+    This field is Windows-specific and omitted for Linux containers.
+    """
+
+class ContainerNetworkStats(BaseModel):
+    """
+    Aggregates the network stats of one container
+    """
+    rx_bytes: Optional[U64] = Field(default=None)
+    """
+    Bytes received. Windows and Linux.
+    """
+    rx_packets: Optional[U64] = Field(default=None)
+    """
+    Packets received. Windows and Linux.
+    """
+    rx_errors: Optional[U64] = Field(default=None)
+    """
+    Received errors. Not used on Windows.
+    This field is Linux-specific and always zero for Windows containers.
+    """
+    rx_dropped: Optional[U64] = Field(default=None)
+    """
+    Incoming packets dropped. Windows and Linux.
+    """
+    tx_bytes: Optional[U64] = Field(default=None)
+    """
+    Bytes sent. Windows and Linux.
+    """
+    tx_packets: Optional[U64] = Field(default=None)
+    """
+    Packets sent. Windows and Linux.
+    """
+    tx_errors: Optional[U64] = Field(default=None)
+    """
+    Sent errors. Not used on Windows.
+    This field is Linux-specific and always zero for Windows containers.
+    """
+    tx_dropped: Optional[U64] = Field(default=None)
+    """
+    Outgoing packets dropped. Windows and Linux.
+    """
+    endpoint_id: Optional[str] = Field(default=None)
+    """
+    Endpoint ID. Not used on Linux.
+    This field is Windows-specific and omitted for Linux containers.
+    """
+    instance_id: Optional[str] = Field(default=None)
+    """
+    Instance ID. Not used on Linux.
+    This field is Windows-specific and omitted for Linux containers.
+    """
+
+class ContainerPidsStats(BaseModel):
+    """
+    PidsStats contains Linux-specific stats of a container's process-IDs (PIDs).  This type is Linux-specific and omitted for Windows containers.
+    """
+    current: Optional[U64] = Field(default=None)
+    """
+    Current is the number of PIDs in the cgroup.
+    """
+    limit: Optional[U64] = Field(default=None)
+    """
+    Limit is the hard limit on the number of pids in the cgroup. A \"Limit\" of 0 means that there is no limit.
+    """
+
+class ContainerStorageStats(BaseModel):
+    """
+    StorageStats is the disk I/O stats for read/write on Windows.
+    This type is Windows-specific and omitted for Linux containers.
+    """
+    read_count_normalized: Optional[U64] = Field(default=None)
+    read_size_bytes: Optional[U64] = Field(default=None)
+    write_count_normalized: Optional[U64] = Field(default=None)
+    write_size_bytes: Optional[U64] = Field(default=None)
 
 class Conversion(BaseModel):
     local: str
@@ -6779,6 +7091,20 @@ class CopyResourceSync(BaseModel):
     id: str
     """
     The id of the sync to copy.
+    """
+
+class CopyServer(BaseModel):
+    """
+    Creates a new server with given `name` and the configuration
+    of the server at the given `id`. Response: [Server].
+    """
+    name: str
+    """
+    The name of the new server.
+    """
+    id: str
+    """
+    The id of the server to copy.
     """
 
 class CopyStack(BaseModel):
@@ -7821,6 +8147,57 @@ class FindUser(BaseModel):
     user: str
     """
     Id or username
+    """
+
+class FullContainerStats(BaseModel):
+    """
+    Statistics sample for a container.
+    """
+    name: str
+    """
+    Name of the container
+    """
+    id: Optional[str] = Field(default=None)
+    """
+    ID of the container
+    """
+    read: Optional[str] = Field(default=None)
+    """
+    Date and time at which this sample was collected.
+    The value is formatted as [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) with nano-seconds.
+    """
+    preread: Optional[str] = Field(default=None)
+    """
+    Date and time at which this first sample was collected.
+    This field is not propagated if the \"one-shot\" option is set.
+    If the \"one-shot\" option is set, this field may be omitted, empty,
+    or set to a default date (`0001-01-01T00:00:00Z`).
+    The value is formatted as [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) with nano-seconds.
+    """
+    pids_stats: Optional[ContainerPidsStats] = Field(default=None)
+    """
+    PidsStats contains Linux-specific stats of a container's process-IDs (PIDs).
+    This type is Linux-specific and omitted for Windows containers.
+    """
+    blkio_stats: Optional[ContainerBlkioStats] = Field(default=None)
+    """
+    BlkioStats stores all IO service stats for data read and write.
+    This type is Linux-specific and holds many fields that are specific to cgroups v1.
+    On a cgroup v2 host, all fields other than `io_service_bytes_recursive` are omitted or `null`.
+    This type is only populated on Linux and omitted for Windows containers.
+    """
+    num_procs: Optional[int] = Field(default=None)
+    """
+    The number of processors on the system.
+    This field is Windows-specific and always zero for Linux containers.
+    """
+    storage_stats: Optional[ContainerStorageStats] = Field(default=None)
+    cpu_stats: Optional[ContainerCpuStats] = Field(default=None)
+    precpu_stats: Optional[ContainerCpuStats] = Field(default=None)
+    memory_stats: Optional[ContainerMemoryStats] = Field(default=None)
+    networks: Optional[ContainerNetworkStats] = Field(default=None)
+    """
+    Network statistics for the container per interface.  This field is omitted if the container has no networking enabled.
     """
 
 class GetAction(BaseModel):
@@ -9422,7 +9799,7 @@ class ListSchedules(BaseModel):
     """
     Pass Vec of tag ids or tag names
     """
-    tag_behavior: Optional[TagBehavior] = Field(default=None)
+    tag_behavior: Optional[TagQueryBehavior] = Field(default=None)
     """
     'All' or 'Any'
     """
@@ -9720,31 +10097,6 @@ class PermissionToml(BaseModel):
     """
     Any [SpecificPermissions](SpecificPermission) on the resource
     """
-
-class PortTypeEnum(str, Enum):
-    EMPTY = ""
-    TCP = "tcp"
-    UDP = "udp"
-    SCTP = "sctp"
-class Port(BaseModel):
-    """
-    An open port on a container
-    """
-    model_config = ConfigDict(populate_by_name=True)
-
-    ip: Optional[str] = Field(alias="IP", default=None)
-    """
-    Host IP address that the container's port is mapped to
-    """
-    private_port: Optional[int] = Field(alias="PrivatePort", default=None)
-    """
-    Port on the container
-    """
-    public_port: Optional[int] = Field(alias="PublicPort", default=None)
-    """
-    Port exposed on the host
-    """
-    typ: Optional[PortTypeEnum] = Field(alias="Type", default=None)
 
 class PruneBuildx(BaseModel):
     """
@@ -10098,6 +10450,83 @@ class RenameUserGroup(BaseModel):
     The new name for the UserGroup
     """
 
+class DefaultRepoFolder(str, Enum):
+    STACKS = "Stacks"
+    """
+    /${root_directory}/stacks
+    """
+    BUILDS = "Builds"
+    """
+    /${root_directory}/builds
+    """
+    REPOS = "Repos"
+    """
+    /${root_directory}/repos
+    """
+    NOTAPPLICABLE = "NotApplicable"
+    """
+    If the repo is only cloned
+    in the core repo cache (resource sync),
+    this isn't relevant.
+    """
+class RepoExecutionArgs(BaseModel):
+    name: str
+    """
+    Resource name (eg Build name, Repo name)
+    """
+    provider: str
+    """
+    Git provider domain. Default: `github.com`
+    """
+    https: bool
+    """
+    Use https (vs http).
+    """
+    account: Optional[str] = Field(default=None)
+    """
+    Configure the account used to access repo (if private)
+    """
+    repo: Optional[str] = Field(default=None)
+    """
+    Full repo identifier. {namespace}/{repo_name}
+    Its optional to force checking and produce error if not defined.
+    """
+    branch: str
+    """
+    Git Branch. Default: `main`
+    """
+    commit: Optional[str] = Field(default=None)
+    """
+    Specific commit hash. Optional
+    """
+    destination: Optional[str] = Field(default=None)
+    """
+    The clone destination path
+    """
+    default_folder: DefaultRepoFolder
+    """
+    The default folder to use.
+    Depends on the resource type.
+    """
+
+class RepoExecutionResponse(BaseModel):
+    logs: List[Log]
+    """
+    Response logs
+    """
+    path: str
+    """
+    Absolute path to the repo root on the host.
+    """
+    commit_hash: Optional[str] = Field(default=None)
+    """
+    Latest short commit hash, if it could be retrieved
+    """
+    commit_message: Optional[str] = Field(default=None)
+    """
+    Latest commit message, if it could be retrieved
+    """
+
 class ResourceToml(BaseModel, Generic[PartialConfig]):
     name: str
     """
@@ -10106,6 +10535,10 @@ class ResourceToml(BaseModel, Generic[PartialConfig]):
     description: Optional[str] = Field(default=None)
     """
     The resource description. Optional.
+    """
+    template: Optional[bool] = Field(default=None)
+    """
+    Mark resource as a template
     """
     tags: Optional[List[str]] = Field(default=None)
     """
@@ -10767,20 +11200,6 @@ class UpdateDeployment(BaseModel):
     The partial config update.
     """
 
-class UpdateDescription(BaseModel):
-    """
-    Update a resources description.
-    Response: [NoData].
-    """
-    target: ResourceTarget
-    """
-    The target resource to set description for.
-    """
-    description: str
-    """
-    The new description.
-    """
-
 class UpdateDockerRegistryAccount(BaseModel):
     """
     **Admin only.** Update a docker registry account.
@@ -10888,6 +11307,34 @@ class UpdateRepo(BaseModel):
     The partial config update to apply.
     """
 
+class UpdateResourceMeta(BaseModel):
+    """
+    Update a resources common meta fields.
+    - description
+    - template
+    - tags
+    Response: [NoData].
+    """
+    target: ResourceTarget
+    """
+    The target resource to set update meta.
+    """
+    description: Optional[str] = Field(default=None)
+    """
+    New description to set,
+    or null for no update
+    """
+    template: Optional[bool] = Field(default=None)
+    """
+    New template value (true or false),
+    or null for no update
+    """
+    tags: Optional[List[str]] = Field(default=None)
+    """
+    The exact tags to set,
+    or null for no update
+    """
+
 class UpdateResourceSync(BaseModel):
     """
     Update the sync at the given id, and return the updated sync.
@@ -10976,17 +11423,6 @@ class UpdateTagColor(BaseModel):
     color: TagColor
     """
     The new color for the tag.
-    """
-
-class UpdateTagsOnResource(BaseModel):
-    """
-    Update the tags on a resource.
-    Response: [NoData]
-    """
-    target: ResourceTarget
-    tags: List[str]
-    """
-    Tag Ids
     """
 
 class UpdateUserAdmin(BaseModel):
@@ -12345,8 +12781,9 @@ class WriteRequestTypes(str, Enum):
     UPDATE_USER_BASE_PERMISSIONS = "UpdateUserBasePermissions"
     UPDATE_PERMISSION_ON_RESOURCE_TYPE = "UpdatePermissionOnResourceType"
     UPDATE_PERMISSION_ON_TARGET = "UpdatePermissionOnTarget"
-    UPDATE_DESCRIPTION = "UpdateDescription"
+    UPDATE_RESOURCE_META = "UpdateResourceMeta"
     CREATE_SERVER = "CreateServer"
+    COPY_SERVER = "CopyServer"
     DELETE_SERVER = "DeleteServer"
     UPDATE_SERVER = "UpdateServer"
     RENAME_SERVER = "RenameServer"
@@ -12420,7 +12857,6 @@ class WriteRequestTypes(str, Enum):
     DELETE_TAG = "DeleteTag"
     RENAME_TAG = "RenameTag"
     UPDATE_TAG_COLOR = "UpdateTagColor"
-    UPDATE_TAGS_ON_RESOURCE = "UpdateTagsOnResource"
     CREATE_VARIABLE = "CreateVariable"
     UPDATE_VARIABLE_VALUE = "UpdateVariableValue"
     UPDATE_VARIABLE_DESCRIPTION = "UpdateVariableDescription"
@@ -12505,13 +12941,17 @@ class WriteRequestUpdatePermissionOnTarget(BaseModel):
     type: Literal[WriteRequestTypes.UPDATE_PERMISSION_ON_TARGET] = WriteRequestTypes.UPDATE_PERMISSION_ON_TARGET
     params: UpdatePermissionOnTarget
 
-class WriteRequestUpdateDescription(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_DESCRIPTION] = WriteRequestTypes.UPDATE_DESCRIPTION
-    params: UpdateDescription
+class WriteRequestUpdateResourceMeta(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_RESOURCE_META] = WriteRequestTypes.UPDATE_RESOURCE_META
+    params: UpdateResourceMeta
 
 class WriteRequestCreateServer(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_SERVER] = WriteRequestTypes.CREATE_SERVER
     params: CreateServer
+
+class WriteRequestCopyServer(BaseModel):
+    type: Literal[WriteRequestTypes.COPY_SERVER] = WriteRequestTypes.COPY_SERVER
+    params: CopyServer
 
 class WriteRequestDeleteServer(BaseModel):
     type: Literal[WriteRequestTypes.DELETE_SERVER] = WriteRequestTypes.DELETE_SERVER
@@ -12805,10 +13245,6 @@ class WriteRequestUpdateTagColor(BaseModel):
     type: Literal[WriteRequestTypes.UPDATE_TAG_COLOR] = WriteRequestTypes.UPDATE_TAG_COLOR
     params: UpdateTagColor
 
-class WriteRequestUpdateTagsOnResource(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_TAGS_ON_RESOURCE] = WriteRequestTypes.UPDATE_TAGS_ON_RESOURCE
-    params: UpdateTagsOnResource
-
 class WriteRequestCreateVariable(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_VARIABLE] = WriteRequestTypes.CREATE_VARIABLE
     params: CreateVariable
@@ -12853,7 +13289,7 @@ class WriteRequestDeleteDockerRegistryAccount(BaseModel):
     type: Literal[WriteRequestTypes.DELETE_DOCKER_REGISTRY_ACCOUNT] = WriteRequestTypes.DELETE_DOCKER_REGISTRY_ACCOUNT
     params: DeleteDockerRegistryAccount
 
-WriteRequest = Union[WriteRequestUpdateUserUsername, WriteRequestUpdateUserPassword, WriteRequestDeleteUser, WriteRequestCreateServiceUser, WriteRequestUpdateServiceUserDescription, WriteRequestCreateApiKeyForServiceUser, WriteRequestDeleteApiKeyForServiceUser, WriteRequestCreateUserGroup, WriteRequestRenameUserGroup, WriteRequestDeleteUserGroup, WriteRequestAddUserToUserGroup, WriteRequestRemoveUserFromUserGroup, WriteRequestSetUsersInUserGroup, WriteRequestSetEveryoneUserGroup, WriteRequestUpdateUserAdmin, WriteRequestUpdateUserBasePermissions, WriteRequestUpdatePermissionOnResourceType, WriteRequestUpdatePermissionOnTarget, WriteRequestUpdateDescription, WriteRequestCreateServer, WriteRequestDeleteServer, WriteRequestUpdateServer, WriteRequestRenameServer, WriteRequestCreateNetwork, WriteRequestCreateTerminal, WriteRequestDeleteTerminal, WriteRequestDeleteAllTerminals, WriteRequestCreateStack, WriteRequestCopyStack, WriteRequestDeleteStack, WriteRequestUpdateStack, WriteRequestRenameStack, WriteRequestWriteStackFileContents, WriteRequestRefreshStackCache, WriteRequestCreateStackWebhook, WriteRequestDeleteStackWebhook, WriteRequestCreateDeployment, WriteRequestCopyDeployment, WriteRequestCreateDeploymentFromContainer, WriteRequestDeleteDeployment, WriteRequestUpdateDeployment, WriteRequestRenameDeployment, WriteRequestCreateBuild, WriteRequestCopyBuild, WriteRequestDeleteBuild, WriteRequestUpdateBuild, WriteRequestRenameBuild, WriteRequestWriteBuildFileContents, WriteRequestRefreshBuildCache, WriteRequestCreateBuildWebhook, WriteRequestDeleteBuildWebhook, WriteRequestCreateBuilder, WriteRequestCopyBuilder, WriteRequestDeleteBuilder, WriteRequestUpdateBuilder, WriteRequestRenameBuilder, WriteRequestCreateRepo, WriteRequestCopyRepo, WriteRequestDeleteRepo, WriteRequestUpdateRepo, WriteRequestRenameRepo, WriteRequestRefreshRepoCache, WriteRequestCreateRepoWebhook, WriteRequestDeleteRepoWebhook, WriteRequestCreateAlerter, WriteRequestCopyAlerter, WriteRequestDeleteAlerter, WriteRequestUpdateAlerter, WriteRequestRenameAlerter, WriteRequestCreateProcedure, WriteRequestCopyProcedure, WriteRequestDeleteProcedure, WriteRequestUpdateProcedure, WriteRequestRenameProcedure, WriteRequestCreateAction, WriteRequestCopyAction, WriteRequestDeleteAction, WriteRequestUpdateAction, WriteRequestRenameAction, WriteRequestCreateResourceSync, WriteRequestCopyResourceSync, WriteRequestDeleteResourceSync, WriteRequestUpdateResourceSync, WriteRequestRenameResourceSync, WriteRequestWriteSyncFileContents, WriteRequestCommitSync, WriteRequestRefreshResourceSyncPending, WriteRequestCreateSyncWebhook, WriteRequestDeleteSyncWebhook, WriteRequestCreateTag, WriteRequestDeleteTag, WriteRequestRenameTag, WriteRequestUpdateTagColor, WriteRequestUpdateTagsOnResource, WriteRequestCreateVariable, WriteRequestUpdateVariableValue, WriteRequestUpdateVariableDescription, WriteRequestUpdateVariableIsSecret, WriteRequestDeleteVariable, WriteRequestCreateGitProviderAccount, WriteRequestUpdateGitProviderAccount, WriteRequestDeleteGitProviderAccount, WriteRequestCreateDockerRegistryAccount, WriteRequestUpdateDockerRegistryAccount, WriteRequestDeleteDockerRegistryAccount]
+WriteRequest = Union[WriteRequestUpdateUserUsername, WriteRequestUpdateUserPassword, WriteRequestDeleteUser, WriteRequestCreateServiceUser, WriteRequestUpdateServiceUserDescription, WriteRequestCreateApiKeyForServiceUser, WriteRequestDeleteApiKeyForServiceUser, WriteRequestCreateUserGroup, WriteRequestRenameUserGroup, WriteRequestDeleteUserGroup, WriteRequestAddUserToUserGroup, WriteRequestRemoveUserFromUserGroup, WriteRequestSetUsersInUserGroup, WriteRequestSetEveryoneUserGroup, WriteRequestUpdateUserAdmin, WriteRequestUpdateUserBasePermissions, WriteRequestUpdatePermissionOnResourceType, WriteRequestUpdatePermissionOnTarget, WriteRequestUpdateResourceMeta, WriteRequestCreateServer, WriteRequestCopyServer, WriteRequestDeleteServer, WriteRequestUpdateServer, WriteRequestRenameServer, WriteRequestCreateNetwork, WriteRequestCreateTerminal, WriteRequestDeleteTerminal, WriteRequestDeleteAllTerminals, WriteRequestCreateStack, WriteRequestCopyStack, WriteRequestDeleteStack, WriteRequestUpdateStack, WriteRequestRenameStack, WriteRequestWriteStackFileContents, WriteRequestRefreshStackCache, WriteRequestCreateStackWebhook, WriteRequestDeleteStackWebhook, WriteRequestCreateDeployment, WriteRequestCopyDeployment, WriteRequestCreateDeploymentFromContainer, WriteRequestDeleteDeployment, WriteRequestUpdateDeployment, WriteRequestRenameDeployment, WriteRequestCreateBuild, WriteRequestCopyBuild, WriteRequestDeleteBuild, WriteRequestUpdateBuild, WriteRequestRenameBuild, WriteRequestWriteBuildFileContents, WriteRequestRefreshBuildCache, WriteRequestCreateBuildWebhook, WriteRequestDeleteBuildWebhook, WriteRequestCreateBuilder, WriteRequestCopyBuilder, WriteRequestDeleteBuilder, WriteRequestUpdateBuilder, WriteRequestRenameBuilder, WriteRequestCreateRepo, WriteRequestCopyRepo, WriteRequestDeleteRepo, WriteRequestUpdateRepo, WriteRequestRenameRepo, WriteRequestRefreshRepoCache, WriteRequestCreateRepoWebhook, WriteRequestDeleteRepoWebhook, WriteRequestCreateAlerter, WriteRequestCopyAlerter, WriteRequestDeleteAlerter, WriteRequestUpdateAlerter, WriteRequestRenameAlerter, WriteRequestCreateProcedure, WriteRequestCopyProcedure, WriteRequestDeleteProcedure, WriteRequestUpdateProcedure, WriteRequestRenameProcedure, WriteRequestCreateAction, WriteRequestCopyAction, WriteRequestDeleteAction, WriteRequestUpdateAction, WriteRequestRenameAction, WriteRequestCreateResourceSync, WriteRequestCopyResourceSync, WriteRequestDeleteResourceSync, WriteRequestUpdateResourceSync, WriteRequestRenameResourceSync, WriteRequestWriteSyncFileContents, WriteRequestCommitSync, WriteRequestRefreshResourceSyncPending, WriteRequestCreateSyncWebhook, WriteRequestDeleteSyncWebhook, WriteRequestCreateTag, WriteRequestDeleteTag, WriteRequestRenameTag, WriteRequestUpdateTagColor, WriteRequestCreateVariable, WriteRequestUpdateVariableValue, WriteRequestUpdateVariableDescription, WriteRequestUpdateVariableIsSecret, WriteRequestDeleteVariable, WriteRequestCreateGitProviderAccount, WriteRequestUpdateGitProviderAccount, WriteRequestDeleteGitProviderAccount, WriteRequestCreateDockerRegistryAccount, WriteRequestUpdateDockerRegistryAccount, WriteRequestDeleteDockerRegistryAccount]
 class WsLoginMessageJwtInner(BaseModel):
     """
     Generated type representing the anonymous struct variant `Jwt` of the `WsLoginMessage` Rust enum
