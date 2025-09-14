@@ -125,8 +125,7 @@ croner = "3.0.0"
 # MISC
 async-compression = { version = "0.4.28", features = ["tokio", "gzip"] }
 derive_builder = "0.20.2"
-comfy-table = "7.1.4"
-typeshare = "1.0.4"
+typeshare = { version = "1.13.3", features = ["python"] }
 octorust = "0.10.0"
 dashmap = "6.1.0"
 wildcard = "0.3.0"
