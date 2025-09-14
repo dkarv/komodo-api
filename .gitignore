@@ -11,3 +11,4 @@ deno.lock
 /lib/ts_client/build
 
 .dev
+package-lock.json
