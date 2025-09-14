@@ -1,4 +1,5 @@
 use anyhow::{Context, anyhow};
+use database::mungos::{find::find_collect, mongodb::bson::doc};
 use komodo_client::{
   api::read::{
     GetPermission, GetPermissionResponse, ListPermissions,
@@ -7,7 +8,6 @@ use komodo_client::{
   },
   entities::permission::PermissionLevel,
 };
-use mungos::{find::find_collect, mongodb::bson::doc};
 use resolver_api::Resolve;
 
 use crate::{

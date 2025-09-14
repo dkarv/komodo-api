@@ -1,30 +1,36 @@
 [package]
 name = "komodo_cli"
-description = "Command line tool to execute Komodo actions"
+description = "Command line tool for Komodo"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
+homepage.workspace = true
 
 [[bin]]
-name = "komodo"
+name = "km"
 path = "src/main.rs"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # local
-# komodo_client = "1.16.12"
+environment_file.workspace = true
 komodo_client.workspace = true
+database.workspace = true
+config.workspace = true
+logger.workspace = true
 # external
-tracing-subscriber.workspace = true
-merge_config_files.workspace = true
-futures.workspace = true
+futures-util.workspace = true
+comfy-table.workspace = true
+serde_json.workspace = true
+serde_qs.workspace = true
+wildcard.workspace = true
 tracing.workspace = true
 colored.workspace = true
+dotenvy.workspace = true
 anyhow.workspace = true
+chrono.workspace = true
 tokio.workspace = true
 serde.workspace = true
 clap.workspace = true
+envy.workspace = true

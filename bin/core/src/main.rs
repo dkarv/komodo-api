@@ -5,7 +5,7 @@ use std::{net::SocketAddr, str::FromStr};
 
 use anyhow::Context;
 use axum::Router;
-use axum_server::tls_rustls::RustlsConfig;
+use axum_server::{Handle, tls_rustls::RustlsConfig};
 use tower_http::{
   cors::{Any, CorsLayer},
   services::{ServeDir, ServeFile},
@@ -18,10 +18,10 @@ mod api;
 mod auth;
 mod cloud;
 mod config;
-mod db;
 mod helpers;
 mod listener;
 mod monitor;
+mod network;
 mod permission;
 mod resource;
 mod schedule;
@@ -45,10 +45,14 @@ async fn app() -> anyhow::Result<()> {
 
   info!("Komodo Core version: v{}", env!("CARGO_PKG_VERSION"));
 
-  if core_config().pretty_startup_config {
-    info!("{:#?}", config.sanitized());
-  } else {
-    info!("{:?}", config.sanitized());
+  match (
+    config.pretty_startup_config,
+    config.unsafe_unsanitized_startup_config,
+  ) {
+    (true, true) => info!("{:#?}", config),
+    (true, false) => info!("{:#?}", config.sanitized()),
+    (false, true) => info!("{:?}", config),
+    (false, false) => info!("{:?}", config.sanitized()),
   }
 
   // Init jwt client to crash on failure
@@ -65,7 +69,7 @@ async fn app() -> anyhow::Result<()> {
   // Spawn background tasks
   monitor::spawn_monitor_loop();
   resource::spawn_resource_refresh_loop();
-  resource::spawn_all_resources_refresh_loop();
+  resource::spawn_all_resources_cache_refresh_loop();
   resource::spawn_build_state_refresh_loop();
   resource::spawn_repo_state_refresh_loop();
   resource::spawn_procedure_state_refresh_loop();
@@ -104,6 +108,18 @@ async fn app() -> anyhow::Result<()> {
   let socket_addr = SocketAddr::from_str(&addr)
     .context("failed to parse listen address")?;
 
+  let handle = Handle::new();
+  tokio::spawn({
+    // Cannot run actions until the server is available.
+    // We can use a handle for the server, and wait until
+    // the handle is listening before running actions
+    let handle = handle.clone();
+    async move {
+      handle.listening().await;
+      startup::run_startup_actions().await;
+    }
+  });
+
   if config.ssl_enabled {
     info!("🔒 Core SSL Enabled");
     rustls::crypto::ring::default_provider()
@@ -117,6 +133,7 @@ async fn app() -> anyhow::Result<()> {
     .await
     .context("Invalid ssl cert / key")?;
     axum_server::bind_rustls(socket_addr, ssl_config)
+      .handle(handle)
       .serve(app)
       .await
       .context("failed to start https server")
@@ -124,6 +141,7 @@ async fn app() -> anyhow::Result<()> {
     info!("🔓 Core SSL Disabled");
     info!("Komodo Core starting on http://{socket_addr}");
     axum_server::bind(socket_addr)
+      .handle(handle)
       .serve(app)
       .await
       .context("failed to start http server")

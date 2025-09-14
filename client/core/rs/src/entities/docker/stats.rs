@@ -61,7 +61,7 @@ pub struct FullContainerStats {
   /// Network statistics for the container per interface.  This field is omitted if the container has no networking enabled.
   #[serde(rename = "networks")]
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub networks: Option<ContainerNetworkStats>,
+  pub networks: Option<HashMap<String, ContainerNetworkStats>>,
 }
 
 /// PidsStats contains Linux-specific stats of a container's process-IDs (PIDs).  This type is Linux-specific and omitted for Windows containers.

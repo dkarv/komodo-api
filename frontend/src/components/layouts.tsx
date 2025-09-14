@@ -170,6 +170,7 @@ interface SectionProps {
   actions?: ReactNode;
   // otherwise items-start
   itemsCenterTitleRow?: boolean;
+  className?: string;
 }
 
 export const Section = ({
@@ -180,8 +181,9 @@ export const Section = ({
   actions,
   children,
   itemsCenterTitleRow,
+  className,
 }: SectionProps) => (
-  <div className="flex flex-col gap-4">
+  <div className={cn("flex flex-col gap-4", className)}>
     {(title || icon || titleRight || titleOther || actions) && (
       <div
         className={cn(
@@ -211,15 +213,18 @@ export const NewLayout = ({
   enabled,
   onConfirm,
   onOpenChange,
+  configureLabel = "a unique name",
 }: {
   entityType: string;
   children: ReactNode;
   enabled: boolean;
   onConfirm: () => Promise<unknown>;
   onOpenChange?: (open: boolean) => void;
+  configureLabel?: string;
 }) => {
   const [open, set] = useState(false);
   const [loading, setLoading] = useState(false);
+
   return (
     <Dialog
       open={open}
@@ -236,7 +241,9 @@ export const NewLayout = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New {entityType}</DialogTitle>
-          <DialogDescription>Enter a unique name for the new {entityType}.</DialogDescription>
+          <DialogDescription>
+            Enter {configureLabel} for the new {entityType}.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-6 py-8">{children}</div>
         <DialogFooter>
@@ -244,9 +251,14 @@ export const NewLayout = ({
             variant="secondary"
             onClick={async () => {
               setLoading(true);
-              await onConfirm();
-              setLoading(false);
-              set(false);
+              try {
+                await onConfirm();
+                set(false);
+              } catch (error) {
+                console.error("Error creating resource:", error);
+              } finally {
+                setLoading(false);
+              }
             }}
             disabled={!enabled || loading}
           >

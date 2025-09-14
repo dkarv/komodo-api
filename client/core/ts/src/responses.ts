@@ -2,7 +2,7 @@ import * as Types from "./types.js";
 
 export type AuthResponses = {
   GetLoginOptions: Types.GetLoginOptionsResponse;
-  CreateLocalUser: Types.CreateLocalUserResponse;
+  SignUpLocalUser: Types.SignUpLocalUserResponse;
   LoginLocalUser: Types.LoginLocalUserResponse;
   ExchangeForJwt: Types.ExchangeForJwtResponse;
   GetUser: Types.GetUserResponse;
@@ -179,9 +179,10 @@ export type ReadResponses = {
 
 export type WriteResponses = {
   // ==== USER ====
-  UpdateUserUsername: Types.UpdateUserUsername;
-  UpdateUserPassword: Types.UpdateUserPassword;
-  DeleteUser: Types.DeleteUser;
+  CreateLocalUser: Types.CreateLocalUserResponse;
+  UpdateUserUsername: Types.UpdateUserUsernameResponse;
+  UpdateUserPassword: Types.UpdateUserPasswordResponse;
+  DeleteUser: Types.DeleteUserResponse;
 
   // ==== SERVICE USER ====
   CreateServiceUser: Types.CreateServiceUserResponse;
@@ -292,7 +293,7 @@ export type WriteResponses = {
   DeleteResourceSync: Types.ResourceSync;
   UpdateResourceSync: Types.ResourceSync;
   RenameResourceSync: Types.Update;
-  CommitSync: Types.ResourceSync;
+  CommitSync: Types.Update;
   WriteSyncFileContents: Types.Update;
   RefreshResourceSyncPending: Types.ResourceSync;
   CreateSyncWebhook: Types.CreateSyncWebhookResponse;
@@ -404,7 +405,14 @@ export type ExecuteResponses = {
   PauseStackService: Types.Update;
   UnpauseStackService: Types.Update;
   DestroyStackService: Types.Update;
-
+  RunStackService: Types.Update;
+  
   // ==== ALERTER ====
   TestAlerter: Types.Update;
+  SendAlert: Types.Update;
+
+  // ==== MAINTENANCE ====
+  ClearRepoCache: Types.Update;
+  BackupCoreDatabase: Types.Update;
+  GlobalAutoUpdate: Types.Update;
 };

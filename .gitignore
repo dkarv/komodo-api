@@ -1,6 +1,7 @@
 target
 node_modules
 dist
+deno.lock
 .env
 .env.development
 .DS_Store
@@ -9,5 +10,5 @@ dist
 /frontend/build
 /lib/ts_client/build
 
-creds.toml
 .dev
+package-lock.json

@@ -60,7 +60,14 @@ async fn update_container_stats() {
 pub async fn get_container_stats(
   container_name: Option<String>,
 ) -> anyhow::Result<Vec<ContainerStats>> {
-  let format = "--format \"{{ json . }}\"";
+  let format = "--format '{\"BlockIO\":\"{{ .BlockIO }}\", \
+                           \"CPUPerc\":\"{{ .CPUPerc }}\", \
+                           \"ID\":\"{{ .ID }}\", \
+                           \"MemPerc\":\"{{ .MemPerc }}\", \
+                           \"MemUsage\":\"{{ .MemUsage }}\", \
+                           \"Name\":\"{{ .Name }}\", \
+                           \"NetIO\":\"{{ .NetIO }}\",\
+                           \"PIDs\":\"{{ .PIDs }}\"}'";
   let container_name = match container_name {
     Some(name) => format!(" {name}"),
     None => "".to_string(),
@@ -231,18 +238,29 @@ fn convert_memory_stats(
 }
 
 fn convert_network_stats(
-  network_stats: models::ContainerNetworkStats,
-) -> ContainerNetworkStats {
-  ContainerNetworkStats {
-    rx_bytes: network_stats.rx_bytes,
-    rx_packets: network_stats.rx_packets,
-    rx_errors: network_stats.rx_errors,
-    rx_dropped: network_stats.rx_dropped,
-    tx_bytes: network_stats.tx_bytes,
-    tx_packets: network_stats.tx_packets,
-    tx_errors: network_stats.tx_errors,
-    tx_dropped: network_stats.tx_dropped,
-    endpoint_id: network_stats.endpoint_id,
-    instance_id: network_stats.instance_id,
-  }
+  network_stats: HashMap<
+    std::string::String,
+    models::ContainerNetworkStats,
+  >,
+) -> HashMap<std::string::String, ContainerNetworkStats> {
+  network_stats
+    .into_iter()
+    .map(|(name, network_stats)| {
+      (
+        name,
+        ContainerNetworkStats {
+          rx_bytes: network_stats.rx_bytes,
+          rx_packets: network_stats.rx_packets,
+          rx_errors: network_stats.rx_errors,
+          rx_dropped: network_stats.rx_dropped,
+          tx_bytes: network_stats.tx_bytes,
+          tx_packets: network_stats.tx_packets,
+          tx_errors: network_stats.tx_errors,
+          tx_dropped: network_stats.tx_dropped,
+          endpoint_id: network_stats.endpoint_id,
+          instance_id: network_stats.instance_id,
+        },
+      )
+    })
+    .collect()
 }

@@ -3,9 +3,9 @@ use async_timing_util::unix_timestamp_ms;
 use axum::{
   Router, extract::Query, response::Redirect, routing::get,
 };
+use database::mongo_indexed::Document;
+use database::mungos::mongodb::bson::doc;
 use komodo_client::entities::user::{User, UserConfig};
-use mongo_indexed::Document;
-use mungos::mongodb::bson::doc;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serror::AddStatusCode;
@@ -148,7 +148,7 @@ async fn callback(
     format!("{}?token={exchange_token}", core_config().host)
   } else {
     let splitter = if redirect.contains('?') { '&' } else { '?' };
-    format!("{}{splitter}token={exchange_token}", redirect)
+    format!("{redirect}{splitter}token={exchange_token}")
   };
   Ok(Redirect::to(&redirect_url))
 }

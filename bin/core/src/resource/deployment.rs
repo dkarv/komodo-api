@@ -1,4 +1,5 @@
 use anyhow::Context;
+use database::mungos::mongodb::Collection;
 use formatting::format_serror;
 use indexmap::IndexSet;
 use komodo_client::entities::{
@@ -18,7 +19,6 @@ use komodo_client::entities::{
   update::Update,
   user::User,
 };
-use mungos::mongodb::Collection;
 use periphery_client::api::container::RemoveContainer;
 
 use crate::{
@@ -301,9 +301,10 @@ impl super::KomodoResource for Deployment {
   }
 
   async fn post_delete(
-    _resource: &Resource<Self::Config, Self::Info>,
+    resource: &Resource<Self::Config, Self::Info>,
     _update: &mut Update,
   ) -> anyhow::Result<()> {
+    deployment_status_cache().remove(&resource.id).await;
     Ok(())
   }
 }
@@ -313,36 +314,33 @@ async fn validate_config(
   config: &mut PartialDeploymentConfig,
   user: &User,
 ) -> anyhow::Result<()> {
-  if let Some(server_id) = &config.server_id {
-    if !server_id.is_empty() {
-      let server = get_check_permissions::<Server>(
-        server_id,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context("Cannot attach Deployment to this Server")?;
-      config.server_id = Some(server.id);
-    }
+  if let Some(server_id) = &config.server_id
+    && !server_id.is_empty()
+  {
+    let server = get_check_permissions::<Server>(
+      server_id,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot attach Deployment to this Server")?;
+    config.server_id = Some(server.id);
   }
   if let Some(DeploymentImage::Build { build_id, version }) =
     &config.image
+    && !build_id.is_empty()
   {
-    if !build_id.is_empty() {
-      let build = get_check_permissions::<Build>(
-        build_id,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context(
-        "Cannot update deployment with this build attached.",
-      )?;
-      config.image = Some(DeploymentImage::Build {
-        build_id: build.id,
-        version: *version,
-      });
-    }
+    let build = get_check_permissions::<Build>(
+      build_id,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot update deployment with this build attached.")?;
+    config.image = Some(DeploymentImage::Build {
+      build_id: build.id,
+      version: *version,
+    });
   }
   if let Some(volumes) = &config.volumes {
     conversions_from_str(volumes).context("Invalid volumes")?;

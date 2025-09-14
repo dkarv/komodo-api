@@ -160,7 +160,7 @@ export const ResourceSyncInfo = ({
                           }
                         }}
                         disabled={!edits[keyPath]}
-                        language="toml"
+                        language="fancy_toml"
                         loading={isPending}
                       />
                     </>
@@ -175,7 +175,7 @@ export const ResourceSyncInfo = ({
                 <CardContent className="pr-8">
                   <MonacoEditor
                     value={edits[keyPath] ?? content.contents}
-                    language="toml"
+                    language="fancy_toml"
                     readOnly={!canEdit}
                     onValueChange={editFileCallback(keyPath)}
                   />

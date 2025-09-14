@@ -6,18 +6,18 @@ use std::{
 };
 
 use anyhow::Context;
+use database::mongo_indexed::Indexed;
+use database::mungos::{
+  bulk_update::{self, BulkUpdate},
+  find::find_collect,
+  mongodb::bson::{doc, oid::ObjectId, to_bson},
+};
 use derive_variants::ExtractVariant;
 use komodo_client::entities::{
   ResourceTarget,
   alert::{Alert, AlertData, AlertDataVariant, SeverityLevel},
   komodo_timestamp, optional_string,
   server::{Server, ServerState},
-};
-use mongo_indexed::Indexed;
-use mungos::{
-  bulk_update::{self, BulkUpdate},
-  find::find_collect,
-  mongodb::bson::{doc, oid::ObjectId, to_bson},
 };
 
 use crate::{
@@ -176,6 +176,77 @@ pub async fn alert_servers(
           server_status.id.clone(),
           AlertDataVariant::ServerUnreachable,
         ),
+    }
+
+    // ===================
+    // SERVER VERSION MISMATCH
+    // ===================
+    let core_version = env!("CARGO_PKG_VERSION");
+    let has_version_mismatch = server_status.state == ServerState::Ok
+      && !server_status.version.is_empty()
+      && server_status.version != "Unknown"
+      && server_status.version != core_version;
+
+    let version_alert = server_alerts.as_ref().and_then(|alerts| {
+      alerts.get(&AlertDataVariant::ServerVersionMismatch)
+    });
+
+    match (has_version_mismatch, version_alert) {
+      (true, None) => {
+        // Only open version mismatch alert if not in maintenance and buffer is ready
+        if !in_maintenance
+          && buffer.ready_to_open(
+            server_status.id.clone(),
+            AlertDataVariant::ServerVersionMismatch,
+          )
+        {
+          let alert = Alert {
+            id: Default::default(),
+            ts,
+            resolved: false,
+            resolved_ts: None,
+            level: SeverityLevel::Warning,
+            target: ResourceTarget::Server(server_status.id.clone()),
+            data: AlertData::ServerVersionMismatch {
+              id: server_status.id.clone(),
+              name: server.name.clone(),
+              region: optional_string(&server.config.region),
+              server_version: server_status.version.clone(),
+              core_version: core_version.to_string(),
+            },
+          };
+          // Use send_unreachable_alerts as a proxy for general server alerts
+          alerts_to_open
+            .push((alert, server.config.send_version_mismatch_alerts))
+        }
+      }
+      (true, Some(alert)) => {
+        // Update existing alert with current version info
+        let mut alert = alert.clone();
+        alert.data = AlertData::ServerVersionMismatch {
+          id: server_status.id.clone(),
+          name: server.name.clone(),
+          region: optional_string(&server.config.region),
+          server_version: server_status.version.clone(),
+          core_version: core_version.to_string(),
+        };
+        // Don't send notification for updates
+        alerts_to_update.push((alert, false));
+      }
+      (false, Some(alert)) => {
+        // Version is now correct, close the alert
+        alert_ids_to_close.push((
+          alert.clone(),
+          server.config.send_version_mismatch_alerts,
+        ));
+      }
+      (false, None) => {
+        // Reset buffer state when no mismatch and no alert
+        buffer.reset(
+          server_status.id.clone(),
+          AlertDataVariant::ServerVersionMismatch,
+        )
+      }
     }
 
     let Some(health) = &server_status.health else {

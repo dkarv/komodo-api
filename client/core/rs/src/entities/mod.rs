@@ -85,6 +85,8 @@ pub type Usize = usize;
 pub type MongoDocument = bson::Document;
 #[typeshare(serialized_as = "any")]
 pub type JsonValue = serde_json::Value;
+#[typeshare(serialized_as = "any")]
+pub type JsonObject = serde_json::Map<String, serde_json::Value>;
 #[typeshare(serialized_as = "MongoIdObj")]
 pub type MongoId = String;
 #[typeshare(serialized_as = "__Serror")]
@@ -127,43 +129,52 @@ pub fn optional_string(string: impl Into<String>) -> Option<String> {
   }
 }
 
-pub fn get_image_name(
+pub fn get_image_names(
   build::Build {
     name,
     config:
       build::BuildConfig {
         image_name,
-        image_registry:
-          ImageRegistryConfig {
-            domain,
-            account,
-            organization,
-          },
+        image_registry,
         ..
       },
     ..
   }: &build::Build,
-) -> anyhow::Result<String> {
+) -> Vec<String> {
   let name = if image_name.is_empty() {
     name
   } else {
     image_name
   };
-  let name = match (
-    !domain.is_empty(),
-    !organization.is_empty(),
-    !account.is_empty(),
-  ) {
-    // If organization and account provided, name under organization.
-    (true, true, true) => {
-      format!("{domain}/{}/{name}", organization)
-    }
-    // Just domain / account provided
-    (true, false, true) => format!("{domain}/{account}/{name}"),
-    // Otherwise, just use name
-    _ => name.to_string(),
-  };
-  Ok(name)
+  // Local only
+  if image_registry.is_empty() {
+    return vec![name.to_string()];
+  }
+  image_registry
+    .iter()
+    .map(
+      |ImageRegistryConfig {
+         domain,
+         account,
+         organization,
+       }| {
+        match (
+          !domain.is_empty(),
+          !organization.is_empty(),
+          !account.is_empty(),
+        ) {
+          // If organization and account provided, name under organization.
+          (true, true, true) => {
+            format!("{domain}/{organization}/{name}")
+          }
+          // Just domain / account provided
+          (true, false, true) => format!("{domain}/{account}/{name}"),
+          // Otherwise, just use name (local only)
+          _ => name.to_string(),
+        }
+      },
+    )
+    .collect()
 }
 
 pub fn to_general_name(name: &str) -> String {
@@ -394,7 +405,7 @@ pub struct LatestCommit {
 #[typeshare]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FileContents {
-  /// The path of the file on the host
+  /// The path to the file
   pub path: String,
   /// The contents of the file
   pub contents: String,
@@ -500,8 +511,17 @@ impl RepoExecutionArgs {
     &self,
     access_token: Option<&str>,
   ) -> anyhow::Result<String> {
-    let access_token_at = match &access_token {
-      Some(token) => format!("token:{token}@"),
+    let access_token_at = match access_token {
+      Some(token) => match token.split_once(':') {
+        Some((username, token)) => format!(
+          "{}:{}@",
+          urlencoding::encode(username.trim()),
+          urlencoding::encode(token.trim())
+        ),
+        None => {
+          format!("token:{}@", urlencoding::encode(token.trim()))
+        }
+      },
       None => String::new(),
     };
     let protocol = if self.https { "https" } else { "http" };
@@ -1081,6 +1101,7 @@ pub enum Operation {
   UnpauseStack,
   StopStack,
   DestroyStack,
+  RunStackService,
 
   // stack (service)
   DeployStackService,
@@ -1151,6 +1172,7 @@ pub enum Operation {
   RenameAlerter,
   DeleteAlerter,
   TestAlerter,
+  SendAlert,
 
   // sync
   CreateResourceSync,
@@ -1160,6 +1182,11 @@ pub enum Operation {
   WriteSyncContents,
   CommitSync,
   RunSync,
+
+  // maintenance
+  ClearRepoCache,
+  BackupCoreDatabase,
+  GlobalAutoUpdate,
 
   // variable
   CreateVariable,
@@ -1268,10 +1295,38 @@ pub enum ResourceTarget {
 }
 
 impl ResourceTarget {
+  pub fn system() -> ResourceTarget {
+    Self::System("system".to_string())
+  }
+}
+
+impl Default for ResourceTarget {
+  fn default() -> Self {
+    ResourceTarget::system()
+  }
+}
+
+impl ResourceTarget {
+  pub fn is_empty(&self) -> bool {
+    match self {
+      ResourceTarget::System(id) => id.is_empty(),
+      ResourceTarget::Server(id) => id.is_empty(),
+      ResourceTarget::Stack(id) => id.is_empty(),
+      ResourceTarget::Deployment(id) => id.is_empty(),
+      ResourceTarget::Build(id) => id.is_empty(),
+      ResourceTarget::Repo(id) => id.is_empty(),
+      ResourceTarget::Procedure(id) => id.is_empty(),
+      ResourceTarget::Action(id) => id.is_empty(),
+      ResourceTarget::Builder(id) => id.is_empty(),
+      ResourceTarget::Alerter(id) => id.is_empty(),
+      ResourceTarget::ResourceSync(id) => id.is_empty(),
+    }
+  }
+
   pub fn extract_variant_id(
     &self,
   ) -> (ResourceTargetVariant, &String) {
-    let id = match &self {
+    let id = match self {
       ResourceTarget::System(id) => id,
       ResourceTarget::Server(id) => id,
       ResourceTarget::Stack(id) => id,
@@ -1285,16 +1340,6 @@ impl ResourceTarget {
       ResourceTarget::ResourceSync(id) => id,
     };
     (self.extract_variant(), id)
-  }
-
-  pub fn system() -> ResourceTarget {
-    Self::System("system".to_string())
-  }
-}
-
-impl Default for ResourceTarget {
-  fn default() -> Self {
-    ResourceTarget::system()
   }
 }
 
@@ -1387,5 +1432,55 @@ pub enum ScheduleFormat {
   Cron,
 }
 
+#[typeshare]
+#[derive(
+  Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum FileFormat {
+  #[default]
+  KeyValue,
+  Toml,
+  Yaml,
+  Json,
+}
+
 /// Used with ExecuteTerminal to capture the exit code
 pub const KOMODO_EXIT_CODE: &str = "__KOMODO_EXIT_CODE:";
+
+pub fn resource_link(
+  host: &str,
+  resource_type: ResourceTargetVariant,
+  id: &str,
+) -> String {
+  let path = match resource_type {
+    ResourceTargetVariant::System => unreachable!(),
+    ResourceTargetVariant::Build => format!("/builds/{id}"),
+    ResourceTargetVariant::Builder => {
+      format!("/builders/{id}")
+    }
+    ResourceTargetVariant::Deployment => {
+      format!("/deployments/{id}")
+    }
+    ResourceTargetVariant::Stack => {
+      format!("/stacks/{id}")
+    }
+    ResourceTargetVariant::Server => {
+      format!("/servers/{id}")
+    }
+    ResourceTargetVariant::Repo => format!("/repos/{id}"),
+    ResourceTargetVariant::Alerter => {
+      format!("/alerters/{id}")
+    }
+    ResourceTargetVariant::Procedure => {
+      format!("/procedures/{id}")
+    }
+    ResourceTargetVariant::Action => {
+      format!("/actions/{id}")
+    }
+    ResourceTargetVariant::ResourceSync => {
+      format!("/resource-syncs/{id}")
+    }
+  };
+  format!("{host}{path}")
+}

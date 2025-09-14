@@ -206,8 +206,8 @@ fn read_resources_directory(
           contents: format_serror(&e.into()),
         });
       };
-    } else if path.is_dir() {
-      if let Err(e) = read_resources_directory(
+    } else if path.is_dir()
+      && let Err(e) = read_resources_directory(
         root_path,
         resource_path,
         curr_path,
@@ -219,20 +219,20 @@ fn read_resources_directory(
       )
       .with_context(|| {
         format!("failed to read resources from {path:?}")
-      }) {
-        file_errors.push(SyncFileContents {
-          resource_path: resource_path.display().to_string(),
-          path: curr_path.display().to_string(),
-          contents: format_serror(&e.into()),
-        });
-        log.push('\n');
-        log.push_str(&format!(
-          "{}: {} from {}",
-          colored("ERROR", Color::Red),
-          colored("adding resources", Color::Green),
-          colored(path.display(), Color::Blue)
-        ));
-      }
+      })
+    {
+      file_errors.push(SyncFileContents {
+        resource_path: resource_path.display().to_string(),
+        path: curr_path.display().to_string(),
+        contents: format_serror(&e.into()),
+      });
+      log.push('\n');
+      log.push_str(&format!(
+        "{}: {} from {}",
+        colored("ERROR", Color::Red),
+        colored("adding resources", Color::Green),
+        colored(path.display(), Color::Blue)
+      ));
     }
   }
   Ok(())

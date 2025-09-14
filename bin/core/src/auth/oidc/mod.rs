@@ -6,11 +6,11 @@ use axum::{
 };
 use client::oidc_client;
 use dashmap::DashMap;
+use database::mungos::mongodb::bson::{Document, doc};
 use komodo_client::entities::{
   komodo_timestamp,
   user::{User, UserConfig},
 };
-use mungos::mongodb::bson::{Document, doc};
 use openidconnect::{
   AccessTokenHash, AuthorizationCode, CsrfToken,
   EmptyAdditionalClaims, Nonce, OAuth2TokenResponse,
@@ -31,11 +31,15 @@ use super::RedirectQuery;
 
 pub mod client;
 
+static APP_USER_AGENT: &str =
+  concat!("Komodo/", env!("CARGO_PKG_VERSION"),);
+
 fn reqwest_client() -> &'static reqwest::Client {
   static REQWEST: OnceLock<reqwest::Client> = OnceLock::new();
   REQWEST.get_or_init(|| {
     reqwest::Client::builder()
       .redirect(reqwest::redirect::Policy::none())
+      .user_agent(APP_USER_AGENT)
       .build()
       .expect("Invalid OIDC reqwest client")
   })
@@ -312,7 +316,7 @@ async fn callback(
   let exchange_token = jwt_client().create_exchange_token(jwt).await;
   let redirect_url = if let Some(redirect) = redirect {
     let splitter = if redirect.contains('?') { '&' } else { '?' };
-    format!("{}{splitter}token={exchange_token}", redirect)
+    format!("{redirect}{splitter}token={exchange_token}")
   } else {
     format!("{}?token={exchange_token}", core_config().host)
   };

@@ -1,4 +1,5 @@
 use anyhow::{Context, anyhow};
+use database::mungos::{by_id::update_one_by_id, mongodb::bson::doc};
 use komodo_client::{
   api::write::*,
   entities::{
@@ -15,7 +16,6 @@ use komodo_client::{
     update::Update,
   },
 };
-use mungos::{by_id::update_one_by_id, mongodb::bson::doc};
 use periphery_client::api::{self, container::InspectContainer};
 use resolver_api::Resolve;
 
@@ -227,7 +227,7 @@ impl Resolve<WriteArgs> for RenameDeployment {
     update_one_by_id(
       &db_client().deployments,
       &deployment.id,
-      mungos::update::Update::Set(
+      database::mungos::update::Update::Set(
         doc! { "name": &name, "updated_at": komodo_timestamp() },
       ),
       None,

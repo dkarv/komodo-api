@@ -1,4 +1,5 @@
 use async_timing_util::wait_until_timelength;
+use database::mungos::{find::find_collect, mongodb::bson::doc};
 use futures::future::join_all;
 use helpers::insert_stacks_status_unknown;
 use komodo_client::entities::{
@@ -12,7 +13,6 @@ use komodo_client::entities::{
   stack::{ComposeProject, StackService, StackState},
   stats::SystemStats,
 };
-use mungos::{find::find_collect, mongodb::bson::doc};
 use periphery_client::api::{self, git::GetLatestCommit};
 use serror::Serror;
 

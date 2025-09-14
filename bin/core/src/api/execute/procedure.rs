@@ -1,5 +1,8 @@
 use std::pin::Pin;
 
+use database::mungos::{
+  by_id::update_one_by_id, mongodb::bson::to_document,
+};
 use formatting::{Color, bold, colored, format_serror, muted};
 use komodo_client::{
   api::execute::{
@@ -14,7 +17,6 @@ use komodo_client::{
     user::User,
   },
 };
-use mungos::{by_id::update_one_by_id, mongodb::bson::to_document};
 use resolver_api::Resolve;
 use tokio::sync::Mutex;
 
@@ -134,7 +136,7 @@ fn resolve_inner(
       let _ = update_one_by_id(
         &db_client().updates,
         &update.id,
-        mungos::update::Update::Set(update_doc),
+        database::mungos::update::Update::Set(update_doc),
         None,
       )
       .await;

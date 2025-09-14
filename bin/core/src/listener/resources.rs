@@ -1,6 +1,6 @@
-use std::sync::OnceLock;
+use std::{str::FromStr, sync::OnceLock};
 
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use komodo_client::{
   api::{
     execute::*,
@@ -13,6 +13,7 @@ use komodo_client::{
 };
 use resolver_api::Resolve;
 use serde::Deserialize;
+use serde_json::json;
 
 use crate::{
   api::{
@@ -39,19 +40,19 @@ fn build_locks() -> &'static ListenerLockCache {
   BUILD_LOCKS.get_or_init(Default::default)
 }
 
-pub async fn handle_build_webhook<B: super::VerifyBranch>(
+pub async fn handle_build_webhook<B: super::ExtractBranch>(
   build: Build,
   body: String,
 ) -> anyhow::Result<()> {
+  if !build.config.webhook_enabled {
+    return Ok(());
+  }
+
   // Acquire and hold lock to make a task queue for
   // subsequent listener calls on same resource.
   // It would fail if we let it go through from action state busy.
   let lock = build_locks().get_or_insert_default(&build.id).await;
   let _lock = lock.lock().await;
-
-  if !build.config.webhook_enabled {
-    return Err(anyhow!("build does not have webhook enabled"));
-  }
 
   B::verify_branch(&body, &build.config.branch)?;
 
@@ -155,7 +156,7 @@ pub enum RepoWebhookOption {
   Build,
 }
 
-pub async fn handle_repo_webhook<B: super::VerifyBranch>(
+pub async fn handle_repo_webhook<B: super::ExtractBranch>(
   option: RepoWebhookOption,
   repo: Repo,
   body: String,
@@ -174,21 +175,21 @@ pub async fn handle_repo_webhook<B: super::VerifyBranch>(
 }
 
 async fn handle_repo_webhook_inner<
-  B: super::VerifyBranch,
+  B: super::ExtractBranch,
   E: RepoExecution,
 >(
   repo: Repo,
   body: String,
 ) -> anyhow::Result<()> {
+  if !repo.config.webhook_enabled {
+    return Ok(());
+  }
+
   // Acquire and hold lock to make a task queue for
   // subsequent listener calls on same resource.
   // It would fail if we let it go through from action state busy.
   let lock = repo_locks().get_or_insert_default(&repo.id).await;
   let _lock = lock.lock().await;
-
-  if !repo.config.webhook_enabled {
-    return Err(anyhow!("repo does not have webhook enabled"));
-  }
 
   B::verify_branch(&body, &repo.config.branch)?;
 
@@ -269,7 +270,7 @@ pub enum StackWebhookOption {
   Deploy,
 }
 
-pub async fn handle_stack_webhook<B: super::VerifyBranch>(
+pub async fn handle_stack_webhook<B: super::ExtractBranch>(
   option: StackWebhookOption,
   stack: Stack,
   body: String,
@@ -286,21 +287,21 @@ pub async fn handle_stack_webhook<B: super::VerifyBranch>(
 }
 
 pub async fn handle_stack_webhook_inner<
-  B: super::VerifyBranch,
+  B: super::ExtractBranch,
   E: StackExecution,
 >(
   stack: Stack,
   body: String,
 ) -> anyhow::Result<()> {
+  if !stack.config.webhook_enabled {
+    return Ok(());
+  }
+
   // Acquire and hold lock to make a task queue for
   // subsequent listener calls on same resource.
   // It would fail if we let it go through, from "action state busy".
   let lock = stack_locks().get_or_insert_default(&stack.id).await;
   let _lock = lock.lock().await;
-
-  if !stack.config.webhook_enabled {
-    return Err(anyhow!("stack does not have webhook enabled"));
-  }
 
   B::verify_branch(&body, &stack.config.branch)?;
 
@@ -365,7 +366,7 @@ pub enum SyncWebhookOption {
   Sync,
 }
 
-pub async fn handle_sync_webhook<B: super::VerifyBranch>(
+pub async fn handle_sync_webhook<B: super::ExtractBranch>(
   option: SyncWebhookOption,
   sync: ResourceSync,
   body: String,
@@ -384,21 +385,21 @@ pub async fn handle_sync_webhook<B: super::VerifyBranch>(
 }
 
 async fn handle_sync_webhook_inner<
-  B: super::VerifyBranch,
+  B: super::ExtractBranch,
   E: SyncExecution,
 >(
   sync: ResourceSync,
   body: String,
 ) -> anyhow::Result<()> {
+  if !sync.config.webhook_enabled {
+    return Ok(());
+  }
+
   // Acquire and hold lock to make a task queue for
   // subsequent listener calls on same resource.
   // It would fail if we let it go through from action state busy.
   let lock = sync_locks().get_or_insert_default(&sync.id).await;
   let _lock = lock.lock().await;
-
-  if !sync.config.webhook_enabled {
-    return Err(anyhow!("sync does not have webhook enabled"));
-  }
 
   B::verify_branch(&body, &sync.config.branch)?;
 
@@ -421,21 +422,21 @@ fn procedure_locks() -> &'static ListenerLockCache {
   PROCEDURE_LOCKS.get_or_init(Default::default)
 }
 
-pub async fn handle_procedure_webhook<B: super::VerifyBranch>(
+pub async fn handle_procedure_webhook<B: super::ExtractBranch>(
   procedure: Procedure,
   target_branch: &str,
   body: String,
 ) -> anyhow::Result<()> {
+  if !procedure.config.webhook_enabled {
+    return Ok(());
+  }
+
   // Acquire and hold lock to make a task queue for
   // subsequent listener calls on same resource.
   // It would fail if we let it go through from action state busy.
   let lock =
     procedure_locks().get_or_insert_default(&procedure.id).await;
   let _lock = lock.lock().await;
-
-  if !procedure.config.webhook_enabled {
-    return Err(anyhow!("procedure does not have webhook enabled"));
-  }
 
   if target_branch != ANY_BRANCH {
     B::verify_branch(&body, target_branch)?;
@@ -471,28 +472,42 @@ fn action_locks() -> &'static ListenerLockCache {
   ACTION_LOCKS.get_or_init(Default::default)
 }
 
-pub async fn handle_action_webhook<B: super::VerifyBranch>(
+pub async fn handle_action_webhook<B: super::ExtractBranch>(
   action: Action,
   target_branch: &str,
   body: String,
 ) -> anyhow::Result<()> {
+  if !action.config.webhook_enabled {
+    return Ok(());
+  }
+
   // Acquire and hold lock to make a task queue for
   // subsequent listener calls on same resource.
   // It would fail if we let it go through from action state busy.
   let lock = action_locks().get_or_insert_default(&action.id).await;
   let _lock = lock.lock().await;
 
-  if !action.config.webhook_enabled {
-    return Err(anyhow!("action does not have webhook enabled"));
-  }
+  let branch = B::extract_branch(&body)?;
 
-  if target_branch != ANY_BRANCH {
-    B::verify_branch(&body, target_branch)?;
+  if target_branch != ANY_BRANCH && branch != target_branch {
+    return Err(anyhow!("request branch does not match expected"));
   }
 
   let user = git_webhook_user().to_owned();
-  let req =
-    ExecuteRequest::RunAction(RunAction { action: action.id });
+
+  let body = serde_json::Value::from_str(&body)
+    .context("Failed to deserialize webhook body")?;
+  let serde_json::Value::Object(args) = json!({
+    "WEBHOOK_BRANCH": branch,
+    "WEBHOOK_BODY": body,
+  }) else {
+    return Err(anyhow!("Something is wrong with serde_json..."));
+  };
+
+  let req = ExecuteRequest::RunAction(RunAction {
+    action: action.id,
+    args: args.into(),
+  });
   let update = init_execution_update(&req, &user).await?;
   let ExecuteRequest::RunAction(req) = req else {
     unreachable!()

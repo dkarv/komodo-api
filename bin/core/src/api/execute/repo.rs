@@ -1,6 +1,13 @@
 use std::{collections::HashSet, future::IntoFuture, time::Duration};
 
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  by_id::update_one_by_id,
+  mongodb::{
+    bson::{doc, to_document},
+    options::FindOneOptions,
+  },
+};
 use formatting::format_serror;
 use interpolate::Interpolator;
 use komodo_client::{
@@ -13,13 +20,6 @@ use komodo_client::{
     repo::Repo,
     server::Server,
     update::{Log, Update},
-  },
-};
-use mungos::{
-  by_id::update_one_by_id,
-  mongodb::{
-    bson::{doc, to_document},
-    options::FindOneOptions,
   },
 };
 use periphery_client::api;
@@ -287,7 +287,7 @@ async fn handle_repo_update_return(
     let _ = update_one_by_id(
       &db_client().updates,
       &update.id,
-      mungos::update::Update::Set(update_doc),
+      database::mungos::update::Update::Set(update_doc),
       None,
     )
     .await;
@@ -520,7 +520,7 @@ impl Resolve<ExecuteArgs> for BuildRepo {
       let _ = update_one_by_id(
         &db.updates,
         &update.id,
-        mungos::update::Update::Set(update_doc),
+        database::mungos::update::Update::Set(update_doc),
         None,
       )
       .await;
@@ -569,7 +569,7 @@ async fn handle_builder_early_return(
     let _ = update_one_by_id(
       &db_client().updates,
       &update.id,
-      mungos::update::Update::Set(update_doc),
+      database::mungos::update::Update::Set(update_doc),
       None,
     )
     .await;

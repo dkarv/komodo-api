@@ -9,6 +9,7 @@ mod action;
 mod alerter;
 mod build;
 mod deployment;
+mod maintenance;
 mod procedure;
 mod repo;
 mod server;
@@ -19,6 +20,7 @@ pub use action::*;
 pub use alerter::*;
 pub use build::*;
 pub use deployment::*;
+pub use maintenance::*;
 pub use procedure::*;
 pub use repo::*;
 pub use server::*;
@@ -58,19 +60,27 @@ pub enum Execution {
   None(NoData),
 
   // ACTION
+  /// Run the target action. (alias: `action`, `ac`)
+  #[clap(alias = "action", alias = "ac")]
   RunAction(RunAction),
   BatchRunAction(BatchRunAction),
 
   // PROCEDURE
+  /// Run the target procedure. (alias: `procedure`, `pr`)
+  #[clap(alias = "procedure", alias = "pr")]
   RunProcedure(RunProcedure),
   BatchRunProcedure(BatchRunProcedure),
 
   // BUILD
+  /// Run the target build. (alias: `build`, `bd`)
+  #[clap(alias = "build", alias = "bd")]
   RunBuild(RunBuild),
   BatchRunBuild(BatchRunBuild),
   CancelBuild(CancelBuild),
 
   // DEPLOYMENT
+  /// Deploy the target deployment. (alias: `dp`)
+  #[clap(alias = "dp")]
   Deploy(Deploy),
   BatchDeploy(BatchDeploy),
   PullDeployment(PullDeployment),
@@ -83,6 +93,8 @@ pub enum Execution {
   BatchDestroyDeployment(BatchDestroyDeployment),
 
   // REPO
+  /// Clone the target repo
+  #[clap(alias = "clone")]
   CloneRepo(CloneRepo),
   BatchCloneRepo(BatchCloneRepo),
   PullRepo(PullRepo),
@@ -117,10 +129,16 @@ pub enum Execution {
   PruneSystem(PruneSystem),
 
   // SYNC
+  /// Execute a Resource Sync. (alias: `sync`)
+  #[clap(alias = "sync")]
   RunSync(RunSync),
+  /// Commit a Resource Sync. (alias: `commit`)
+  #[clap(alias = "commit")]
   CommitSync(CommitSync), // This is a special case, its actually a write operation.
 
   // STACK
+  /// Deploy the target stack. (alias: `stack`, `st`)
+  #[clap(alias = "stack", alias = "st")]
   DeployStack(DeployStack),
   BatchDeployStack(BatchDeployStack),
   DeployStackIfChanged(DeployStackIfChanged),
@@ -134,14 +152,23 @@ pub enum Execution {
   StopStack(StopStack),
   DestroyStack(DestroyStack),
   BatchDestroyStack(BatchDestroyStack),
+  RunStackService(RunStackService),
 
   // ALERTER
   TestAlerter(TestAlerter),
+  #[clap(alias = "alert")]
+  SendAlert(SendAlert),
+
+  // MAINTENANCE
+  ClearRepoCache(ClearRepoCache),
+  BackupCoreDatabase(BackupCoreDatabase),
+  GlobalAutoUpdate(GlobalAutoUpdate),
 
   // SLEEP
   Sleep(Sleep),
 }
 
+/// Sleeps for the specified time.
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Parser)]
 pub struct Sleep {

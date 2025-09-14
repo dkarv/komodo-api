@@ -9,13 +9,16 @@
 ## All fields with a "Default" provided are optional. If they are
 ## left out of the file, the "Default" value will be used.
 
-## This file is bundled into the official image, `ghcr.io/moghtech/komodo`,
-## as the default config at `/config/config.toml`.
-## Komodo can start with no external config file mounted.
+## This file is bundled into the official image, `ghcr.io/moghtech/komodo-core`,
+## as the default config at `/config/.default.config.toml`.
+## Komodo Core can start with no external config file mounted.
 
-## There is usually no need to create this file on your host.
-## Most fields can instead be configured using environment variables.
+## Most fields can also be configured using environment variables.
 ## Environment variables will override values set in this file.
+
+## Can also use JSON or YAML if preferred. You can convert here:
+##   - YAML: https://it-tools.tech/toml-to-yaml
+##   - JSON: https://it-tools.tech/toml-to-json
 
 ## This will be the document title on the web page.
 ## Env: KOMODO_TITLE
@@ -26,7 +29,7 @@ title = "Komodo"
 ## Eg https://komodo.example.com or http://12.34.56.78:9120. This should match the address configured in your Oauth app.
 ## Env: KOMODO_HOST
 ## Required, no default.
-host = "https://demo.komo.do"
+host = "https://komodo.example.com"
 
 ## The port the core system will run on.
 ## Env: KOMODO_PORT
@@ -44,13 +47,18 @@ bind_ip = "[::]"
 ## If the periphery servers don't have passkeys configured, this doesn't need to be changed.
 ## Env: KOMODO_PASSKEY or KOMODO_PASSKEY_FILE
 ## Required, no default
-passkey = "a_random_passkey"
+passkey = "default-passkey-changeme"
 
 ## Ensure a server with this address exists on Core
 ## upon first startup. Example: `https://periphery:8120`
 ## Env: KOMODO_FIRST_SERVER
 ## Optional, no default.
-first_server = ""
+# first_server = ""
+
+## Give the first server a custom name.
+## Env: KOMODO_FIRST_SERVER_NAME
+## Default: Local
+first_server_name = "Local"
 
 ## Disables write support on resources in the UI.
 ## This protects users that that would normally have write priviledges during their UI usage,
@@ -71,6 +79,13 @@ disable_confirm_dialog = false
 ## Default: false
 disable_websocket_reconnect = false
 
+
+## Disable init system resource creation on fresh Komodo launch.
+## These include the 'Backup Core Database' and 'Global Auto Update' procedures.
+## Env: KOMODO_DISABLE_INIT_RESOURCES
+## Default: false
+disable_init_resources = false
+
 ## Configure the directory for sync files (inside the container).
 ## There shouldn't be a need to change this, just mount a volume.
 ## Env: KOMODO_SYNC_DIRECTORY
@@ -89,6 +104,12 @@ repo_directory = "/repo-cache"
 ## Default: /action-cache
 action_directory = "/action-cache"
 
+## Interface to use as default route in multi-NIC environments.
+## Env: KOMODO_INTERNET_INTERFACE
+## Example: "eth1"
+## Optional, no default.
+internet_interface = ""
+
 ################
 # AUTH / LOGIN #
 ################
@@ -105,6 +126,16 @@ action_directory = "/action-cache"
 ## Env: KOMODO_LOCAL_AUTH
 ## Default: false
 local_auth = false
+
+## Initialize the first admin user when starting up Komodo for the first time.
+## Env: KOMODO_INIT_ADMIN_USERNAME or KOMODO_INIT_ADMIN_USERNAME_FILE
+## Default: None
+# init_admin_username = "admin"
+
+## Set password for first admin user
+## Env: KOMODO_INIT_ADMIN_PASSWORD or KOMODO_INIT_ADMIN_PASSWORD_FILE
+## Default: changeme
+init_admin_password = "changeme"
 
 ## Normally new users will be registered, but not enabled until an Admin enables them.
 ## With `disable_user_registration = true`, only the first user to log in will registered as a user.

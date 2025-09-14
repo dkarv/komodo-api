@@ -5,6 +5,7 @@ use axum::{
   Extension, Router, extract::Path, middleware, routing::post,
 };
 use axum_extra::{TypedHeader, headers::ContentType};
+use database::mungos::by_id::find_one_by_id;
 use derive_variants::{EnumVariants, ExtractVariant};
 use formatting::format_serror;
 use futures::future::join_all;
@@ -17,7 +18,6 @@ use komodo_client::{
     user::User,
   },
 };
-use mungos::by_id::find_one_by_id;
 use resolver_api::Resolve;
 use response::JsonString;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,7 @@ mod action;
 mod alerter;
 mod build;
 mod deployment;
+mod maintenance;
 mod procedure;
 mod repo;
 mod server;
@@ -101,6 +102,7 @@ pub enum ExecuteRequest {
   UnpauseStack(UnpauseStack),
   DestroyStack(DestroyStack),
   BatchDestroyStack(BatchDestroyStack),
+  RunStackService(RunStackService),
 
   // ==== DEPLOYMENT ====
   Deploy(Deploy),
@@ -138,9 +140,15 @@ pub enum ExecuteRequest {
 
   // ==== ALERTER ====
   TestAlerter(TestAlerter),
+  SendAlert(SendAlert),
 
   // ==== SYNC ====
   RunSync(RunSync),
+
+  // ==== MAINTENANCE ====
+  ClearRepoCache(ClearRepoCache),
+  BackupCoreDatabase(BackupCoreDatabase),
+  GlobalAutoUpdate(GlobalAutoUpdate),
 }
 
 pub fn router() -> Router {
@@ -195,8 +203,10 @@ pub fn inner_handler(
   Box::pin(async move {
     let req_id = Uuid::new_v4();
 
-    // need to validate no cancel is active before any update is created.
+    // Need to validate no cancel is active before any update is created.
+    // This ensures no double update created if Cancel is called more than once for the same request.
     build::validate_cancel_build(&request).await?;
+    repo::validate_cancel_repo_build(&request).await?;
 
     let update = init_execution_update(&request, &user).await?;
 
@@ -211,24 +221,33 @@ pub fn inner_handler(
       ));
     }
 
+    // Spawn a task for the execution which continues
+    // running after this method returns.
     let handle =
       tokio::spawn(task(req_id, request, user, update.clone()));
 
+    // Spawns another task to monitor the first for failures,
+    // and add the log to Update about it (which primary task can't do because it errored out)
     tokio::spawn({
       let update_id = update.id.clone();
       async move {
         let log = match handle.await {
           Ok(Err(e)) => {
             warn!("/execute request {req_id} task error: {e:#}",);
-            Log::error("task error", format_serror(&e.into()))
+            Log::error("Task Error", format_serror(&e.into()))
           }
           Err(e) => {
             warn!("/execute request {req_id} spawn error: {e:?}",);
-            Log::error("spawn error", format!("{e:#?}"))
+            Log::error("Spawn Error", format!("{e:#?}"))
           }
           _ => return,
         };
         let res = async {
+          // Nothing to do if update was never actually created,
+          // which is the case when the id is empty.
+          if update_id.is_empty() {
+            return Ok(());
+          }
           let mut update =
             find_one_by_id(&db_client().updates, &update_id)
               .await

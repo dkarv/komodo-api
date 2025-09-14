@@ -1,6 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Context;
+use database::mungos::{
+  find::find_collect,
+  mongodb::{Collection, bson::doc, options::FindOptions},
+};
 use formatting::format_serror;
 use komodo_client::{
   api::write::RefreshBuildCache,
@@ -20,10 +24,6 @@ use komodo_client::{
     update::Update,
     user::{User, build_user},
   },
-};
-use mungos::{
-  find::find_collect,
-  mongodb::{Collection, bson::doc, options::FindOptions},
 };
 use resolver_api::Resolve;
 
@@ -116,9 +116,11 @@ impl super::KomodoResource for Build {
         git_provider,
         repo,
         branch,
-        image_registry_domain: optional_string(
-          build.config.image_registry.domain,
-        ),
+        image_registry_domain: build
+          .config
+          .image_registry
+          .first()
+          .and_then(|r| optional_string(&r.domain)),
         built_hash: build.info.built_hash,
         latest_hash: build.info.latest_hash,
         state,
@@ -216,9 +218,10 @@ impl super::KomodoResource for Build {
   }
 
   async fn post_delete(
-    _resource: &Resource<Self::Config, Self::Info>,
+    resource: &Resource<Self::Config, Self::Info>,
     _update: &mut Update,
   ) -> anyhow::Result<()> {
+    build_state_cache().remove(&resource.id).await;
     Ok(())
   }
 }
@@ -255,30 +258,30 @@ async fn validate_config(
   config: &mut PartialBuildConfig,
   user: &User,
 ) -> anyhow::Result<()> {
-  if let Some(builder_id) = &config.builder_id {
-    if !builder_id.is_empty() {
-      let builder = super::get_check_permissions::<Builder>(
-        builder_id,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context("Cannot attach Build to this Builder")?;
-      config.builder_id = Some(builder.id)
-    }
+  if let Some(builder_id) = &config.builder_id
+    && !builder_id.is_empty()
+  {
+    let builder = super::get_check_permissions::<Builder>(
+      builder_id,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot attach Build to this Builder")?;
+    config.builder_id = Some(builder.id)
   }
-  if let Some(linked_repo) = &config.linked_repo {
-    if !linked_repo.is_empty() {
-      let repo = get_check_permissions::<Repo>(
-        linked_repo,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context("Cannot attach Repo to this Build")?;
-      // in case it comes in as name
-      config.linked_repo = Some(repo.id);
-    }
+  if let Some(linked_repo) = &config.linked_repo
+    && !linked_repo.is_empty()
+  {
+    let repo = get_check_permissions::<Repo>(
+      linked_repo,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot attach Repo to this Build")?;
+    // in case it comes in as name
+    config.linked_repo = Some(repo.id);
   }
   if let Some(build_args) = &config.build_args {
     environment_vars_from_str(build_args)

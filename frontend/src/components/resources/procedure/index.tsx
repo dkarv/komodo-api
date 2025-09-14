@@ -31,7 +31,7 @@ export const ProcedureComponents: RequiredResourceComponents = {
   list_item: (id) => useProcedure(id),
   resource_links: () => undefined,
 
-  Description: () => <>Compose Komodo actions together.</>,
+  Description: () => <>Orchestrate multiple Komodo executions.</>,
 
   Dashboard: () => {
     const summary = useRead("GetProceduresSummary", {}).data;

@@ -1,6 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Context;
+use database::mungos::{
+  find::find_collect,
+  mongodb::{Collection, bson::doc, options::FindOneOptions},
+};
 use formatting::format_serror;
 use komodo_client::entities::{
   Operation, ResourceTarget, ResourceTargetVariant,
@@ -15,10 +19,6 @@ use komodo_client::entities::{
   to_path_compatible_name,
   update::Update,
   user::User,
-};
-use mungos::{
-  find::find_collect,
-  mongodb::{Collection, bson::doc, options::FindOneOptions},
 };
 use periphery_client::api::git::DeleteRepo;
 
@@ -161,13 +161,6 @@ impl super::KomodoResource for Repo {
   }
 
   async fn pre_delete(
-    _resource: &Resource<Self::Config, Self::Info>,
-    _update: &mut Update,
-  ) -> anyhow::Result<()> {
-    Ok(())
-  }
-
-  async fn post_delete(
     repo: &Resource<Self::Config, Self::Info>,
     update: &mut Update,
   ) -> anyhow::Result<()> {
@@ -191,10 +184,21 @@ impl super::KomodoResource for Repo {
     {
       Ok(log) => update.logs.push(log),
       Err(e) => update.push_error_log(
-        "delete repo on periphery",
-        format_serror(&e.context("failed to delete repo").into()),
+        "Delete Repo on Periphery",
+        format_serror(
+          &e.context("Failed to delete repo files").into(),
+        ),
       ),
     }
+
+    Ok(())
+  }
+
+  async fn post_delete(
+    repo: &Resource<Self::Config, Self::Info>,
+    _update: &mut Update,
+  ) -> anyhow::Result<()> {
+    repo_state_cache().remove(&repo.id).await;
 
     Ok(())
   }
@@ -232,29 +236,29 @@ async fn validate_config(
   config: &mut PartialRepoConfig,
   user: &User,
 ) -> anyhow::Result<()> {
-  if let Some(server_id) = &config.server_id {
-    if !server_id.is_empty() {
-      let server = get_check_permissions::<Server>(
-        server_id,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context("Cannot attach Repo to this Server")?;
-      config.server_id = Some(server.id);
-    }
+  if let Some(server_id) = &config.server_id
+    && !server_id.is_empty()
+  {
+    let server = get_check_permissions::<Server>(
+      server_id,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot attach Repo to this Server")?;
+    config.server_id = Some(server.id);
   }
-  if let Some(builder_id) = &config.builder_id {
-    if !builder_id.is_empty() {
-      let builder = super::get_check_permissions::<Builder>(
-        builder_id,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context("Cannot attach Repo to this Builder")?;
-      config.builder_id = Some(builder.id);
-    }
+  if let Some(builder_id) = &config.builder_id
+    && !builder_id.is_empty()
+  {
+    let builder = super::get_check_permissions::<Builder>(
+      builder_id,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot attach Repo to this Builder")?;
+    config.builder_id = Some(builder.id);
   }
   Ok(())
 }
@@ -296,6 +300,7 @@ async fn get_repo_state_from_db(id: &str) -> RepoState {
         "$or": [
           { "operation": "CloneRepo" },
           { "operation": "PullRepo" },
+          { "operation": "BuildRepo" },
         ],
       })
       .with_options(

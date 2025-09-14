@@ -13,6 +13,13 @@
 ## file will be located either in `/etc/komodo/periphery.config.toml`,
 ## or for user installs, `$HOME/.config/komodo/periphery.config.toml`.
 
+## Most fields can also be configured using environment variables.
+## Environment variables will override values set in this file.
+
+## You can also use JSON or YAML if preferred. You can convert here:
+##   - YAML: https://it-tools.tech/toml-to-yaml
+##   - JSON: https://it-tools.tech/toml-to-json
+
 ## Optional. The port the server runs on.
 ## Env: PERIPHERY_PORT
 ## Default: 8120
@@ -68,10 +75,10 @@ disable_container_exec = false
 stats_polling_rate = "5-sec"
 
 ## How often Periphery polls the host for container stats,
-## Env: PERIPHERY_STATS_POLLING_RATE
+## Env: PERIPHERY_CONTAINER_STATS_POLLING_RATE
 ## Options: https://docs.rs/komodo_client/latest/komodo_client/entities/enum.Timelength.html
-## Default: 5-sec
-container_stats_polling_rate = "1-min"
+## Default: 30-sec
+container_stats_polling_rate = "30-sec"
 
 ## Whether stack actions should use `docker-compose ...`
 ## instead of `docker compose ...`.
@@ -96,7 +103,8 @@ exclude_disk_mounts = []
 ########
 
 ## Optional. Limit the ip addresses which can call the periphery api.
-## Example: allowed_ips = ["::ffff:12.34.56.78"]
+## Supports Ipv4 / Ipv6 addresses and subnets.
+## Examples: allowed_ips = ["::ffff:12.34.56.78", "10.0.10.0/24"]
 ## Env: PERIPHERY_ALLOWED_IPS
 ## Default: empty, which will not block any request by ip.
 allowed_ips = []

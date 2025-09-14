@@ -93,7 +93,16 @@ class Resource(BaseModel, Generic[Config, Info]):
 class ScheduleFormat(str, Enum):
     ENGLISH = "English"
     CRON = "Cron"
+class FileFormat(str, Enum):
+    KEYVALUE = "key_value"
+    TOML = "toml"
+    YAML = "yaml"
+    JSON = "json"
 class ActionConfig(BaseModel):
+    run_at_startup: bool
+    """
+    Whether this action should run at startup.
+    """
     schedule_format: Optional[ScheduleFormat] = Field(default=None)
     """
     Choose whether to specify schedule as regular CRON, or using the english to CRON parser.
@@ -107,13 +116,13 @@ class ActionConfig(BaseModel):
     1. Regular CRON expression:
     
     (second, minute, hour, day, month, day-of-week)
-    ```
+    ```text
     0 0 0 1,15 * ?
     ```
     
     2. "English" expression via [english-to-cron](https://crates.io/crates/english-to-cron):
     
-    ```
+    ```text
     at midnight on the 1st and 15th of the month
     ```
     """
@@ -153,6 +162,15 @@ class ActionConfig(BaseModel):
     """
     Typescript file contents using pre-initialized `komodo` client.
     Supports variable / secret interpolation.
+    """
+    arguments_format: Optional[FileFormat] = Field(default=None)
+    """
+    Specify the format in which the arguments are defined.
+    Default: `key_value` (like environment)
+    """
+    arguments: Optional[str] = Field(default=None)
+    """
+    Default arguments to give to the Action for use in the script at `ARGS`.
     """
 
 class NoData(BaseModel):
@@ -555,6 +573,7 @@ class Operation(str, Enum):
     UNPAUSESTACK = "UnpauseStack"
     STOPSTACK = "StopStack"
     DESTROYSTACK = "DestroyStack"
+    RUNSTACKSERVICE = "RunStackService"
     DEPLOYSTACKSERVICE = "DeployStackService"
     PULLSTACKSERVICE = "PullStackService"
     STARTSTACKSERVICE = "StartStackService"
@@ -609,6 +628,7 @@ class Operation(str, Enum):
     RENAMEALERTER = "RenameAlerter"
     DELETEALERTER = "DeleteAlerter"
     TESTALERTER = "TestAlerter"
+    SENDALERT = "SendAlert"
     CREATERESOURCESYNC = "CreateResourceSync"
     UPDATERESOURCESYNC = "UpdateResourceSync"
     RENAMERESOURCESYNC = "RenameResourceSync"
@@ -616,6 +636,9 @@ class Operation(str, Enum):
     WRITESYNCCONTENTS = "WriteSyncContents"
     COMMITSYNC = "CommitSync"
     RUNSYNC = "RunSync"
+    CLEARREPOCACHE = "ClearRepoCache"
+    BACKUPCOREDATABASE = "BackupCoreDatabase"
+    GLOBALAUTOUPDATE = "GlobalAutoUpdate"
     CREATEVARIABLE = "CreateVariable"
     UPDATEVARIABLEVALUE = "UpdateVariableValue"
     DELETEVARIABLE = "DeleteVariable"
@@ -876,9 +899,10 @@ class BuildConfig(BaseModel):
     """
     The path of the dockerfile relative to the build path.
     """
-    image_registry: Optional[ImageRegistryConfig] = Field(default=None)
+    image_registry: Optional[List[ImageRegistryConfig]] = Field(default=None)
     """
-    Configuration for the registry to push the built image to.
+    Configuration for the registry/s to push the built image to.
+    The first registry in this list will be used with attached Deployments.
     """
     skip_secret_interp: Optional[bool] = Field(default=None)
     """
@@ -969,6 +993,10 @@ class BuildInfo(BaseModel):
 Build = Resource[BuildConfig, BuildInfo]
 
 class BuildState(str, Enum):
+    BUILDING = "Building"
+    """
+    Currently building
+    """
     OK = "Ok"
     """
     Last build successful (or never built)
@@ -976,10 +1004,6 @@ class BuildState(str, Enum):
     FAILED = "Failed"
     """
     Last build failed
-    """
-    BUILDING = "Building"
-    """
-    Currently building
     """
     UNKNOWN = "Unknown"
     """
@@ -1040,7 +1064,7 @@ class BuildListItemInfo(BaseModel):
     """
     image_registry_domain: Optional[str] = Field(default=None)
     """
-    The image registry domain
+    The first listed image registry domain
     """
 
 BuildListItem = ResourceListItem[BuildListItemInfo]
@@ -1165,7 +1189,12 @@ class ExecutionTypes(str, Enum):
     STOP_STACK = "StopStack"
     DESTROY_STACK = "DestroyStack"
     BATCH_DESTROY_STACK = "BatchDestroyStack"
+    RUN_STACK_SERVICE = "RunStackService"
     TEST_ALERTER = "TestAlerter"
+    SEND_ALERT = "SendAlert"
+    CLEAR_REPO_CACHE = "ClearRepoCache"
+    BACKUP_CORE_DATABASE = "BackupCoreDatabase"
+    GLOBAL_AUTO_UPDATE = "GlobalAutoUpdate"
     SLEEP = "Sleep"
 
 class ExecutionNone(BaseModel):
@@ -1176,6 +1205,9 @@ class ExecutionNone(BaseModel):
     params: NoData
 
 class ExecutionRunAction(BaseModel):
+    """
+    Run the target action. (alias: `action`, `ac`)
+    """
     type: Literal[ExecutionTypes.RUN_ACTION] = ExecutionTypes.RUN_ACTION
     params: RunAction
 
@@ -1184,6 +1216,9 @@ class ExecutionBatchRunAction(BaseModel):
     params: BatchRunAction
 
 class ExecutionRunProcedure(BaseModel):
+    """
+    Run the target procedure. (alias: `procedure`, `pr`)
+    """
     type: Literal[ExecutionTypes.RUN_PROCEDURE] = ExecutionTypes.RUN_PROCEDURE
     params: RunProcedure
 
@@ -1192,6 +1227,9 @@ class ExecutionBatchRunProcedure(BaseModel):
     params: BatchRunProcedure
 
 class ExecutionRunBuild(BaseModel):
+    """
+    Run the target build. (alias: `build`, `bd`)
+    """
     type: Literal[ExecutionTypes.RUN_BUILD] = ExecutionTypes.RUN_BUILD
     params: RunBuild
 
@@ -1204,6 +1242,9 @@ class ExecutionCancelBuild(BaseModel):
     params: CancelBuild
 
 class ExecutionDeploy(BaseModel):
+    """
+    Deploy the target deployment. (alias: `dp`)
+    """
     type: Literal[ExecutionTypes.DEPLOY] = ExecutionTypes.DEPLOY
     params: Deploy
 
@@ -1244,6 +1285,9 @@ class ExecutionBatchDestroyDeployment(BaseModel):
     params: BatchDestroyDeployment
 
 class ExecutionCloneRepo(BaseModel):
+    """
+    Clone the target repo
+    """
     type: Literal[ExecutionTypes.CLONE_REPO] = ExecutionTypes.CLONE_REPO
     params: CloneRepo
 
@@ -1356,14 +1400,23 @@ class ExecutionPruneSystem(BaseModel):
     params: PruneSystem
 
 class ExecutionRunSync(BaseModel):
+    """
+    Execute a Resource Sync. (alias: `sync`)
+    """
     type: Literal[ExecutionTypes.RUN_SYNC] = ExecutionTypes.RUN_SYNC
     params: RunSync
 
 class ExecutionCommitSync(BaseModel):
+    """
+    Commit a Resource Sync. (alias: `commit`)
+    """
     type: Literal[ExecutionTypes.COMMIT_SYNC] = ExecutionTypes.COMMIT_SYNC
     params: CommitSync
 
 class ExecutionDeployStack(BaseModel):
+    """
+    Deploy the target stack. (alias: `stack`, `st`)
+    """
     type: Literal[ExecutionTypes.DEPLOY_STACK] = ExecutionTypes.DEPLOY_STACK
     params: DeployStack
 
@@ -1415,16 +1468,36 @@ class ExecutionBatchDestroyStack(BaseModel):
     type: Literal[ExecutionTypes.BATCH_DESTROY_STACK] = ExecutionTypes.BATCH_DESTROY_STACK
     params: BatchDestroyStack
 
+class ExecutionRunStackService(BaseModel):
+    type: Literal[ExecutionTypes.RUN_STACK_SERVICE] = ExecutionTypes.RUN_STACK_SERVICE
+    params: RunStackService
+
 class ExecutionTestAlerter(BaseModel):
     type: Literal[ExecutionTypes.TEST_ALERTER] = ExecutionTypes.TEST_ALERTER
     params: TestAlerter
+
+class ExecutionSendAlert(BaseModel):
+    type: Literal[ExecutionTypes.SEND_ALERT] = ExecutionTypes.SEND_ALERT
+    params: SendAlert
+
+class ExecutionClearRepoCache(BaseModel):
+    type: Literal[ExecutionTypes.CLEAR_REPO_CACHE] = ExecutionTypes.CLEAR_REPO_CACHE
+    params: ClearRepoCache
+
+class ExecutionBackupCoreDatabase(BaseModel):
+    type: Literal[ExecutionTypes.BACKUP_CORE_DATABASE] = ExecutionTypes.BACKUP_CORE_DATABASE
+    params: BackupCoreDatabase
+
+class ExecutionGlobalAutoUpdate(BaseModel):
+    type: Literal[ExecutionTypes.GLOBAL_AUTO_UPDATE] = ExecutionTypes.GLOBAL_AUTO_UPDATE
+    params: GlobalAutoUpdate
 
 class ExecutionSleep(BaseModel):
     type: Literal[ExecutionTypes.SLEEP] = ExecutionTypes.SLEEP
     params: Sleep
 
 # A wrapper for all Komodo exections.
-Execution = Union[ExecutionNone, ExecutionRunAction, ExecutionBatchRunAction, ExecutionRunProcedure, ExecutionBatchRunProcedure, ExecutionRunBuild, ExecutionBatchRunBuild, ExecutionCancelBuild, ExecutionDeploy, ExecutionBatchDeploy, ExecutionPullDeployment, ExecutionStartDeployment, ExecutionRestartDeployment, ExecutionPauseDeployment, ExecutionUnpauseDeployment, ExecutionStopDeployment, ExecutionDestroyDeployment, ExecutionBatchDestroyDeployment, ExecutionCloneRepo, ExecutionBatchCloneRepo, ExecutionPullRepo, ExecutionBatchPullRepo, ExecutionBuildRepo, ExecutionBatchBuildRepo, ExecutionCancelRepoBuild, ExecutionStartContainer, ExecutionRestartContainer, ExecutionPauseContainer, ExecutionUnpauseContainer, ExecutionStopContainer, ExecutionDestroyContainer, ExecutionStartAllContainers, ExecutionRestartAllContainers, ExecutionPauseAllContainers, ExecutionUnpauseAllContainers, ExecutionStopAllContainers, ExecutionPruneContainers, ExecutionDeleteNetwork, ExecutionPruneNetworks, ExecutionDeleteImage, ExecutionPruneImages, ExecutionDeleteVolume, ExecutionPruneVolumes, ExecutionPruneDockerBuilders, ExecutionPruneBuildx, ExecutionPruneSystem, ExecutionRunSync, ExecutionCommitSync, ExecutionDeployStack, ExecutionBatchDeployStack, ExecutionDeployStackIfChanged, ExecutionBatchDeployStackIfChanged, ExecutionPullStack, ExecutionBatchPullStack, ExecutionStartStack, ExecutionRestartStack, ExecutionPauseStack, ExecutionUnpauseStack, ExecutionStopStack, ExecutionDestroyStack, ExecutionBatchDestroyStack, ExecutionTestAlerter, ExecutionSleep]
+Execution = Union[ExecutionNone, ExecutionRunAction, ExecutionBatchRunAction, ExecutionRunProcedure, ExecutionBatchRunProcedure, ExecutionRunBuild, ExecutionBatchRunBuild, ExecutionCancelBuild, ExecutionDeploy, ExecutionBatchDeploy, ExecutionPullDeployment, ExecutionStartDeployment, ExecutionRestartDeployment, ExecutionPauseDeployment, ExecutionUnpauseDeployment, ExecutionStopDeployment, ExecutionDestroyDeployment, ExecutionBatchDestroyDeployment, ExecutionCloneRepo, ExecutionBatchCloneRepo, ExecutionPullRepo, ExecutionBatchPullRepo, ExecutionBuildRepo, ExecutionBatchBuildRepo, ExecutionCancelRepoBuild, ExecutionStartContainer, ExecutionRestartContainer, ExecutionPauseContainer, ExecutionUnpauseContainer, ExecutionStopContainer, ExecutionDestroyContainer, ExecutionStartAllContainers, ExecutionRestartAllContainers, ExecutionPauseAllContainers, ExecutionUnpauseAllContainers, ExecutionStopAllContainers, ExecutionPruneContainers, ExecutionDeleteNetwork, ExecutionPruneNetworks, ExecutionDeleteImage, ExecutionPruneImages, ExecutionDeleteVolume, ExecutionPruneVolumes, ExecutionPruneDockerBuilders, ExecutionPruneBuildx, ExecutionPruneSystem, ExecutionRunSync, ExecutionCommitSync, ExecutionDeployStack, ExecutionBatchDeployStack, ExecutionDeployStackIfChanged, ExecutionBatchDeployStackIfChanged, ExecutionPullStack, ExecutionBatchPullStack, ExecutionStartStack, ExecutionRestartStack, ExecutionPauseStack, ExecutionUnpauseStack, ExecutionStopStack, ExecutionDestroyStack, ExecutionBatchDestroyStack, ExecutionRunStackService, ExecutionTestAlerter, ExecutionSendAlert, ExecutionClearRepoCache, ExecutionBackupCoreDatabase, ExecutionGlobalAutoUpdate, ExecutionSleep]
 class EnabledExecution(BaseModel):
     """
     Allows to enable / disabled procedures in the sequence / parallel vec on the fly
@@ -1476,13 +1549,13 @@ class ProcedureConfig(BaseModel):
     1. Regular CRON expression:
     
     (second, minute, hour, day, month, day-of-week)
-    ```
+    ```text
     0 0 0 1,15 * ?
     ```
     
     2. "English" expression via [english-to-cron](https://crates.io/crates/english-to-cron):
     
-    ```
+    ```text
     at midnight on the 1st and 15th of the month
     ```
     """
@@ -1612,24 +1685,6 @@ class GitProviderAccount(BaseModel):
 
 CreateGitProviderAccountResponse = GitProviderAccount
 
-class JwtResponse(BaseModel):
-    """
-    JSON containing an authentication token.
-    """
-    jwt: str
-    """
-    A token the user can use to authenticate their requests.
-    """
-
-CreateLocalUserResponse = JwtResponse
-
-"""
-Response for [CreateLocalUser].
-"""
-CreateProcedureResponse = Procedure
-
-CreateRepoWebhookResponse = NoData
-
 class UserConfigLocalInner(BaseModel):
     """
     Generated type representing the anonymous struct variant `Local` of the `UserConfig` Rust enum
@@ -1756,6 +1811,12 @@ class User(BaseModel):
     Give the user elevated permissions on all resources of a certain type
     """
     updated_at: Optional[I64] = Field(default=None)
+
+CreateLocalUserResponse = User
+
+CreateProcedureResponse = Procedure
+
+CreateRepoWebhookResponse = NoData
 
 CreateServiceUserResponse = User
 
@@ -2068,6 +2129,19 @@ class DeploymentQuerySpecifics(BaseModel):
 
 DeploymentQuery = ResourceQuery[DeploymentQuerySpecifics]
 
+class JwtResponse(BaseModel):
+    """
+    JSON containing an authentication token.
+    """
+    user_id: str
+    """
+    User ID for signed in user.
+    """
+    jwt: str
+    """
+    A token the user can use to authenticate their requests.
+    """
+
 ExchangeForJwtResponse = JwtResponse
 
 """
@@ -2102,14 +2176,20 @@ class SeverityLevel(str, Enum):
     OK = "OK"
     """
     No problem.
+    
+    Aliases: ok, low, l
     """
     WARNING = "WARNING"
     """
     Problem is imminent.
+    
+    Aliases: warning, w, medium, m
     """
     CRITICAL = "CRITICAL"
     """
     Problem fully realized.
+    
+    Aliases: critical, c, high, h
     """
 class AlertDataNoneInner(BaseModel):
     """
@@ -2223,6 +2303,31 @@ class AlertDataServerDiskInner(BaseModel):
     total_gb: float
     """
     The total size of the disk in GB
+    """
+
+class AlertDataServerVersionMismatchInner(BaseModel):
+    """
+    Generated type representing the anonymous struct variant `ServerVersionMismatch` of the `AlertData` Rust enum
+    """
+    id: str
+    """
+    The id of the server
+    """
+    name: str
+    """
+    The name of the server
+    """
+    region: Optional[str] = Field(default=None)
+    """
+    The region of the server
+    """
+    server_version: str
+    """
+    The actual server version
+    """
+    core_version: str
+    """
+    The core version
     """
 
 class AlertDataContainerStateChangeInner(BaseModel):
@@ -2490,6 +2595,19 @@ class AlertDataScheduleRunInner(BaseModel):
     The resource name
     """
 
+class AlertDataCustomInner(BaseModel):
+    """
+    Generated type representing the anonymous struct variant `Custom` of the `AlertData` Rust enum
+    """
+    message: str
+    """
+    The alert message.
+    """
+    details: Optional[str] = Field(default=None)
+    """
+    Message details. May be empty string.
+    """
+
 class AlertDataTypes(str, Enum):
     NONE = "None"
     TEST = "Test"
@@ -2497,6 +2615,7 @@ class AlertDataTypes(str, Enum):
     SERVER_CPU = "ServerCpu"
     SERVER_MEM = "ServerMem"
     SERVER_DISK = "ServerDisk"
+    SERVER_VERSION_MISMATCH = "ServerVersionMismatch"
     CONTAINER_STATE_CHANGE = "ContainerStateChange"
     DEPLOYMENT_IMAGE_UPDATE_AVAILABLE = "DeploymentImageUpdateAvailable"
     DEPLOYMENT_AUTO_UPDATED = "DeploymentAutoUpdated"
@@ -2510,6 +2629,7 @@ class AlertDataTypes(str, Enum):
     PROCEDURE_FAILED = "ProcedureFailed"
     ACTION_FAILED = "ActionFailed"
     SCHEDULE_RUN = "ScheduleRun"
+    CUSTOM = "Custom"
 
 class AlertDataNone(BaseModel):
     """
@@ -2553,6 +2673,13 @@ class AlertDataServerDisk(BaseModel):
     """
     type: Literal[AlertDataTypes.SERVER_DISK] = AlertDataTypes.SERVER_DISK
     data: AlertDataServerDiskInner
+
+class AlertDataServerVersionMismatch(BaseModel):
+    """
+    A server has a version mismatch with the core.
+    """
+    type: Literal[AlertDataTypes.SERVER_VERSION_MISMATCH] = AlertDataTypes.SERVER_VERSION_MISMATCH
+    data: AlertDataServerVersionMismatchInner
 
 class AlertDataContainerStateChange(BaseModel):
     """
@@ -2645,8 +2772,16 @@ class AlertDataScheduleRun(BaseModel):
     type: Literal[AlertDataTypes.SCHEDULE_RUN] = AlertDataTypes.SCHEDULE_RUN
     data: AlertDataScheduleRunInner
 
+class AlertDataCustom(BaseModel):
+    """
+    Custom header / body.
+    Produced using `/execute/SendAlert`
+    """
+    type: Literal[AlertDataTypes.CUSTOM] = AlertDataTypes.CUSTOM
+    data: AlertDataCustomInner
+
 # The variants of data related to the alert.
-AlertData = Union[AlertDataNone, AlertDataTest, AlertDataServerUnreachable, AlertDataServerCpu, AlertDataServerMem, AlertDataServerDisk, AlertDataContainerStateChange, AlertDataDeploymentImageUpdateAvailable, AlertDataDeploymentAutoUpdated, AlertDataStackStateChange, AlertDataStackImageUpdateAvailable, AlertDataStackAutoUpdated, AlertDataAwsBuilderTerminationFailed, AlertDataResourceSyncPendingUpdates, AlertDataBuildFailed, AlertDataRepoBuildFailed, AlertDataProcedureFailed, AlertDataActionFailed, AlertDataScheduleRun]
+AlertData = Union[AlertDataNone, AlertDataTest, AlertDataServerUnreachable, AlertDataServerCpu, AlertDataServerMem, AlertDataServerDisk, AlertDataServerVersionMismatch, AlertDataContainerStateChange, AlertDataDeploymentImageUpdateAvailable, AlertDataDeploymentAutoUpdated, AlertDataStackStateChange, AlertDataStackImageUpdateAvailable, AlertDataStackAutoUpdated, AlertDataAwsBuilderTerminationFailed, AlertDataResourceSyncPendingUpdates, AlertDataBuildFailed, AlertDataRepoBuildFailed, AlertDataProcedureFailed, AlertDataActionFailed, AlertDataScheduleRun, AlertDataCustom]
 class Alert(BaseModel):
     """
     Representation of an alert in the system.
@@ -3197,6 +3332,11 @@ class ServerConfig(BaseModel):
     The http address of the periphery client.
     Default: http://localhost:8120
     """
+    external_address: Optional[str] = Field(default=None)
+    """
+    The address to use with links for containers on the server.
+    If empty, will use the 'address' for links.
+    """
     region: Optional[str] = Field(default=None)
     """
     An optional region label
@@ -3206,7 +3346,7 @@ class ServerConfig(BaseModel):
     Whether a server is enabled.
     If a server is disabled,
     you won't be able to perform any actions on it or see deployment's status.
-    default: true
+    Default: false
     """
     timeout_seconds: I64
     """
@@ -3254,6 +3394,10 @@ class ServerConfig(BaseModel):
     """
     Whether to send alerts about the servers DISK status
     """
+    send_version_mismatch_alerts: bool
+    """
+    Whether to send alerts about the servers version mismatch with core
+    """
     cpu_warning: float
     """
     The percentage threshhold which triggers WARNING state for CPU.
@@ -3300,6 +3444,36 @@ class StackActionState(BaseModel):
 GetStackActionStateResponse = StackActionState
 
 GetStackLogResponse = Log
+
+class StackFileRequires(str, Enum):
+    REDEPLOY = "Redeploy"
+    """
+    Diff requires service redeploy.
+    """
+    RESTART = "Restart"
+    """
+    Diff requires service restart
+    """
+    NONE = "None"
+    """
+    Diff requires no action. Default.
+    """
+class StackFileDependency(BaseModel):
+    """
+    Configure additional file dependencies of the Stack.
+    """
+    path: str
+    """
+    Specify the file
+    """
+    services: Optional[List[str]] = Field(default=None)
+    """
+    Specify specific service/s
+    """
+    requires: Optional[StackFileRequires] = Field(default=None)
+    """
+    Specify
+    """
 
 class StackConfig(BaseModel):
     """
@@ -3442,6 +3616,19 @@ class StackConfig(BaseModel):
     """
     Add additional env files to attach with `--env-file`.
     Relative to the run directory root.
+    
+    Note. It is already included as an `additional_file`.
+    Don't add it again there.
+    """
+    config_files: Optional[List[StackFileDependency]] = Field(default=None)
+    """
+    Add additional config files either in repo or on host to track.
+    Can add any files associated with the stack to enable editing them in the UI.
+    Doing so will also include diffing these when deciding to deploy in `DeployStackIfChanged`.
+    Relative to the run directory.
+    
+    Note. If the config file is .env and should be included in compose command
+    using `--env-file`, add it to `additional_env_files` instead.
     """
     send_alerts: bool
     """
@@ -3499,7 +3686,7 @@ class StackConfig(BaseModel):
 class FileContents(BaseModel):
     path: str
     """
-    The path of the file on the host
+    The path to the file
     """
     contents: str
     """
@@ -3535,10 +3722,33 @@ class StackServiceNames(BaseModel):
     The services image.
     """
 
+class StackRemoteFileContents(BaseModel):
+    """
+    Same as [FileContents] with some extra
+    info specific to Stacks.
+    """
+    path: str
+    """
+    The path to the file
+    """
+    contents: str
+    """
+    The contents of the file
+    """
+    services: Optional[List[str]] = Field(default=None)
+    """
+    The services depending on this file,
+    or empty for global requirement (eg all compose files and env files).
+    """
+    requires: Optional[StackFileRequires] = Field(default=None)
+    """
+    Whether diff requires Redeploy / Restart / None
+    """
+
 class StackInfo(BaseModel):
     missing_files: Optional[List[str]] = Field(default=None)
     """
-    If any of the expected files are missing in the repo,
+    If any of the expected compose / additional files are missing in the repo,
     they will be stored here.
     """
     deployed_project_name: Optional[str] = Field(default=None)
@@ -3558,7 +3768,7 @@ class StackInfo(BaseModel):
     """
     deployed_contents: Optional[List[FileContents]] = Field(default=None)
     """
-    The deployed compose file contents.
+    The deployed compose / additional file contents.
     This is updated whenever Komodo successfully deploys the stack.
     """
     deployed_services: Optional[List[StackServiceNames]] = Field(default=None)
@@ -3576,9 +3786,9 @@ class StackInfo(BaseModel):
     The latest service names.
     This is updated whenever the stack cache refreshes, using the latest file contents (either db defined or remote).
     """
-    remote_contents: Optional[List[FileContents]] = Field(default=None)
+    remote_contents: Optional[List[StackRemoteFileContents]] = Field(default=None)
     """
-    The remote compose file contents, whether on host or in repo.
+    The remote compose / additional file contents, whether on host or in repo.
     This is updated whenever Komodo refreshes the stack cache.
     It will be empty if the file is defined directly in the stack config.
     """
@@ -3637,6 +3847,20 @@ class SystemInformation(BaseModel):
     """
 
 GetSystemInformationResponse = SystemInformation
+
+class SystemLoadAverage(BaseModel):
+    one: float
+    """
+    1m load average
+    """
+    five: float
+    """
+    5m load average
+    """
+    fifteen: float
+    """
+    15m load average
+    """
 
 class SingleDiskUsage(BaseModel):
     """
@@ -3752,6 +3976,10 @@ class SystemStats(BaseModel):
     """
     Cpu usage percentage
     """
+    load_average: Optional[SystemLoadAverage] = Field(default=None)
+    """
+    Load average (1m, 5m, 15m)
+    """
     mem_free_gb: Optional[float] = Field(default=None)
     """
     [1.15.9+]
@@ -3859,11 +4087,11 @@ class Tag(BaseModel):
     `{ "_id": { "$oid": "..." }, ...(rest of serialized Tag) }`
     """
     name: str
+    owner: Optional[str] = Field(default=None)
     color: Optional[TagColor] = Field(default=None)
     """
     Hex color code with alpha for UI display
     """
-    owner: Optional[str] = Field(default=None)
 
 GetTagResponse = Tag
 
@@ -3914,14 +4142,14 @@ GetUserResponse = User
 GetVariableResponse = Variable
 
 class ContainerStateStatusEnum(str, Enum):
-    EMPTY = ""
-    CREATED = "created"
     RUNNING = "running"
+    CREATED = "created"
     PAUSED = "paused"
     RESTARTING = "restarting"
     EXITED = "exited"
     REMOVING = "removing"
     DEAD = "dead"
+    EMPTY = ""
 class HealthStatusEnum(str, Enum):
     EMPTY = ""
     NONE = "none"
@@ -5248,6 +5476,8 @@ InspectDockerVolumeResponse = Volume
 
 InspectStackContainerResponse = Container
 
+JsonObject = any
+
 JsonValue = any
 
 ListActionsResponse = List[ActionListItem]
@@ -5327,15 +5557,15 @@ class ContainerListItem(BaseModel):
     """
     The network mode
     """
-    networks: List[str]
+    networks: Optional[List[str]] = Field(default=None)
     """
     The network names attached to container
     """
-    ports: List[Port]
+    ports: Optional[List[Port]] = Field(default=None)
     """
     Port mappings for the container
     """
-    volumes: List[str]
+    volumes: Optional[List[str]] = Field(default=None)
     """
     The volume names attached to container
     """
@@ -5624,6 +5854,10 @@ class Permission(BaseModel):
 ListPermissionsResponse = List[Permission]
 
 class ProcedureState(str, Enum):
+    RUNNING = "Running"
+    """
+    Currently running
+    """
     OK = "Ok"
     """
     Last run successful
@@ -5631,10 +5865,6 @@ class ProcedureState(str, Enum):
     FAILED = "Failed"
     """
     Last run failed
-    """
-    RUNNING = "Running"
-    """
-    Currently running
     """
     UNKNOWN = "Unknown"
     """
@@ -5752,14 +5982,6 @@ RepoListItem = ResourceListItem[RepoListItemInfo]
 ListReposResponse = List[RepoListItem]
 
 class ResourceSyncState(str, Enum):
-    OK = "Ok"
-    """
-    Last sync successful (or never synced). No Changes pending
-    """
-    FAILED = "Failed"
-    """
-    Last sync failed
-    """
     SYNCING = "Syncing"
     """
     Currently syncing
@@ -5767,6 +5989,14 @@ class ResourceSyncState(str, Enum):
     PENDING = "Pending"
     """
     Updates pending
+    """
+    OK = "Ok"
+    """
+    Last sync successful (or never synced). No Changes pending
+    """
+    FAILED = "Failed"
+    """
+    Last sync failed
     """
     UNKNOWN = "Unknown"
     """
@@ -5881,13 +6111,13 @@ ListSchedulesResponse = List[Schedule]
 ListSecretsResponse = List[str]
 
 class ServerState(str, Enum):
-    NOTOK = "NotOk"
-    """
-    Server is unreachable.
-    """
     OK = "Ok"
     """
     Server health check passing.
+    """
+    NOTOK = "NotOk"
+    """
+    Server is unreachable.
     """
     DISABLED = "Disabled"
     """
@@ -5905,6 +6135,11 @@ class ServerListItemInfo(BaseModel):
     address: str
     """
     Address of the server.
+    """
+    external_address: Optional[str] = Field(default=None)
+    """
+    External address of the server (reachable by users).
+    Used with links.
     """
     version: str
     """
@@ -5925,6 +6160,10 @@ class ServerListItemInfo(BaseModel):
     send_disk_alerts: bool
     """
     Whether server is configured to send disk alerts.
+    """
+    send_version_mismatch_alerts: bool
+    """
+    Whether server is configured to send version mismatch alerts.
     """
     terminals_disabled: bool
     """
@@ -6205,12 +6444,22 @@ Server-specific query
 """
 SetLastSeenUpdateResponse = NoData
 
+SignUpLocalUserResponse = JwtResponse
+
+"""
+Response for [SignUpLocalUser].
+"""
 class StackQuerySpecifics(BaseModel):
     server_ids: Optional[List[str]] = Field(default=None)
     """
     Query only for Stacks on these Servers.
     If empty, does not filter by Server.
     Only accepts Server id (not name).
+    """
+    linked_repos: Optional[List[str]] = Field(default=None)
+    """
+    Query only for Stacks with these linked repos.
+    Only accepts Repo id (not name).
     """
     repos: Optional[List[str]] = Field(default=None)
     """
@@ -6367,6 +6616,18 @@ class AwsBuilderConfig(BaseModel):
     Which secrets are available on the AMI.
     """
 
+class BackupCoreDatabase(BaseModel):
+    """
+    Backs up the Komodo Core database to compressed jsonl files.
+    Admin only. Response: [Update]
+    
+    Mount a folder to `/backups`, and Core will use it to create
+    timestamped database dumps, which can be restored using
+    the Komodo CLI.
+    
+    https://komo.do/docs/setup/backup
+    """
+    pass
 class BatchBuildRepo(BaseModel):
     """
     Builds multiple Repos in parallel that match pattern. Response: [BatchExecutionResponse].
@@ -6377,7 +6638,7 @@ class BatchBuildRepo(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* repos
     foo-*
     # add some more
@@ -6395,7 +6656,7 @@ class BatchCloneRepo(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* repos
     foo-*
     # add some more
@@ -6413,7 +6674,7 @@ class BatchDeploy(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* deployments
     foo-*
     # add some more
@@ -6431,7 +6692,7 @@ class BatchDeployStack(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* stacks
     foo-*
     # add some more
@@ -6449,7 +6710,7 @@ class BatchDeployStackIfChanged(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* stacks
     foo-*
     # add some more
@@ -6467,7 +6728,7 @@ class BatchDestroyDeployment(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* deployments
     foo-*
     # add some more
@@ -6485,7 +6746,7 @@ class BatchDestroyStack(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     d
     Example:
-    ```
+    ```text
     # match all foo-* stacks
     foo-*
     # add some more
@@ -6507,7 +6768,7 @@ class BatchPullRepo(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* repos
     foo-*
     # add some more
@@ -6525,7 +6786,7 @@ class BatchPullStack(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* stacks
     foo-*
     # add some more
@@ -6543,7 +6804,7 @@ class BatchRunAction(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* actions
     foo-*
     # add some more
@@ -6561,7 +6822,7 @@ class BatchRunBuild(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* builds
     foo-*
     # add some more
@@ -6579,7 +6840,7 @@ class BatchRunProcedure(BaseModel):
     Supports multiline and comma delineated combinations of the above.
     
     Example:
-    ```
+    ```text
     # match all foo-* procedures
     foo-*
     # add some more
@@ -6635,6 +6896,12 @@ class CancelRepoBuild(BaseModel):
     Can be id or name
     """
 
+class ClearRepoCache(BaseModel):
+    """
+    Clears all repos from the Core repo cache. Admin only.
+    Response: [Update]
+    """
+    pass
 class CloneRepo(BaseModel):
     """
     Clones the target repo. Response: [Update].
@@ -7295,20 +7562,20 @@ class CreateGitProviderAccount(BaseModel):
 
 class CreateLocalUser(BaseModel):
     """
-    Create a new local user account. Will fail if a user with the
-    given username already exists.
-    Response: [CreateLocalUserResponse].
+    **Admin only.** Create a local user.
+    Response: [User].
     
-    Note. This method is only available if the core api has `local_auth` enabled.
+    Note. Not to be confused with /auth/SignUpLocalUser.
+    This method requires admin user credentials, and can
+    bypass disabled user registration.
     """
     username: str
     """
-    The username for the new user.
+    The username for the local user.
     """
     password: str
     """
-    The password for the new user.
-    This cannot be retreived later.
+    A password for the local user.
     """
 
 class CreateNetwork(BaseModel):
@@ -7465,6 +7732,10 @@ class CreateTag(BaseModel):
     name: str
     """
     The name of the tag.
+    """
+    color: Optional[TagColor] = Field(default=None)
+    """
+    Tag color. Default: Slate.
     """
 
 class TerminalRecreateMode(str, Enum):
@@ -8195,7 +8466,7 @@ class FullContainerStats(BaseModel):
     cpu_stats: Optional[ContainerCpuStats] = Field(default=None)
     precpu_stats: Optional[ContainerCpuStats] = Field(default=None)
     memory_stats: Optional[ContainerMemoryStats] = Field(default=None)
-    networks: Optional[ContainerNetworkStats] = Field(default=None)
+    networks: Optional[Dict[str, ContainerNetworkStats]] = Field(default=None)
     """
     Network statistics for the container per interface.  This field is omitted if the container has no networking enabled.
     """
@@ -8466,6 +8737,10 @@ class GetCoreInfoResponse(BaseModel):
     """
     Whether to disable websocket automatic reconnect.
     """
+    enable_fancy_toml: bool
+    """
+    Whether to enable fancy toml highlighting.
+    """
     timezone: str
     """
     TZ identifier Core is using, if manually set.
@@ -8659,6 +8934,10 @@ class SystemStatsRecord(BaseModel):
     cpu_perc: float
     """
     Cpu usage percentage
+    """
+    load_average: Optional[SystemLoadAverage] = Field(default=None)
+    """
+    Load average (1m, 5m, 15m)
     """
     mem_used_gb: float
     """
@@ -9027,6 +9306,10 @@ class GetServersSummaryResponse(BaseModel):
     """
     The number of healthy (`status: OK`) servers.
     """
+    warning: I64
+    """
+    The number of servers with warnings (e.g., version mismatch).
+    """
     unhealthy: I64
     """
     The number of unhealthy servers.
@@ -9278,6 +9561,16 @@ class GetVersionResponse(BaseModel):
     The version of the core api.
     """
 
+class GlobalAutoUpdate(BaseModel):
+    """
+    Trigger a global poll for image updates on Stacks and Deployments
+    with `poll_for_updates` or `auto_update` enabled.
+    Admin only. Response: [Update]
+    
+    1. `docker compose pull` any Stacks / Deployments with `poll_for_updates` or `auto_update` enabled. This will pick up any available updates.
+    2. Redeploy Stacks / Deployments that have updates found and 'auto_update' enabled.
+    """
+    pass
 class InspectDeploymentContainer(BaseModel):
     """
     Inspect the docker container associated with the Deployment.
@@ -9387,7 +9680,7 @@ class ListAlerts(BaseModel):
     Pass a custom mongo query to filter the alerts.
     
     ## Example JSON
-    ```
+    ```json
     {
     "resolved": "false",
     "level": "CRITICAL",
@@ -10660,15 +10953,29 @@ class RunAction(BaseModel):
     """
     Id or name
     """
+    args: Optional[JsonObject] = Field(default=None)
+    """
+    Custom arguments which are merged on top of the default arguments.
+    CLI Format: `"VAR1=val1&VAR2=val2"`
+    
+    Webhook-triggered actions use this to pass WEBHOOK_BRANCH and WEBHOOK_BODY.
+    """
 
 class RunBuild(BaseModel):
     """
     Runs the target build. Response: [Update].
     
     1. Get a handle to the builder. If using AWS builder, this means starting a builder ec2 instance.
+    
     2. Clone the repo on the builder. If an `on_clone` commmand is given, it will be executed.
+    
     3. Execute `docker build {...params}`, where params are determined using the builds configuration.
-    4. If a dockerhub account is attached, the build will be pushed to that account.
+    
+    4. If a docker registry is configured, the build will be pushed to the registry.
+    
+    5. If using AWS builder, destroy the builder ec2 instance.
+    
+    6. Deploy any Deployments with *Redeploy on Build* enabled.
     """
     build: str
     """
@@ -10682,6 +10989,59 @@ class RunProcedure(BaseModel):
     procedure: str
     """
     Id or name
+    """
+
+class RunStackService(BaseModel):
+    """
+    Runs a one-time command against a service using `docker compose run`. Response: [Update]
+    """
+    stack: str
+    """
+    Id or name
+    """
+    service: str
+    """
+    Service to run
+    """
+    command: Optional[List[str]] = Field(default=None)
+    """
+    Command and args to pass to the service container
+    """
+    no_tty: Optional[bool] = Field(default=None)
+    """
+    Do not allocate TTY
+    """
+    no_deps: Optional[bool] = Field(default=None)
+    """
+    Do not start linked services
+    """
+    detach: Optional[bool] = Field(default=None)
+    """
+    Detach container on run
+    """
+    service_ports: Optional[bool] = Field(default=None)
+    """
+    Map service ports to the host
+    """
+    env: Optional[Dict[str, str]] = Field(default=None)
+    """
+    Extra environment variables for the run
+    """
+    workdir: Optional[str] = Field(default=None)
+    """
+    Working directory inside the container
+    """
+    user: Optional[str] = Field(default=None)
+    """
+    User to run as inside the container
+    """
+    entrypoint: Optional[str] = Field(default=None)
+    """
+    Override the default entrypoint
+    """
+    pull: Optional[bool] = Field(default=None)
+    """
+    Pull the image before running
     """
 
 class RunSync(BaseModel):
@@ -10809,6 +11169,29 @@ class SearchStackLog(BaseModel):
     Enable `--timestamps`
     """
 
+class SendAlert(BaseModel):
+    """
+    Send a custom alert message to configured Alerters. Response: [Update]
+    """
+    level: Optional[SeverityLevel] = Field(default=None)
+    """
+    The alert level.
+    """
+    message: str
+    """
+    The alert message. Required.
+    """
+    details: Optional[str] = Field(default=None)
+    """
+    The alert details. Optional.
+    """
+    alerters: Optional[List[str]] = Field(default=None)
+    """
+    Specific alerter names or ids.
+    If empty / not passed, sends to all configured alerters
+    with the `Custom` alert type whitelisted / not blacklisted.
+    """
+
 class ServerBuilderConfig(BaseModel):
     """
     Configuration for a Komodo Server Builder.
@@ -10871,6 +11254,25 @@ class SetUsersInUserGroup(BaseModel):
     The user ids or usernames to hard set as the group's users.
     """
 
+class SignUpLocalUser(BaseModel):
+    """
+    Sign up a new local user account. Will fail if a user with the
+    given username already exists.
+    Response: [SignUpLocalUserResponse].
+    
+    Note. This method is only available if the core api has `local_auth` enabled,
+    and if user registration is not disabled (after the first user).
+    """
+    username: str
+    """
+    The username for the new user.
+    """
+    password: str
+    """
+    The password for the new user.
+    This cannot be retreived later.
+    """
+
 class SingleNetworkInterfaceUsage(BaseModel):
     """
     Info for network interface usage.
@@ -10898,6 +11300,9 @@ class SlackAlerterEndpoint(BaseModel):
     """
 
 class Sleep(BaseModel):
+    """
+    Sleeps for the specified time.
+    """
     duration_ms: Optional[I64] = Field(default=None)
 
 class StartAllContainers(BaseModel):
@@ -11582,7 +11987,7 @@ class WriteSyncFileContents(BaseModel):
 
 class AuthRequestTypes(str, Enum):
     GET_LOGIN_OPTIONS = "GetLoginOptions"
-    CREATE_LOCAL_USER = "CreateLocalUser"
+    SIGN_UP_LOCAL_USER = "SignUpLocalUser"
     LOGIN_LOCAL_USER = "LoginLocalUser"
     EXCHANGE_FOR_JWT = "ExchangeForJwt"
     GET_USER = "GetUser"
@@ -11591,9 +11996,9 @@ class AuthRequestGetLoginOptions(BaseModel):
     type: Literal[AuthRequestTypes.GET_LOGIN_OPTIONS] = AuthRequestTypes.GET_LOGIN_OPTIONS
     params: GetLoginOptions
 
-class AuthRequestCreateLocalUser(BaseModel):
-    type: Literal[AuthRequestTypes.CREATE_LOCAL_USER] = AuthRequestTypes.CREATE_LOCAL_USER
-    params: CreateLocalUser
+class AuthRequestSignUpLocalUser(BaseModel):
+    type: Literal[AuthRequestTypes.SIGN_UP_LOCAL_USER] = AuthRequestTypes.SIGN_UP_LOCAL_USER
+    params: SignUpLocalUser
 
 class AuthRequestLoginLocalUser(BaseModel):
     type: Literal[AuthRequestTypes.LOGIN_LOCAL_USER] = AuthRequestTypes.LOGIN_LOCAL_USER
@@ -11607,7 +12012,7 @@ class AuthRequestGetUser(BaseModel):
     type: Literal[AuthRequestTypes.GET_USER] = AuthRequestTypes.GET_USER
     params: GetUser
 
-AuthRequest = Union[AuthRequestGetLoginOptions, AuthRequestCreateLocalUser, AuthRequestLoginLocalUser, AuthRequestExchangeForJwt, AuthRequestGetUser]
+AuthRequest = Union[AuthRequestGetLoginOptions, AuthRequestSignUpLocalUser, AuthRequestLoginLocalUser, AuthRequestExchangeForJwt, AuthRequestGetUser]
 class DayOfWeek(str, Enum):
     """
     Days of the week
@@ -11654,6 +12059,7 @@ class ExecuteRequestTypes(str, Enum):
     UNPAUSE_STACK = "UnpauseStack"
     DESTROY_STACK = "DestroyStack"
     BATCH_DESTROY_STACK = "BatchDestroyStack"
+    RUN_STACK_SERVICE = "RunStackService"
     DEPLOY = "Deploy"
     BATCH_DEPLOY = "BatchDeploy"
     PULL_DEPLOYMENT = "PullDeployment"
@@ -11679,7 +12085,11 @@ class ExecuteRequestTypes(str, Enum):
     RUN_ACTION = "RunAction"
     BATCH_RUN_ACTION = "BatchRunAction"
     TEST_ALERTER = "TestAlerter"
+    SEND_ALERT = "SendAlert"
     RUN_SYNC = "RunSync"
+    CLEAR_REPO_CACHE = "ClearRepoCache"
+    BACKUP_CORE_DATABASE = "BackupCoreDatabase"
+    GLOBAL_AUTO_UPDATE = "GlobalAutoUpdate"
 
 class ExecuteRequestStartContainer(BaseModel):
     type: Literal[ExecuteRequestTypes.START_CONTAINER] = ExecuteRequestTypes.START_CONTAINER
@@ -11817,6 +12227,10 @@ class ExecuteRequestBatchDestroyStack(BaseModel):
     type: Literal[ExecuteRequestTypes.BATCH_DESTROY_STACK] = ExecuteRequestTypes.BATCH_DESTROY_STACK
     params: BatchDestroyStack
 
+class ExecuteRequestRunStackService(BaseModel):
+    type: Literal[ExecuteRequestTypes.RUN_STACK_SERVICE] = ExecuteRequestTypes.RUN_STACK_SERVICE
+    params: RunStackService
+
 class ExecuteRequestDeploy(BaseModel):
     type: Literal[ExecuteRequestTypes.DEPLOY] = ExecuteRequestTypes.DEPLOY
     params: Deploy
@@ -11917,11 +12331,27 @@ class ExecuteRequestTestAlerter(BaseModel):
     type: Literal[ExecuteRequestTypes.TEST_ALERTER] = ExecuteRequestTypes.TEST_ALERTER
     params: TestAlerter
 
+class ExecuteRequestSendAlert(BaseModel):
+    type: Literal[ExecuteRequestTypes.SEND_ALERT] = ExecuteRequestTypes.SEND_ALERT
+    params: SendAlert
+
 class ExecuteRequestRunSync(BaseModel):
     type: Literal[ExecuteRequestTypes.RUN_SYNC] = ExecuteRequestTypes.RUN_SYNC
     params: RunSync
 
-ExecuteRequest = Union[ExecuteRequestStartContainer, ExecuteRequestRestartContainer, ExecuteRequestPauseContainer, ExecuteRequestUnpauseContainer, ExecuteRequestStopContainer, ExecuteRequestDestroyContainer, ExecuteRequestStartAllContainers, ExecuteRequestRestartAllContainers, ExecuteRequestPauseAllContainers, ExecuteRequestUnpauseAllContainers, ExecuteRequestStopAllContainers, ExecuteRequestPruneContainers, ExecuteRequestDeleteNetwork, ExecuteRequestPruneNetworks, ExecuteRequestDeleteImage, ExecuteRequestPruneImages, ExecuteRequestDeleteVolume, ExecuteRequestPruneVolumes, ExecuteRequestPruneDockerBuilders, ExecuteRequestPruneBuildx, ExecuteRequestPruneSystem, ExecuteRequestDeployStack, ExecuteRequestBatchDeployStack, ExecuteRequestDeployStackIfChanged, ExecuteRequestBatchDeployStackIfChanged, ExecuteRequestPullStack, ExecuteRequestBatchPullStack, ExecuteRequestStartStack, ExecuteRequestRestartStack, ExecuteRequestStopStack, ExecuteRequestPauseStack, ExecuteRequestUnpauseStack, ExecuteRequestDestroyStack, ExecuteRequestBatchDestroyStack, ExecuteRequestDeploy, ExecuteRequestBatchDeploy, ExecuteRequestPullDeployment, ExecuteRequestStartDeployment, ExecuteRequestRestartDeployment, ExecuteRequestPauseDeployment, ExecuteRequestUnpauseDeployment, ExecuteRequestStopDeployment, ExecuteRequestDestroyDeployment, ExecuteRequestBatchDestroyDeployment, ExecuteRequestRunBuild, ExecuteRequestBatchRunBuild, ExecuteRequestCancelBuild, ExecuteRequestCloneRepo, ExecuteRequestBatchCloneRepo, ExecuteRequestPullRepo, ExecuteRequestBatchPullRepo, ExecuteRequestBuildRepo, ExecuteRequestBatchBuildRepo, ExecuteRequestCancelRepoBuild, ExecuteRequestRunProcedure, ExecuteRequestBatchRunProcedure, ExecuteRequestRunAction, ExecuteRequestBatchRunAction, ExecuteRequestTestAlerter, ExecuteRequestRunSync]
+class ExecuteRequestClearRepoCache(BaseModel):
+    type: Literal[ExecuteRequestTypes.CLEAR_REPO_CACHE] = ExecuteRequestTypes.CLEAR_REPO_CACHE
+    params: ClearRepoCache
+
+class ExecuteRequestBackupCoreDatabase(BaseModel):
+    type: Literal[ExecuteRequestTypes.BACKUP_CORE_DATABASE] = ExecuteRequestTypes.BACKUP_CORE_DATABASE
+    params: BackupCoreDatabase
+
+class ExecuteRequestGlobalAutoUpdate(BaseModel):
+    type: Literal[ExecuteRequestTypes.GLOBAL_AUTO_UPDATE] = ExecuteRequestTypes.GLOBAL_AUTO_UPDATE
+    params: GlobalAutoUpdate
+
+ExecuteRequest = Union[ExecuteRequestStartContainer, ExecuteRequestRestartContainer, ExecuteRequestPauseContainer, ExecuteRequestUnpauseContainer, ExecuteRequestStopContainer, ExecuteRequestDestroyContainer, ExecuteRequestStartAllContainers, ExecuteRequestRestartAllContainers, ExecuteRequestPauseAllContainers, ExecuteRequestUnpauseAllContainers, ExecuteRequestStopAllContainers, ExecuteRequestPruneContainers, ExecuteRequestDeleteNetwork, ExecuteRequestPruneNetworks, ExecuteRequestDeleteImage, ExecuteRequestPruneImages, ExecuteRequestDeleteVolume, ExecuteRequestPruneVolumes, ExecuteRequestPruneDockerBuilders, ExecuteRequestPruneBuildx, ExecuteRequestPruneSystem, ExecuteRequestDeployStack, ExecuteRequestBatchDeployStack, ExecuteRequestDeployStackIfChanged, ExecuteRequestBatchDeployStackIfChanged, ExecuteRequestPullStack, ExecuteRequestBatchPullStack, ExecuteRequestStartStack, ExecuteRequestRestartStack, ExecuteRequestStopStack, ExecuteRequestPauseStack, ExecuteRequestUnpauseStack, ExecuteRequestDestroyStack, ExecuteRequestBatchDestroyStack, ExecuteRequestRunStackService, ExecuteRequestDeploy, ExecuteRequestBatchDeploy, ExecuteRequestPullDeployment, ExecuteRequestStartDeployment, ExecuteRequestRestartDeployment, ExecuteRequestPauseDeployment, ExecuteRequestUnpauseDeployment, ExecuteRequestStopDeployment, ExecuteRequestDestroyDeployment, ExecuteRequestBatchDestroyDeployment, ExecuteRequestRunBuild, ExecuteRequestBatchRunBuild, ExecuteRequestCancelBuild, ExecuteRequestCloneRepo, ExecuteRequestBatchCloneRepo, ExecuteRequestPullRepo, ExecuteRequestBatchPullRepo, ExecuteRequestBuildRepo, ExecuteRequestBatchBuildRepo, ExecuteRequestCancelRepoBuild, ExecuteRequestRunProcedure, ExecuteRequestBatchRunProcedure, ExecuteRequestRunAction, ExecuteRequestBatchRunAction, ExecuteRequestTestAlerter, ExecuteRequestSendAlert, ExecuteRequestRunSync, ExecuteRequestClearRepoCache, ExecuteRequestBackupCoreDatabase, ExecuteRequestGlobalAutoUpdate]
 class IanaTimezone(str, Enum):
     """
     One representative IANA zone for each distinct base UTC offset in the tz database.
@@ -12082,26 +12512,6 @@ class IanaTimezone(str, Enum):
     """
     UTC+14:00
     """
-class ImageRegistryLegacy1_14Types(str, Enum):
-    NONE = "None"
-    STANDARD = "Standard"
-
-class ImageRegistryLegacy1_14None(BaseModel):
-    """
-    Don't push the image to any registry
-    """
-    type: Literal[ImageRegistryLegacy1_14Types.NONE] = ImageRegistryLegacy1_14Types.NONE
-    params: NoData
-
-class ImageRegistryLegacy1_14Standard(BaseModel):
-    """
-    Push the image to a standard image registry (any domain)
-    """
-    type: Literal[ImageRegistryLegacy1_14Types.STANDARD] = ImageRegistryLegacy1_14Types.STANDARD
-    params: ImageRegistryConfig
-
-# Configuration for the registry to push the built image to.
-ImageRegistryLegacy1_14 = Union[ImageRegistryLegacy1_14None, ImageRegistryLegacy1_14Standard]
 class ReadRequestTypes(str, Enum):
     GET_VERSION = "GetVersion"
     GET_CORE_INFO = "GetCoreInfo"
@@ -12763,6 +13173,7 @@ class UserRequestDeleteApiKey(BaseModel):
 
 UserRequest = Union[UserRequestPushRecentlyViewed, UserRequestSetLastSeenUpdate, UserRequestCreateApiKey, UserRequestDeleteApiKey]
 class WriteRequestTypes(str, Enum):
+    CREATE_LOCAL_USER = "CreateLocalUser"
     UPDATE_USER_USERNAME = "UpdateUserUsername"
     UPDATE_USER_PASSWORD = "UpdateUserPassword"
     DELETE_USER = "DeleteUser"
@@ -12868,6 +13279,10 @@ class WriteRequestTypes(str, Enum):
     CREATE_DOCKER_REGISTRY_ACCOUNT = "CreateDockerRegistryAccount"
     UPDATE_DOCKER_REGISTRY_ACCOUNT = "UpdateDockerRegistryAccount"
     DELETE_DOCKER_REGISTRY_ACCOUNT = "DeleteDockerRegistryAccount"
+
+class WriteRequestCreateLocalUser(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_LOCAL_USER] = WriteRequestTypes.CREATE_LOCAL_USER
+    params: CreateLocalUser
 
 class WriteRequestUpdateUserUsername(BaseModel):
     type: Literal[WriteRequestTypes.UPDATE_USER_USERNAME] = WriteRequestTypes.UPDATE_USER_USERNAME
@@ -13289,7 +13704,7 @@ class WriteRequestDeleteDockerRegistryAccount(BaseModel):
     type: Literal[WriteRequestTypes.DELETE_DOCKER_REGISTRY_ACCOUNT] = WriteRequestTypes.DELETE_DOCKER_REGISTRY_ACCOUNT
     params: DeleteDockerRegistryAccount
 
-WriteRequest = Union[WriteRequestUpdateUserUsername, WriteRequestUpdateUserPassword, WriteRequestDeleteUser, WriteRequestCreateServiceUser, WriteRequestUpdateServiceUserDescription, WriteRequestCreateApiKeyForServiceUser, WriteRequestDeleteApiKeyForServiceUser, WriteRequestCreateUserGroup, WriteRequestRenameUserGroup, WriteRequestDeleteUserGroup, WriteRequestAddUserToUserGroup, WriteRequestRemoveUserFromUserGroup, WriteRequestSetUsersInUserGroup, WriteRequestSetEveryoneUserGroup, WriteRequestUpdateUserAdmin, WriteRequestUpdateUserBasePermissions, WriteRequestUpdatePermissionOnResourceType, WriteRequestUpdatePermissionOnTarget, WriteRequestUpdateResourceMeta, WriteRequestCreateServer, WriteRequestCopyServer, WriteRequestDeleteServer, WriteRequestUpdateServer, WriteRequestRenameServer, WriteRequestCreateNetwork, WriteRequestCreateTerminal, WriteRequestDeleteTerminal, WriteRequestDeleteAllTerminals, WriteRequestCreateStack, WriteRequestCopyStack, WriteRequestDeleteStack, WriteRequestUpdateStack, WriteRequestRenameStack, WriteRequestWriteStackFileContents, WriteRequestRefreshStackCache, WriteRequestCreateStackWebhook, WriteRequestDeleteStackWebhook, WriteRequestCreateDeployment, WriteRequestCopyDeployment, WriteRequestCreateDeploymentFromContainer, WriteRequestDeleteDeployment, WriteRequestUpdateDeployment, WriteRequestRenameDeployment, WriteRequestCreateBuild, WriteRequestCopyBuild, WriteRequestDeleteBuild, WriteRequestUpdateBuild, WriteRequestRenameBuild, WriteRequestWriteBuildFileContents, WriteRequestRefreshBuildCache, WriteRequestCreateBuildWebhook, WriteRequestDeleteBuildWebhook, WriteRequestCreateBuilder, WriteRequestCopyBuilder, WriteRequestDeleteBuilder, WriteRequestUpdateBuilder, WriteRequestRenameBuilder, WriteRequestCreateRepo, WriteRequestCopyRepo, WriteRequestDeleteRepo, WriteRequestUpdateRepo, WriteRequestRenameRepo, WriteRequestRefreshRepoCache, WriteRequestCreateRepoWebhook, WriteRequestDeleteRepoWebhook, WriteRequestCreateAlerter, WriteRequestCopyAlerter, WriteRequestDeleteAlerter, WriteRequestUpdateAlerter, WriteRequestRenameAlerter, WriteRequestCreateProcedure, WriteRequestCopyProcedure, WriteRequestDeleteProcedure, WriteRequestUpdateProcedure, WriteRequestRenameProcedure, WriteRequestCreateAction, WriteRequestCopyAction, WriteRequestDeleteAction, WriteRequestUpdateAction, WriteRequestRenameAction, WriteRequestCreateResourceSync, WriteRequestCopyResourceSync, WriteRequestDeleteResourceSync, WriteRequestUpdateResourceSync, WriteRequestRenameResourceSync, WriteRequestWriteSyncFileContents, WriteRequestCommitSync, WriteRequestRefreshResourceSyncPending, WriteRequestCreateSyncWebhook, WriteRequestDeleteSyncWebhook, WriteRequestCreateTag, WriteRequestDeleteTag, WriteRequestRenameTag, WriteRequestUpdateTagColor, WriteRequestCreateVariable, WriteRequestUpdateVariableValue, WriteRequestUpdateVariableDescription, WriteRequestUpdateVariableIsSecret, WriteRequestDeleteVariable, WriteRequestCreateGitProviderAccount, WriteRequestUpdateGitProviderAccount, WriteRequestDeleteGitProviderAccount, WriteRequestCreateDockerRegistryAccount, WriteRequestUpdateDockerRegistryAccount, WriteRequestDeleteDockerRegistryAccount]
+WriteRequest = Union[WriteRequestCreateLocalUser, WriteRequestUpdateUserUsername, WriteRequestUpdateUserPassword, WriteRequestDeleteUser, WriteRequestCreateServiceUser, WriteRequestUpdateServiceUserDescription, WriteRequestCreateApiKeyForServiceUser, WriteRequestDeleteApiKeyForServiceUser, WriteRequestCreateUserGroup, WriteRequestRenameUserGroup, WriteRequestDeleteUserGroup, WriteRequestAddUserToUserGroup, WriteRequestRemoveUserFromUserGroup, WriteRequestSetUsersInUserGroup, WriteRequestSetEveryoneUserGroup, WriteRequestUpdateUserAdmin, WriteRequestUpdateUserBasePermissions, WriteRequestUpdatePermissionOnResourceType, WriteRequestUpdatePermissionOnTarget, WriteRequestUpdateResourceMeta, WriteRequestCreateServer, WriteRequestCopyServer, WriteRequestDeleteServer, WriteRequestUpdateServer, WriteRequestRenameServer, WriteRequestCreateNetwork, WriteRequestCreateTerminal, WriteRequestDeleteTerminal, WriteRequestDeleteAllTerminals, WriteRequestCreateStack, WriteRequestCopyStack, WriteRequestDeleteStack, WriteRequestUpdateStack, WriteRequestRenameStack, WriteRequestWriteStackFileContents, WriteRequestRefreshStackCache, WriteRequestCreateStackWebhook, WriteRequestDeleteStackWebhook, WriteRequestCreateDeployment, WriteRequestCopyDeployment, WriteRequestCreateDeploymentFromContainer, WriteRequestDeleteDeployment, WriteRequestUpdateDeployment, WriteRequestRenameDeployment, WriteRequestCreateBuild, WriteRequestCopyBuild, WriteRequestDeleteBuild, WriteRequestUpdateBuild, WriteRequestRenameBuild, WriteRequestWriteBuildFileContents, WriteRequestRefreshBuildCache, WriteRequestCreateBuildWebhook, WriteRequestDeleteBuildWebhook, WriteRequestCreateBuilder, WriteRequestCopyBuilder, WriteRequestDeleteBuilder, WriteRequestUpdateBuilder, WriteRequestRenameBuilder, WriteRequestCreateRepo, WriteRequestCopyRepo, WriteRequestDeleteRepo, WriteRequestUpdateRepo, WriteRequestRenameRepo, WriteRequestRefreshRepoCache, WriteRequestCreateRepoWebhook, WriteRequestDeleteRepoWebhook, WriteRequestCreateAlerter, WriteRequestCopyAlerter, WriteRequestDeleteAlerter, WriteRequestUpdateAlerter, WriteRequestRenameAlerter, WriteRequestCreateProcedure, WriteRequestCopyProcedure, WriteRequestDeleteProcedure, WriteRequestUpdateProcedure, WriteRequestRenameProcedure, WriteRequestCreateAction, WriteRequestCopyAction, WriteRequestDeleteAction, WriteRequestUpdateAction, WriteRequestRenameAction, WriteRequestCreateResourceSync, WriteRequestCopyResourceSync, WriteRequestDeleteResourceSync, WriteRequestUpdateResourceSync, WriteRequestRenameResourceSync, WriteRequestWriteSyncFileContents, WriteRequestCommitSync, WriteRequestRefreshResourceSyncPending, WriteRequestCreateSyncWebhook, WriteRequestDeleteSyncWebhook, WriteRequestCreateTag, WriteRequestDeleteTag, WriteRequestRenameTag, WriteRequestUpdateTagColor, WriteRequestCreateVariable, WriteRequestUpdateVariableValue, WriteRequestUpdateVariableDescription, WriteRequestUpdateVariableIsSecret, WriteRequestDeleteVariable, WriteRequestCreateGitProviderAccount, WriteRequestUpdateGitProviderAccount, WriteRequestDeleteGitProviderAccount, WriteRequestCreateDockerRegistryAccount, WriteRequestUpdateDockerRegistryAccount, WriteRequestDeleteDockerRegistryAccount]
 class WsLoginMessageJwtInner(BaseModel):
     """
     Generated type representing the anonymous struct variant `Jwt` of the `WsLoginMessage` Rust enum

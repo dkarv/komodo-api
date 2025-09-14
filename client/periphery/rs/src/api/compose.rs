@@ -1,11 +1,15 @@
 use komodo_client::entities::{
   FileContents, RepoExecutionResponse, SearchCombinator,
   repo::Repo,
-  stack::{ComposeProject, Stack, StackServiceNames},
+  stack::{
+    ComposeProject, Stack, StackFileDependency,
+    StackRemoteFileContents, StackServiceNames,
+  },
   update::Log,
 };
 use resolver_api::Resolve;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// List the compose project names that are on the host.
 /// List running `docker compose ls`
@@ -28,12 +32,13 @@ pub struct GetComposeContentsOnHost {
   /// The name of the stack
   pub name: String,
   pub run_directory: String,
-  pub file_paths: Vec<String>,
+  /// Both compose files and env / additional files, all relative to run directory.
+  pub file_paths: Vec<StackFileDependency>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GetComposeContentsOnHostResponse {
-  pub contents: Vec<FileContents>,
+  pub contents: Vec<StackRemoteFileContents>,
   pub errors: Vec<FileContents>,
 }
 
@@ -91,7 +96,7 @@ pub struct GetComposeLogSearch {
 
 //
 
-/// Write the compose contents to the file on the host, for stacks using
+/// Write the compose / additional file contents to the file on the host, for stacks using
 /// `files_on_host`.
 #[derive(Debug, Clone, Serialize, Deserialize, Resolve)]
 #[response(Log)]
@@ -204,7 +209,7 @@ pub struct ComposeUpResponse {
   #[serde(default)]
   pub services: Vec<StackServiceNames>,
   /// The deploy compose file contents if they could be acquired, or empty vec.
-  pub file_contents: Vec<FileContents>,
+  pub file_contents: Vec<StackRemoteFileContents>,
   /// The error in getting remote file contents at the path, or null
   pub remote_errors: Vec<FileContents>,
   /// The output of `docker compose config` at deploy time
@@ -213,6 +218,14 @@ pub struct ComposeUpResponse {
   pub commit_hash: Option<String>,
   /// If its a repo based stack, will include the latest commit message
   pub commit_message: Option<String>,
+}
+
+//
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposeRunResponse {
+  /// Logs produced during stack write/prepare for the run
+  pub logs: Vec<Log>,
 }
 
 //
@@ -227,4 +240,57 @@ pub struct ComposeExecution {
   pub project: String,
   /// The command in `docker compose -p {project} {command}`
   pub command: String,
+}
+
+//
+
+/// docker compose run one-time service execution.
+#[derive(Debug, Clone, Serialize, Deserialize, Resolve)]
+#[response(Log)]
+#[error(serror::Error)]
+pub struct ComposeRun {
+  /// The stack to run a service for
+  pub stack: Stack,
+  /// The linked repo, if it exists.
+  pub repo: Option<Repo>,
+  /// If provided, use it to login in. Otherwise check periphery local registries.
+  pub git_token: Option<String>,
+  /// If provided, use it to login in. Otherwise check periphery local git providers.
+  pub registry_token: Option<String>,
+  /// Propogate any secret replacers from core interpolation.
+  #[serde(default)]
+  pub replacers: Vec<(String, String)>,
+
+  /// Service to run
+  pub service: String,
+  /// Command
+  #[serde(default)]
+  pub command: Option<Vec<String>>,
+  /// Do not allocate TTY
+  #[serde(default)]
+  pub no_tty: Option<bool>,
+  /// Do not start linked services
+  #[serde(default)]
+  pub no_deps: Option<bool>,
+  /// Detach container on run
+  #[serde(default)]
+  pub detach: Option<bool>,
+  /// Map service ports to the host
+  #[serde(default)]
+  pub service_ports: Option<bool>,
+  /// Extra environment variables for the run
+  #[serde(default)]
+  pub env: Option<HashMap<String, String>>,
+  /// Working directory inside the container
+  #[serde(default)]
+  pub workdir: Option<String>,
+  /// User to run as inside the container
+  #[serde(default)]
+  pub user: Option<String>,
+  /// Override the default entrypoint
+  #[serde(default)]
+  pub entrypoint: Option<String>,
+  /// Pull the image before running
+  #[serde(default)]
+  pub pull: Option<bool>,
 }

@@ -132,7 +132,7 @@ export const ActionComponents: RequiredResourceComponents = {
           name={action.name}
           title={running ? "Running" : "Run Action"}
           icon={<Clapperboard className="h-4 w-4" />}
-          onClick={() => mutate({ action: id })}
+          onClick={() => mutate({ action: id, args: {} })}
           disabled={running || isPending}
           loading={running}
         />

@@ -7,6 +7,10 @@ use std::{
 
 use anyhow::Context;
 use command::run_komodo_command;
+use config::merge_objects;
+use database::mungos::{
+  by_id::update_one_by_id, mongodb::bson::to_document,
+};
 use interpolate::Interpolator;
 use komodo_client::{
   api::{
@@ -14,6 +18,7 @@ use komodo_client::{
     user::{CreateApiKey, CreateApiKeyResponse, DeleteApiKey},
   },
   entities::{
+    FileFormat, JsonObject,
     action::Action,
     alert::{Alert, AlertData, SeverityLevel},
     config::core::CoreConfig,
@@ -22,8 +27,8 @@ use komodo_client::{
     update::Update,
     user::action_user,
   },
+  parsers::parse_key_value_list,
 };
-use mungos::{by_id::update_one_by_id, mongodb::bson::to_document};
 use resolver_api::Resolve;
 use tokio::fs;
 
@@ -46,7 +51,10 @@ use super::ExecuteArgs;
 impl super::BatchExecute for BatchRunAction {
   type Resource = Action;
   fn single_request(action: String) -> ExecuteRequest {
-    ExecuteRequest::RunAction(RunAction { action })
+    ExecuteRequest::RunAction(RunAction {
+      action,
+      args: Default::default(),
+    })
   }
 }
 
@@ -91,6 +99,23 @@ impl Resolve<ExecuteArgs> for RunAction {
 
     update_update(update.clone()).await?;
 
+    let default_args = parse_action_arguments(
+      &action.config.arguments,
+      action.config.arguments_format,
+    )
+    .context("Failed to parse default Action arguments")?;
+
+    let args = merge_objects(
+      default_args,
+      self.args.unwrap_or_default(),
+      true,
+      true,
+    )
+    .context("Failed to merge request args with default args")?;
+
+    let args = serde_json::to_string(&args)
+      .context("Failed to serialize action run arguments")?;
+
     let CreateApiKeyResponse { key, secret } = CreateApiKey {
       name: update.id.clone(),
       expires: 0,
@@ -103,7 +128,7 @@ impl Resolve<ExecuteArgs> for RunAction {
     let contents = &mut action.config.file_contents;
 
     // Wrap the file contents in the execution context.
-    *contents = full_contents(contents, &key, &secret);
+    *contents = full_contents(contents, &args, &key, &secret);
 
     let replacers =
       interpolate(contents, &mut update, key.clone(), secret.clone())
@@ -179,7 +204,7 @@ impl Resolve<ExecuteArgs> for RunAction {
       let _ = update_one_by_id(
         &db_client().updates,
         &update.id,
-        mungos::update::Update::Set(update_doc),
+        database::mungos::update::Update::Set(update_doc),
         None,
       )
       .await;
@@ -236,7 +261,13 @@ async fn interpolate(
   Ok(interpolator.secret_replacers)
 }
 
-fn full_contents(contents: &str, key: &str, secret: &str) -> String {
+fn full_contents(
+  contents: &str,
+  // Pre-serialized to JSON string.
+  args: &str,
+  key: &str,
+  secret: &str,
+) -> String {
   let CoreConfig {
     port, ssl_enabled, ..
   } = core_config();
@@ -260,6 +291,8 @@ const TOML = {{
   parseResourceToml: __TOML__.parse,
   parseCargoToml: __TOML__.parse,
 }}
+
+const ARGS = {args};
 
 const komodo = KomodoClient('{base_url}', {{
   type: 'api-key',
@@ -365,4 +398,26 @@ fn delete_file(
       false
     }
   })
+}
+
+fn parse_action_arguments(
+  args: &str,
+  format: FileFormat,
+) -> anyhow::Result<JsonObject> {
+  match format {
+    FileFormat::KeyValue => {
+      let args = parse_key_value_list(args)
+        .context("Failed to parse args as key value list")?
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::String(v)))
+        .collect();
+      Ok(args)
+    }
+    FileFormat::Toml => toml::from_str(args)
+      .context("Failed to parse Toml to Action args"),
+    FileFormat::Yaml => serde_yaml_ng::from_str(args)
+      .context("Failed to parse Yaml to action args"),
+    FileFormat::Json => serde_json::from_str(args)
+      .context("Failed to parse Json to action args"),
+  }
 }

@@ -27,7 +27,8 @@ pub fn init(config: &LogConfig) -> anyhow::Result<()> {
           tracing_subscriber::fmt::layer()
             .pretty()
             .with_file(false)
-            .with_line_number(false),
+            .with_line_number(false)
+            .with_target(config.location),
         )
         .with(OpenTelemetryLayer::new(tracer))
         .try_init()
@@ -41,7 +42,8 @@ pub fn init(config: &LogConfig) -> anyhow::Result<()> {
         .with(
           tracing_subscriber::fmt::layer()
             .with_file(false)
-            .with_line_number(false),
+            .with_line_number(false)
+            .with_target(config.location),
         )
         .with(OpenTelemetryLayer::new(tracer))
         .try_init()
@@ -63,14 +65,16 @@ pub fn init(config: &LogConfig) -> anyhow::Result<()> {
         tracing_subscriber::fmt::layer()
           .pretty()
           .with_file(false)
-          .with_line_number(false),
+          .with_line_number(false)
+          .with_target(config.location),
       )
       .try_init(),
     (StdioLogMode::Standard, false, false) => registry
       .with(
         tracing_subscriber::fmt::layer()
           .with_file(false)
-          .with_line_number(false),
+          .with_line_number(false)
+          .with_target(config.location),
       )
       .try_init(),
 

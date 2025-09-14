@@ -20,6 +20,8 @@ use super::KomodoWriteRequest;
 pub struct CreateTag {
   /// The name of the tag.
   pub name: String,
+  /// Tag color. Default: Slate.
+  pub color: Option<TagColor>,
 }
 
 //

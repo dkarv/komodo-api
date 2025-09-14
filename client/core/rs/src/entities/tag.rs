@@ -32,14 +32,30 @@ pub struct Tag {
   #[cfg_attr(feature = "mongo", unique_index)]
   pub name: String,
 
-  /// Hex color code with alpha for UI display
-  #[serde(default)]
-  pub color: TagColor,
-
   #[serde(default)]
   #[builder(default)]
   #[cfg_attr(feature = "mongo", index)]
   pub owner: String,
+
+  /// Hex color code with alpha for UI display
+  #[serde(default)]
+  #[builder(default)]
+  pub color: TagColor,
+  // /// This field is not stored on database,
+  // /// but rather populated at query time based on results from the other resources.
+  // #[serde(default, skip_serializing_if = "is_false")]
+  // #[builder(default)]
+  // pub unused: bool,
+}
+
+// fn is_false(b: &bool) -> bool {
+//   !b
+// }
+
+impl Tag {
+  pub fn builder() -> TagBuilder {
+    TagBuilder::default()
+  }
 }
 
 #[typeshare]

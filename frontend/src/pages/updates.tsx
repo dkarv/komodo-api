@@ -1,7 +1,7 @@
 import { Page } from "@components/layouts";
 import { ResourceComponents } from "@components/resources";
 import { UpdatesTable } from "@components/updates/table";
-import { useRead, useResourceParamType, useSetTitle } from "@lib/hooks";
+import { useRead, useSetTitle } from "@lib/hooks";
 import { filterBySplit, RESOURCE_TARGETS } from "@lib/utils";
 import { Types } from "komodo_client";
 import { CaretSortIcon } from "@radix-ui/react-icons";
@@ -25,7 +25,7 @@ import {
   SearchX,
 } from "lucide-react";
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -37,6 +37,7 @@ import {
 import { ResourceSelector } from "@components/resources/common";
 
 export default function UpdatesPage() {
+  useSetTitle("Updates");
   const [page, setPage] = useState(0);
   const [params, setParams] = useSearchParams();
 
@@ -169,110 +170,6 @@ export default function UpdatesPage() {
     </Page>
   );
 }
-
-export const Updates = () => {
-  const type = useResourceParamType()!;
-  const id = useParams().id as string;
-  if (type && id) {
-    return <ResourceUpdates type={type} id={id} />;
-  } else {
-    return <AllUpdates />;
-  }
-};
-
-const AllUpdates = () => {
-  useSetTitle("Updates");
-  const [operation, setOperation] = useState<Types.Operation | undefined>();
-  const [page, setPage] = useState(0);
-  const updates = useRead("ListUpdates", { query: { operation }, page }).data;
-  return (
-    <Page
-      title="Updates"
-      icon={<Bell className="w-8 h-8" />}
-      actions={
-        <OperationSelector selected={operation} onSelect={setOperation} />
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <UpdatesTable updates={updates?.updates ?? []} showTarget />
-        <div className="flex gap-4 justify-center items-center text-muted-foreground">
-          <Button
-            variant="outline"
-            onClick={() => setPage(page - 1)}
-            disabled={page === 0}
-          >
-            Prev Page
-          </Button>
-          Page: {page + 1}
-          <Button
-            variant="outline"
-            onClick={() => updates?.next_page && setPage(updates.next_page)}
-            disabled={!updates?.next_page}
-          >
-            Next Page
-          </Button>
-        </div>
-      </div>
-    </Page>
-  );
-};
-
-const ResourceUpdates = ({
-  type,
-  id,
-}: {
-  type: UsableResource;
-  id: string;
-}) => {
-  const name = useRead(`List${type}s`, {}).data?.find((r) => r.id === id)?.name;
-  useSetTitle(name && `${name} | Updates`);
-  const [operation, setOperation] = useState<Types.Operation | undefined>();
-  const [page, setPage] = useState(0);
-  const updates = useRead("ListUpdates", {
-    query: {
-      "target.type": type,
-      "target.id": id,
-      operation,
-    },
-    page,
-  }).data;
-  const Components = ResourceComponents[type];
-  return (
-    <Page
-      title={name}
-      titleRight={<h2 className="text-muted-foreground">Updates</h2>}
-      icon={<Components.BigIcon id={id} />}
-      actions={
-        <OperationSelector
-          selected={operation}
-          onSelect={setOperation}
-          options={OPERATIONS_BY_RESOURCE[type]}
-        />
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <UpdatesTable updates={updates?.updates ?? []} />
-        <div className="flex gap-4 justify-center items-center text-muted-foreground">
-          <Button
-            variant="outline"
-            onClick={() => setPage(page - 1)}
-            disabled={page === 0}
-          >
-            Prev Page
-          </Button>
-          Page: {page + 1}
-          <Button
-            variant="outline"
-            onClick={() => updates?.next_page && setPage(updates.next_page)}
-            disabled={!updates?.next_page}
-          >
-            Next Page
-          </Button>
-        </div>
-      </div>
-    </Page>
-  );
-};
 
 const OPERATIONS_BY_RESOURCE: { [key: string]: Types.Operation[] } = {
   Server: [

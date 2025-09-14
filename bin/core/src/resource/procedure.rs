@@ -1,6 +1,11 @@
 use std::time::Duration;
 
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  find::find_collect,
+  mongodb::{Collection, bson::doc, options::FindOneOptions},
+};
+use futures::{TryStreamExt, stream::FuturesUnordered};
 use komodo_client::{
   api::execute::Execution,
   entities::{
@@ -23,10 +28,6 @@ use komodo_client::{
     update::Update,
     user::User,
   },
-};
-use mungos::{
-  find::find_collect,
-  mongodb::{Collection, bson::doc, options::FindOneOptions},
 };
 
 use crate::{
@@ -165,6 +166,7 @@ impl super::KomodoResource for Procedure {
     _update: &mut Update,
   ) -> anyhow::Result<()> {
     cancel_schedule(&ResourceTarget::Procedure(resource.id.clone()));
+    procedure_state_cache().remove(&resource.id).await;
     Ok(())
   }
 }
@@ -708,6 +710,15 @@ async fn validate_config(
           .await?;
           params.stack = stack.id;
         }
+        Execution::RunStackService(params) => {
+          let stack = super::get_check_permissions::<Stack>(
+            &params.stack,
+            user,
+            PermissionLevel::Execute.into(),
+          )
+          .await?;
+          params.stack = stack.id;
+        }
         Execution::BatchDestroyStack(_params) => {
           if !user.admin {
             return Err(anyhow!(
@@ -723,6 +734,45 @@ async fn validate_config(
           )
           .await?;
           params.alerter = alerter.id;
+        }
+        Execution::SendAlert(params) => {
+          params.alerters = params
+            .alerters
+            .iter()
+            .map(async |alerter| {
+              let id = super::get_check_permissions::<Alerter>(
+                alerter,
+                user,
+                PermissionLevel::Execute.into(),
+              )
+              .await?
+              .id;
+              anyhow::Ok(id)
+            })
+            .collect::<FuturesUnordered<_>>()
+            .try_collect::<Vec<_>>()
+            .await?;
+        }
+        Execution::ClearRepoCache(_params) => {
+          if !user.admin {
+            return Err(anyhow!(
+              "Non admin user cannot clear repo cache"
+            ));
+          }
+        }
+        Execution::BackupCoreDatabase(_params) => {
+          if !user.admin {
+            return Err(anyhow!(
+              "Non admin user cannot trigger core database backup"
+            ));
+          }
+        }
+        Execution::GlobalAutoUpdate(_params) => {
+          if !user.admin {
+            return Err(anyhow!(
+              "Non admin user cannot trigger global auto update"
+            ));
+          }
         }
         Execution::Sleep(_) => {}
       }

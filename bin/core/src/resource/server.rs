@@ -1,4 +1,5 @@
 use anyhow::Context;
+use database::mungos::mongodb::{Collection, bson::doc};
 use indexmap::IndexSet;
 use komodo_client::entities::{
   Operation, ResourceTarget, ResourceTargetVariant, komodo_timestamp,
@@ -11,7 +12,6 @@ use komodo_client::entities::{
   update::Update,
   user::User,
 };
-use mungos::mongodb::{Collection, bson::doc};
 
 use crate::{
   config::core_config,
@@ -75,12 +75,16 @@ impl super::KomodoResource for Server {
           .unwrap_or(String::from("Unknown")),
         region: server.config.region,
         address: server.config.address,
+        external_address: server.config.external_address,
         send_unreachable_alerts: server
           .config
           .send_unreachable_alerts,
         send_cpu_alerts: server.config.send_cpu_alerts,
         send_mem_alerts: server.config.send_mem_alerts,
         send_disk_alerts: server.config.send_disk_alerts,
+        send_version_mismatch_alerts: server
+          .config
+          .send_version_mismatch_alerts,
         terminals_disabled,
         container_exec_disabled,
       },

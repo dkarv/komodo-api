@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
+use strum::Display;
 use typeshare::typeshare;
 
 use crate::entities::{I64, Usize};
@@ -15,34 +16,47 @@ use super::{ContainerConfig, GraphDriverData, PortBinding};
 )]
 pub struct ContainerListItem {
   /// The Server which holds the container.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub server_id: Option<String>,
   /// The first name in Names, not including the initial '/'
   pub name: String,
   /// The ID of this container
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub id: Option<String>,
   /// The name of the image used when creating this container
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub image: Option<String>,
   /// The ID of the image that this container was created from
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub image_id: Option<String>,
   /// When the container was created
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub created: Option<I64>,
   /// The size of files that have been created or changed by this container
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub size_rw: Option<I64>,
   /// The total size of all the files in this container
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub size_root_fs: Option<I64>,
   /// The state of this container (e.g. `exited`)
   pub state: ContainerStateStatusEnum,
   /// Additional human-readable status of this container (e.g. `Exit 0`)
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub status: Option<String>,
   /// The network mode
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub network_mode: Option<String>,
   /// The network names attached to container
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub networks: Vec<String>,
   /// Port mappings for the container
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub ports: Vec<Port>,
   /// The volume names attached to container
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub volumes: Vec<String>,
   /// The container stats, if they can be retreived.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub stats: Option<ContainerStats>,
   /// The labels attached to container.
   /// It's too big to send with container list,
@@ -253,32 +267,29 @@ pub struct ContainerState {
   Debug,
   Clone,
   Copy,
+  Default,
   PartialEq,
+  Eq,
   PartialOrd,
+  Ord,
+  Display,
   Serialize,
   Deserialize,
-  Eq,
-  Ord,
-  Default,
 )]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum ContainerStateStatusEnum {
+  Running,
+  Created,
+  Paused,
+  Restarting,
+  Exited,
+  Removing,
+  Dead,
   #[default]
   #[serde(rename = "")]
+  #[strum(serialize = "")]
   Empty,
-  #[serde(rename = "created")]
-  Created,
-  #[serde(rename = "running")]
-  Running,
-  #[serde(rename = "paused")]
-  Paused,
-  #[serde(rename = "restarting")]
-  Restarting,
-  #[serde(rename = "exited")]
-  Exited,
-  #[serde(rename = "removing")]
-  Removing,
-  #[serde(rename = "dead")]
-  Dead,
 }
 
 impl ::std::str::FromStr for ContainerStateStatusEnum {

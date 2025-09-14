@@ -7,6 +7,7 @@ import {
   SetStateAction,
   forwardRef,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { Button } from "../ui/button";
@@ -25,7 +26,6 @@ import {
   HardDrive,
   LinkIcon,
   Loader2,
-  LogOut,
   Network,
   Search,
   SearchX,
@@ -45,7 +45,6 @@ import {
 import { toast, useToast } from "@ui/use-toast";
 import { cn, filterBySplit, usableResourcePath } from "@lib/utils";
 import { Link, useNavigate } from "react-router-dom";
-import { AUTH_TOKEN_STORAGE_KEY } from "@main";
 import { Textarea } from "@ui/textarea";
 import { Card } from "@ui/card";
 import {
@@ -69,7 +68,7 @@ import {
   useContainerPortsMap,
   useRead,
   useTemplatesQueryBehavior,
-  useUser,
+  usePromptHotkeys,
 } from "@lib/hooks";
 import { Prune } from "./resources/server/actions";
 import { MonacoEditor, MonacoLanguage } from "./monaco";
@@ -94,24 +93,6 @@ import {
 } from "@ui/select";
 import { useServer } from "./resources/server";
 
-export const WithLoading = ({
-  children,
-  isLoading,
-  loading,
-  isError,
-  error,
-}: {
-  children: ReactNode;
-  isLoading: boolean;
-  loading?: ReactNode;
-  isError: boolean;
-  error?: ReactNode;
-}) => {
-  if (isLoading) return <>{loading ?? "loading"}</>;
-  if (isError) return <>{error ?? null}</>;
-  return <>{children}</>;
-};
-
 export const ActionButton = forwardRef<
   HTMLButtonElement,
   {
@@ -132,6 +113,7 @@ export const ActionButton = forwardRef<
     onClick?: MouseEventHandler<HTMLButtonElement>;
     onBlur?: FocusEventHandler<HTMLButtonElement>;
     loading?: boolean;
+    "data-confirm-button"?: boolean;
   }
 >(
   (
@@ -145,17 +127,22 @@ export const ActionButton = forwardRef<
       loading,
       onClick,
       onBlur,
+      "data-confirm-button": dataConfirmButton,
     },
     ref
   ) => (
     <Button
       size={size}
       variant={variant || "secondary"}
-      className={cn("flex items-center justify-between w-[190px]", className)}
+      className={cn(
+        "flex flex-1 shrink-0 gap-4 items-center justify-between max-w-[190px]",
+        className
+      )}
       onClick={onClick}
       onBlur={onBlur}
       disabled={disabled || loading}
       ref={ref}
+      data-confirm-button={dataConfirmButton}
     >
       {title} {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
     </Button>
@@ -201,7 +188,22 @@ export const ActionWithDialog = ({
     useRead("GetCoreInfo", {}).data?.disable_confirm_dialog ?? false;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Add prompt hotkeys for better UX when dialog is open
+  usePromptHotkeys({
+    onConfirm: () => {
+      if (name === input && !disabled) {
+        onClick && onClick();
+        setOpen(false);
+      }
+    },
+    onCancel: () => setOpen(false),
+    enabled: open,
+    confirmDisabled: disabled || name !== input,
+  });
+
+  // If confirm dialogs are disabled and this isn't forced, use ConfirmButton directly
   if (!forceConfirmDialog && disable_confirm_dialog) {
     return (
       <ConfirmButton
@@ -258,6 +260,7 @@ export const ActionWithDialog = ({
         </div>
         <DialogFooter>
           <ConfirmButton
+            ref={confirmButtonRef}
             title={title}
             icon={icon}
             disabled={disabled || name !== input}
@@ -272,7 +275,27 @@ export const ActionWithDialog = ({
   );
 };
 
-export const ConfirmButton = ({
+export const ConfirmButton = forwardRef<
+  HTMLButtonElement,
+  {
+    variant?:
+      | "link"
+      | "default"
+      | "destructive"
+      | "outline"
+      | "secondary"
+      | "ghost"
+      | null
+      | undefined;
+    size?: "default" | "sm" | "lg" | "icon" | null | undefined;
+    title: string;
+    icon: ReactNode;
+    onClick?: MouseEventHandler<HTMLButtonElement>;
+    loading?: boolean;
+    disabled?: boolean;
+    className?: string;
+  }
+>(({
   variant,
   size,
   title,
@@ -281,28 +304,12 @@ export const ConfirmButton = ({
   loading,
   onClick,
   className,
-}: {
-  variant?:
-    | "link"
-    | "default"
-    | "destructive"
-    | "outline"
-    | "secondary"
-    | "ghost"
-    | null
-    | undefined;
-  size?: "default" | "sm" | "lg" | "icon" | null | undefined;
-  title: string;
-  icon: ReactNode;
-  onClick?: MouseEventHandler<HTMLButtonElement>;
-  loading?: boolean;
-  disabled?: boolean;
-  className?: string;
-}) => {
+}, ref) => {
   const [confirmed, set] = useState(false);
 
   return (
     <ActionButton
+      ref={ref}
       variant={variant}
       size={size}
       title={confirmed ? "Confirm" : title}
@@ -323,30 +330,10 @@ export const ConfirmButton = ({
       onBlur={() => set(false)}
       loading={loading}
       className={className}
+      data-confirm-button={true}
     />
   );
-};
-
-export const Logout = () => {
-  const user = useUser().data;
-  return (
-    user && (
-      <Button
-        variant="ghost"
-        onClick={() => {
-          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-          location.reload();
-        }}
-        className="px-2 flex flex-row gap-2 items-center"
-      >
-        <div className="hidden xl:flex max-w-[120px] overflow-hidden overflow-ellipsis">
-          {user.username}
-        </div>
-        <LogOut className="w-4 h-4" />
-      </Button>
-    )
-  );
-};
+});
 
 export const UserSettings = () => (
   <Link to="/settings">
@@ -359,16 +346,20 @@ export const UserSettings = () => (
 export const CopyButton = ({
   content,
   className,
+  icon = <Copy className="w-4 h-4" />,
+  label = "selection",
 }: {
   content: string | undefined;
   className?: string;
+  icon?: ReactNode;
+  label?: string;
 }) => {
   const { toast } = useToast();
   const [copied, set] = useState(false);
 
   useEffect(() => {
     if (copied) {
-      toast({ title: "Copied selection" });
+      toast({ title: "Copied " + label });
       const timeout = setTimeout(() => set(false), 3000);
       return () => {
         clearTimeout(timeout);
@@ -388,7 +379,7 @@ export const CopyButton = ({
       }}
       disabled={!content}
     >
-      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      {copied ? <Check className="w-4 h-4" /> : icon}
     </Button>
   );
 };
@@ -407,6 +398,7 @@ export const TextUpdateMenuMonaco = ({
   setOpen,
   triggerHidden,
   language,
+  triggerChild,
 }: {
   title: string;
   titleRight?: ReactNode;
@@ -421,6 +413,7 @@ export const TextUpdateMenuMonaco = ({
   setOpen?: (open: boolean) => void;
   triggerHidden?: boolean;
   language?: MonacoLanguage;
+  triggerChild?: ReactNode;
 }) => {
   const [_open, _setOpen] = useState(false);
   const [__open, __setOpen] = [open ?? _open, setOpen ?? _setOpen];
@@ -434,23 +427,25 @@ export const TextUpdateMenuMonaco = ({
   return (
     <Dialog open={__open} onOpenChange={__setOpen}>
       <DialogTrigger asChild>
-        <Card
-          className={cn(
-            "px-3 py-2 hover:bg-accent/50 transition-colors cursor-pointer",
-            fullWidth ? "w-full" : "w-fit",
-            triggerHidden && "hidden"
-          )}
-        >
-          <div
+        {triggerChild ?? (
+          <Card
             className={cn(
-              "text-sm text-nowrap overflow-hidden overflow-ellipsis",
-              (!value || !!disabled) && "text-muted-foreground",
-              triggerClassName
+              "px-3 py-2 hover:bg-accent/50 transition-colors cursor-pointer",
+              fullWidth ? "w-full" : "w-fit",
+              triggerHidden && "hidden"
             )}
           >
-            {value.split("\n")[0] || placeholder}
-          </div>
-        </Card>
+            <div
+              className={cn(
+                "text-sm text-nowrap overflow-hidden overflow-ellipsis",
+                (!value || !!disabled) && "text-muted-foreground",
+                triggerClassName
+              )}
+            >
+              {value.split("\n")[0] || placeholder}
+            </div>
+          </Card>
+        )}
       </DialogTrigger>
       <DialogContent className="min-w-[50vw]">
         {titleRight && (
@@ -525,16 +520,41 @@ export const StatusBadge = ({
   const background = hex_color_by_intention(intent) + "25";
 
   const _text = text === Types.ServerState.NotOk ? "Not Ok" : text;
+  const displayText = snake_case_to_upper_space_case(_text).toUpperCase();
+
+  // Special handling for "VERSION MISMATCH" with flex layout for responsive design
+  if (displayText === "VERSION MISMATCH") {
+    return (
+      <div
+        className={cn(
+          "px-2 py-1 text-xs text-white rounded-md font-medium tracking-wide",
+          "inline-flex flex-wrap items-center justify-center text-center",
+          "leading-tight gap-x-1",
+          "min-h-[1.5rem]", // Minimum height to match other badges, but can grow
+          color
+        )}
+        style={{ 
+          background,
+          minWidth: "fit-content",
+          maxWidth: "80px", // This controls when it wraps to two lines
+        }}
+      >
+        <span>VERSION</span>
+        <span>MISMATCH</span>
+      </div>
+    );
+  }
 
   return (
     <p
       className={cn(
         "px-2 py-1 w-fit text-xs text-white rounded-md font-medium tracking-wide",
+        "h-6 flex items-center", // Fixed height and center content vertically
         color
       )}
       style={{ background }}
     >
-      {snake_case_to_upper_space_case(_text).toUpperCase()}
+      {displayText}
     </p>
   );
 };
@@ -850,16 +870,16 @@ export const DockerContainersSection = ({
                   <SortableHeader column={column} title="Networks" />
                 ),
                 cell: ({ row }) =>
-                  row.original.networks.length > 0 ? (
+                  (row.original.networks?.length ?? 0) > 0 ? (
                     <div className="flex items-center gap-x-2 flex-wrap">
-                      {row.original.networks.map((network, i) => (
+                      {row.original.networks?.map((network, i) => (
                         <Fragment key={network}>
                           <DockerResourceLink
                             type="network"
                             server_id={server_id}
                             name={network}
                           />
-                          {i !== row.original.networks.length - 1 && (
+                          {i !== row.original.networks!.length - 1 && (
                             <div className="text-muted-foreground">|</div>
                           )}
                         </Fragment>
@@ -878,12 +898,29 @@ export const DockerContainersSection = ({
               {
                 accessorKey: "ports.0",
                 size: 200,
+                sortingFn: (a, b) => {
+                  const getMinHostPort = (row: typeof a) => {
+                    const ports = row.original.ports ?? [];
+                    if (!ports.length) return Number.POSITIVE_INFINITY;
+                    const nums = ports
+                      .map((p) => p.PublicPort)
+                      .filter((p): p is number => typeof p === "number")
+                      .map((n) => Number(n));
+                    if (!nums.length || nums.some((n) => Number.isNaN(n))) {
+                      return Number.POSITIVE_INFINITY;
+                    }
+                    return Math.min(...nums);
+                  };
+                  const pa = getMinHostPort(a);
+                  const pb = getMinHostPort(b);
+                  return pa === pb ? 0 : pa > pb ? 1 : -1;
+                },
                 header: ({ column }) => (
                   <SortableHeader column={column} title="Ports" />
                 ),
                 cell: ({ row }) => (
                   <ContainerPortsTableView
-                    ports={row.original.ports}
+                    ports={row.original.ports ?? []}
                     server_id={row.original.server_id}
                   />
                 ),
@@ -1165,6 +1202,35 @@ export const TemplateQueryBehaviorSelector = () => {
   );
 };
 
+export type ServerAddress = {
+  raw: string;
+  protocol: "http:" | "https:";
+  hostname: string;
+};
+
+export const useServerAddress = (
+  server_id: string | undefined
+): ServerAddress | null => {
+  const server = useServer(server_id);
+
+  if (!server) return null;
+  const base = server.info.external_address || server.info.address;
+
+  const parsed = (() => {
+    try {
+      return new URL(base);
+    } catch {
+      return new URL("http://" + base);
+    }
+  })();
+
+  return {
+    raw: base,
+    protocol: parsed.protocol === "https:" ? "https:" : "http:",
+    hostname: parsed.hostname,
+  };
+};
+
 export const ContainerPortLink = ({
   host_port,
   ports,
@@ -1174,16 +1240,29 @@ export const ContainerPortLink = ({
   ports: Types.Port[];
   server_id: string | undefined;
 }) => {
-  // Get the server address with periphery port removed
-  const server_address = useServer(server_id)
-    ?.info.address.split(":")
-    // take just protocol and dns (indexes 0 and 1)
-    .filter((_, i) => i < 2)
-    .join(":");
-  const link =
-    host_port === "443"
-      ? server_address
-      : server_address?.replace("https", "http") + ":" + host_port;
+  const server_address = useServerAddress(server_id);
+
+  if (!server_address) return null;
+
+  const isHttps = server_address.protocol === "https:";
+  const link = host_port === "443" && isHttps
+    ? `https://${server_address.hostname}`
+    : `http://${server_address.hostname}:${host_port}`;
+
+  const uniqueHostPorts = Array.from(
+    new Set(
+      ports
+        .map((p) => p.PublicPort)
+        .filter((p): p is number => typeof p === "number")
+        .map((n) => Number(n))
+        .filter((n) => !Number.isNaN(n))
+    )
+  ).sort((a, b) => a - b);
+  const display_text =
+    uniqueHostPorts.length <= 1
+      ? String(uniqueHostPorts[0] ?? host_port)
+      : `${uniqueHostPorts[0]}-${uniqueHostPorts[uniqueHostPorts.length - 1]}`;
+
   return (
     <Tooltip>
       <TooltipTrigger>
@@ -1195,7 +1274,7 @@ export const ContainerPortLink = ({
           <EthernetPort
             className={cn("w-4 h-4", stroke_color_class_by_intention("Good"))}
           />
-          {host_port}
+          {display_text}
         </a>
       </TooltipTrigger>
       <TooltipContent className="flex flex-col gap-2 w-fit">
@@ -1207,12 +1286,18 @@ export const ContainerPortLink = ({
           <LinkIcon className="w-3 h-3" />
           {link}
         </a>
-        {ports.map((port, i) => (
+        {ports.slice(0, 10).map((port, i) => (
           <div key={i} className="flex gap-2 text-sm text-muted-foreground">
-            <div>-</div>
+            <span>-</span>
             <div>{fmt_port_mount(port)}</div>
           </div>
         ))}
+        {ports.length > 10 && (
+          <div className="flex gap-2 text-sm text-muted-foreground">
+            <span>+</span>
+            <div>{ports.length - 10} more…</div>
+          </div>
+        )}
       </TooltipContent>
     </Tooltip>
   );
@@ -1225,24 +1310,38 @@ export const ContainerPortsTableView = ({
   ports: Types.Port[];
   server_id: string | undefined;
 }) => {
-  const map = useContainerPortsMap(ports);
-  const host_ports = Object.keys(map);
+  const portsMap = useContainerPortsMap(ports);
+  const sortedNumericPorts = Object.keys(portsMap)
+    .map(Number)
+    .filter((port) => !Number.isNaN(port))
+    .sort((a, b) => a - b);
+
+  type Group = { start: number; end: number; ports: Types.Port[] };
+
+  const groupedPorts = sortedNumericPorts.reduce<Group[]>((acc, port) => {
+    const lastGroup = acc[acc.length - 1];
+    const currentPorts = portsMap[String(port)] || [];
+    if (lastGroup && port === lastGroup.end + 1) {
+      lastGroup.end = port;
+      lastGroup.ports.push(...currentPorts);
+    } else {
+      acc.push({ start: port, end: port, ports: currentPorts });
+    }
+    return acc;
+  }, []);
+
   return (
     <div className="flex items-center gap-x-1 flex-wrap">
-      {host_ports.map((host_port, i) => {
-        return (
-          <Fragment key={host_port}>
-            <ContainerPortLink
-              host_port={host_port}
-              ports={map[host_port]}
-              server_id={server_id}
-            />
-            {i !== host_ports.length - 1 && (
-              <div className="text-muted-foreground">|</div>
-            )}
-          </Fragment>
-        );
-      })}
+      {groupedPorts.map((group, i) => (
+        <Fragment key={group.start}>
+          {i > 0 && <span className="text-muted-foreground">|</span>}
+          <ContainerPortLink
+            host_port={String(group.start)}
+            ports={group.ports}
+            server_id={server_id}
+          />
+        </Fragment>
+      ))}
     </div>
   );
 };

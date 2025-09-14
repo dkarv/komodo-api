@@ -1,5 +1,6 @@
 use ::slack::types::Block;
 use anyhow::{Context, anyhow};
+use database::mungos::{find::find_collect, mongodb::bson::doc};
 use derive_variants::ExtractVariant;
 use futures::future::join_all;
 use interpolate::Interpolator;
@@ -11,7 +12,6 @@ use komodo_client::entities::{
   komodo_timestamp,
   stack::StackState,
 };
-use mungos::{find::find_collect, mongodb::bson::doc};
 use tracing::Instrument;
 
 use crate::helpers::query::get_variables_and_secrets;
@@ -48,8 +48,9 @@ pub async fn send_alerts(alerts: &[Alert]) {
       return;
     };
 
-    let handles =
-      alerts.iter().map(|alert| send_alert(&alerters, alert));
+    let handles = alerts
+      .iter()
+      .map(|alert| send_alert_to_alerters(&alerters, alert));
 
     join_all(handles).await;
   }
@@ -58,7 +59,7 @@ pub async fn send_alerts(alerts: &[Alert]) {
 }
 
 #[instrument(level = "debug")]
-async fn send_alert(alerters: &[Alerter], alert: &Alert) {
+async fn send_alert_to_alerters(alerters: &[Alerter], alert: &Alert) {
   if alerters.is_empty() {
     return;
   }
@@ -188,8 +189,7 @@ async fn send_custom_alert(
       let sanitized_error =
         svi::replace_in_string(&format!("{e:?}"), &replacers);
       anyhow::Error::msg(format!(
-        "Error with request: {}",
-        sanitized_error
+        "Error with request: {sanitized_error}"
       ))
     })
     .context("failed at post request to alerter")?;
@@ -245,35 +245,244 @@ fn resource_link(
   resource_type: ResourceTargetVariant,
   id: &str,
 ) -> String {
-  let path = match resource_type {
-    ResourceTargetVariant::System => unreachable!(),
-    ResourceTargetVariant::Build => format!("/builds/{id}"),
-    ResourceTargetVariant::Builder => {
-      format!("/builders/{id}")
-    }
-    ResourceTargetVariant::Deployment => {
-      format!("/deployments/{id}")
-    }
-    ResourceTargetVariant::Stack => {
-      format!("/stacks/{id}")
-    }
-    ResourceTargetVariant::Server => {
-      format!("/servers/{id}")
-    }
-    ResourceTargetVariant::Repo => format!("/repos/{id}"),
-    ResourceTargetVariant::Alerter => {
-      format!("/alerters/{id}")
-    }
-    ResourceTargetVariant::Procedure => {
-      format!("/procedures/{id}")
-    }
-    ResourceTargetVariant::Action => {
-      format!("/actions/{id}")
-    }
-    ResourceTargetVariant::ResourceSync => {
-      format!("/resource-syncs/{id}")
-    }
-  };
+  komodo_client::entities::resource_link(
+    &core_config().host,
+    resource_type,
+    id,
+  )
+}
 
-  format!("{}{path}", core_config().host)
+/// Standard message content format
+/// used by Ntfy, Pushover.
+fn standard_alert_content(alert: &Alert) -> String {
+  let level = fmt_level(alert.level);
+  match &alert.data {
+    AlertData::Test { id, name } => {
+      let link = resource_link(ResourceTargetVariant::Alerter, id);
+      format!(
+        "{level} | If you see this message, then Alerter {name} is working\n{link}",
+      )
+    }
+    AlertData::ServerVersionMismatch {
+      id,
+      name,
+      region,
+      server_version,
+      core_version,
+    } => {
+      let region = fmt_region(region);
+      let link = resource_link(ResourceTargetVariant::Server, id);
+      match alert.level {
+        SeverityLevel::Ok => {
+          format!(
+            "{level} | {name}{region} | Periphery version now matches Core version ✅\n{link}"
+          )
+        }
+        _ => {
+          format!(
+            "{level} | {name}{region} | Version mismatch detected ⚠️\nPeriphery: {server_version} | Core: {core_version}\n{link}"
+          )
+        }
+      }
+    }
+    AlertData::ServerUnreachable {
+      id,
+      name,
+      region,
+      err,
+    } => {
+      let region = fmt_region(region);
+      let link = resource_link(ResourceTargetVariant::Server, id);
+      match alert.level {
+        SeverityLevel::Ok => {
+          format!("{level} | {name}{region} is now reachable\n{link}")
+        }
+        SeverityLevel::Critical => {
+          let err = err
+            .as_ref()
+            .map(|e| format!("\nerror: {e:#?}"))
+            .unwrap_or_default();
+          format!(
+            "{level} | {name}{region} is unreachable ❌\n{link}{err}"
+          )
+        }
+        _ => unreachable!(),
+      }
+    }
+    AlertData::ServerCpu {
+      id,
+      name,
+      region,
+      percentage,
+    } => {
+      let region = fmt_region(region);
+      let link = resource_link(ResourceTargetVariant::Server, id);
+      format!(
+        "{level} | {name}{region} cpu usage at {percentage:.1}%\n{link}",
+      )
+    }
+    AlertData::ServerMem {
+      id,
+      name,
+      region,
+      used_gb,
+      total_gb,
+    } => {
+      let region = fmt_region(region);
+      let link = resource_link(ResourceTargetVariant::Server, id);
+      let percentage = 100.0 * used_gb / total_gb;
+      format!(
+        "{level} | {name}{region} memory usage at {percentage:.1}%💾\n\nUsing {used_gb:.1} GiB / {total_gb:.1} GiB\n{link}",
+      )
+    }
+    AlertData::ServerDisk {
+      id,
+      name,
+      region,
+      path,
+      used_gb,
+      total_gb,
+    } => {
+      let region = fmt_region(region);
+      let link = resource_link(ResourceTargetVariant::Server, id);
+      let percentage = 100.0 * used_gb / total_gb;
+      format!(
+        "{level} | {name}{region} disk usage at {percentage:.1}%💿\nmount point: {path:?}\nusing {used_gb:.1} GiB / {total_gb:.1} GiB\n{link}",
+      )
+    }
+    AlertData::ContainerStateChange {
+      id,
+      name,
+      server_id: _server_id,
+      server_name,
+      from,
+      to,
+    } => {
+      let link = resource_link(ResourceTargetVariant::Deployment, id);
+      let to_state = fmt_docker_container_state(to);
+      format!(
+        "📦Deployment {name} is now {to_state}\nserver: {server_name}\nprevious: {from}\n{link}",
+      )
+    }
+    AlertData::DeploymentImageUpdateAvailable {
+      id,
+      name,
+      server_id: _server_id,
+      server_name,
+      image,
+    } => {
+      let link = resource_link(ResourceTargetVariant::Deployment, id);
+      format!(
+        "⬆ Deployment {name} has an update available\nserver: {server_name}\nimage: {image}\n{link}",
+      )
+    }
+    AlertData::DeploymentAutoUpdated {
+      id,
+      name,
+      server_id: _server_id,
+      server_name,
+      image,
+    } => {
+      let link = resource_link(ResourceTargetVariant::Deployment, id);
+      format!(
+        "⬆ Deployment {name} was updated automatically\nserver: {server_name}\nimage: {image}\n{link}",
+      )
+    }
+    AlertData::StackStateChange {
+      id,
+      name,
+      server_id: _server_id,
+      server_name,
+      from,
+      to,
+    } => {
+      let link = resource_link(ResourceTargetVariant::Stack, id);
+      let to_state = fmt_stack_state(to);
+      format!(
+        "🥞 Stack {name} is now {to_state}\nserver: {server_name}\nprevious: {from}\n{link}",
+      )
+    }
+    AlertData::StackImageUpdateAvailable {
+      id,
+      name,
+      server_id: _server_id,
+      server_name,
+      service,
+      image,
+    } => {
+      let link = resource_link(ResourceTargetVariant::Stack, id);
+      format!(
+        "⬆ Stack {name} has an update available\nserver: {server_name}\nservice: {service}\nimage: {image}\n{link}",
+      )
+    }
+    AlertData::StackAutoUpdated {
+      id,
+      name,
+      server_id: _server_id,
+      server_name,
+      images,
+    } => {
+      let link = resource_link(ResourceTargetVariant::Stack, id);
+      let images_label =
+        if images.len() > 1 { "images" } else { "image" };
+      let images_str = images.join(", ");
+      format!(
+        "⬆ Stack {name} was updated automatically ⏫\nserver: {server_name}\n{images_label}: {images_str}\n{link}",
+      )
+    }
+    AlertData::AwsBuilderTerminationFailed {
+      instance_id,
+      message,
+    } => {
+      format!(
+        "{level} | Failed to terminate AWS builder instance\ninstance id: {instance_id}\n{message}",
+      )
+    }
+    AlertData::ResourceSyncPendingUpdates { id, name } => {
+      let link =
+        resource_link(ResourceTargetVariant::ResourceSync, id);
+      format!(
+        "{level} | Pending resource sync updates on {name}\n{link}",
+      )
+    }
+    AlertData::BuildFailed { id, name, version } => {
+      let link = resource_link(ResourceTargetVariant::Build, id);
+      format!(
+        "{level} | Build {name} failed\nversion: v{version}\n{link}",
+      )
+    }
+    AlertData::RepoBuildFailed { id, name } => {
+      let link = resource_link(ResourceTargetVariant::Repo, id);
+      format!("{level} | Repo build for {name} failed\n{link}",)
+    }
+    AlertData::ProcedureFailed { id, name } => {
+      let link = resource_link(ResourceTargetVariant::Procedure, id);
+      format!("{level} | Procedure {name} failed\n{link}")
+    }
+    AlertData::ActionFailed { id, name } => {
+      let link = resource_link(ResourceTargetVariant::Action, id);
+      format!("{level} | Action {name} failed\n{link}")
+    }
+    AlertData::ScheduleRun {
+      resource_type,
+      id,
+      name,
+    } => {
+      let link = resource_link(*resource_type, id);
+      format!(
+        "{level} | {name} ({resource_type}) | Scheduled run started 🕝\n{link}"
+      )
+    }
+    AlertData::Custom { message, details } => {
+      format!(
+        "{level} | {message}{}",
+        if details.is_empty() {
+          format_args!("")
+        } else {
+          format_args!("\n{details}")
+        }
+      )
+    }
+    AlertData::None {} => Default::default(),
+  }
 }

@@ -11,10 +11,11 @@
 
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::entities::{
   Timelength,
+  config::DatabaseConfig,
   logger::{LogConfig, LogLevel, StdioLogMode},
 };
 
@@ -31,12 +32,36 @@ use super::{DockerRegistry, GitProvider, empty_or_redacted};
 /// To configure the core api, you can either mount your own custom configuration file to
 /// `/config/config.toml` inside the container,
 /// or simply override whichever fields you need using the environment.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Env {
   /// Specify a custom config path for the core config toml.
   /// Default: `/config/config.toml`
-  #[serde(default = "default_config_path")]
-  pub komodo_config_path: String,
+  #[serde(
+    default = "default_core_config_paths",
+    alias = "komodo_config_path"
+  )]
+  pub komodo_config_paths: Vec<PathBuf>,
+  /// If specifying folders, use this to narrow down which
+  /// files will be matched to parse into the final [PeripheryConfig].
+  /// Only files inside the folders which have names containing a keywords
+  /// provided to `config_keywords` will be included.
+  /// Keywords support wildcard matching syntax.
+  #[serde(
+    default = "super::default_config_keywords",
+    alias = "komodo_config_keyword"
+  )]
+  pub komodo_config_keywords: Vec<String>,
+  /// Will merge nested config object (eg. secrets, providers) across multiple
+  /// config files. Default: `true`
+  #[serde(default = "super::default_merge_nested_config")]
+  pub komodo_merge_nested_config: bool,
+  /// Will extend config arrays across multiple config files.
+  /// Default: `true`
+  #[serde(default = "super::default_extend_config_arrays")]
+  pub komodo_extend_config_arrays: bool,
+  /// Print some extra logs on startup to debug config loading issues.
+  #[serde(default)]
+  pub komodo_config_debug: bool,
 
   /// Override `title`
   pub komodo_title: Option<String>,
@@ -55,6 +80,8 @@ pub struct Env {
   pub komodo_timezone: Option<String>,
   /// Override `first_server`
   pub komodo_first_server: Option<String>,
+  /// Override `first_server_name`
+  pub komodo_first_server_name: Option<String>,
   /// Override `frontend_path`
   pub komodo_frontend_path: Option<String>,
   /// Override `jwt_secret`
@@ -90,12 +117,16 @@ pub struct Env {
   pub komodo_logging_stdio: Option<StdioLogMode>,
   /// Override `logging.pretty`
   pub komodo_logging_pretty: Option<bool>,
+  /// Override `logging.location`
+  pub komodo_logging_location: Option<bool>,
   /// Override `logging.otlp_endpoint`
   pub komodo_logging_otlp_endpoint: Option<String>,
   /// Override `logging.opentelemetry_service_name`
   pub komodo_logging_opentelemetry_service_name: Option<String>,
   /// Override `pretty_startup_config`
   pub komodo_pretty_startup_config: Option<bool>,
+  /// Override `unsafe_unsanitized_startup_config`
+  pub komodo_unsafe_unsanitized_startup_config: Option<bool>,
 
   /// Override `transparent_mode`
   pub komodo_transparent_mode: Option<bool>,
@@ -113,9 +144,21 @@ pub struct Env {
   pub komodo_disable_non_admin_create: Option<bool>,
   /// Override `disable_websocket_reconnect`
   pub komodo_disable_websocket_reconnect: Option<bool>,
+  /// Override `disable_init_resources`
+  pub komodo_disable_init_resources: Option<bool>,
+  /// Override `enable_fancy_toml`
+  pub komodo_enable_fancy_toml: Option<bool>,
 
   /// Override `local_auth`
   pub komodo_local_auth: Option<bool>,
+  /// Override `init_admin_username`
+  pub komodo_init_admin_username: Option<String>,
+  /// Override `init_admin_username` from file
+  pub komodo_init_admin_username_file: Option<PathBuf>,
+  /// Override `init_admin_password`
+  pub komodo_init_admin_password: Option<String>,
+  /// Override `init_admin_password` from file
+  pub komodo_init_admin_password_file: Option<PathBuf>,
 
   /// Override `oidc_enabled`
   pub komodo_oidc_enabled: Option<bool>,
@@ -216,6 +259,9 @@ pub struct Env {
   /// Override `aws.secret_access_key` with file
   pub komodo_aws_secret_access_key_file: Option<PathBuf>,
 
+  /// Override `internet_interface`
+  pub komodo_internet_interface: Option<String>,
+
   /// Override `ssl_enabled`.
   pub komodo_ssl_enabled: Option<bool>,
   /// Override `ssl_key_file`
@@ -224,8 +270,8 @@ pub struct Env {
   pub komodo_ssl_cert_file: Option<PathBuf>,
 }
 
-fn default_config_path() -> String {
-  "/config/config.toml".to_string()
+fn default_core_config_paths() -> Vec<PathBuf> {
+  vec![PathBuf::from_str("/config").unwrap()]
 }
 
 /// # Core Configuration File
@@ -241,7 +287,7 @@ fn default_config_path() -> String {
 /// or simply override whichever fields you need using the environment.
 ///
 /// Refer to the [example file](https://github.com/moghtech/komodo/blob/main/config/core.config.toml) for a full example.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CoreConfig {
   // ===========
   // = General =
@@ -254,7 +300,7 @@ pub struct CoreConfig {
   /// The host to use with oauth redirect url, whatever host
   /// the user hits to access Komodo. eg `https://komodo.domain.com`.
   /// Only used if oauth used without user specifying redirect url themselves.
-  #[serde(default)]
+  #[serde(default = "default_host")]
   pub host: String,
 
   /// Port the core web server runs on.
@@ -267,8 +313,13 @@ pub struct CoreConfig {
   #[serde(default = "default_core_bind_ip")]
   pub bind_ip: String,
 
+  /// Interface to use as default route in multi-NIC environments.
+  #[serde(default)]
+  pub internet_interface: String,
+
   /// Sent in auth header with req to periphery.
   /// Should be some secure hash, maybe 20-40 chars.
+  #[serde(default = "default_passkey")]
   pub passkey: String,
 
   /// A TZ Identifier. If not provided, will use Core local timezone.
@@ -289,17 +340,31 @@ pub struct CoreConfig {
   #[serde(default)]
   pub disable_websocket_reconnect: bool,
 
+  /// Disable init system resource creation on fresh Komodo launch.
+  /// These include the Backup Core Database and Global Auto Update procedures.
+  #[serde(default)]
+  pub disable_init_resources: bool,
+
+  /// Enable the fancy TOML syntax highlighting
+  #[serde(default)]
+  pub enable_fancy_toml: bool,
+
   /// If defined, ensure an enabled first server exists at this address.
   /// Example: `http://periphery:8120`
-  #[serde(default)]
-  pub first_server: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub first_server: Option<String>,
+
+  /// Give the first server this name.
+  /// Default: `Local`
+  #[serde(default = "default_first_server_name")]
+  pub first_server_name: String,
 
   /// The path to the built frontend folder.
   #[serde(default = "default_frontend_path")]
   pub frontend_path: String,
 
   /// Configure database connection
-  #[serde(alias = "mongo")]
+  #[serde(default, alias = "mongo")]
   pub database: DatabaseConfig,
 
   // ================
@@ -308,6 +373,15 @@ pub struct CoreConfig {
   /// enable login with local auth
   #[serde(default)]
   pub local_auth: bool,
+
+  /// Upon fresh launch, initalize an Admin user with this username.
+  /// If this is not provided, no initial user will be created.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub init_admin_username: Option<String>,
+  /// Upon fresh launch, initalize an Admin user with this password.
+  /// Default: `changeme`
+  #[serde(default = "default_init_admin_password")]
+  pub init_admin_password: String,
 
   /// Enable transparent mode, which gives all (enabled) users read access to all resources.
   #[serde(default)]
@@ -327,7 +401,7 @@ pub struct CoreConfig {
   /// APIs are disabled. Used by demo to lock the 'demo' : 'demo' login.
   ///
   /// To lock the api for all users, use `lock_login_credentials_for = ["__ALL__"]`
-  #[serde(default)]
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub lock_login_credentials_for: Vec<String>,
 
   /// Normally all users can create resources.
@@ -388,7 +462,7 @@ pub struct CoreConfig {
 
   /// Your OIDC provider may set additional audiences other than `client_id`,
   /// they must be added here to make claims verification work.
-  #[serde(default)]
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub oidc_additional_audiences: Vec<String>,
 
   // =========
@@ -437,6 +511,12 @@ pub struct CoreConfig {
   #[serde(default)]
   pub pretty_startup_config: bool,
 
+  /// Unsafe: logs unsanitized config on startup,
+  /// in order to verify everything is being
+  /// passed correctly.
+  #[serde(default)]
+  pub unsafe_unsanitized_startup_config: bool,
+
   // ===========
   // = Pruning =
   // ===========
@@ -478,7 +558,11 @@ pub struct CoreConfig {
   // =================
   /// Configure git credentials used to clone private repos.
   /// Supports any git provider.
-  #[serde(default, alias = "git_provider")]
+  #[serde(
+    default,
+    alias = "git_provider",
+    skip_serializing_if = "Vec::is_empty"
+  )]
   pub git_providers: Vec<GitProvider>,
 
   // ======================
@@ -486,7 +570,11 @@ pub struct CoreConfig {
   // ======================
   /// Configure docker credentials used to push / pull images.
   /// Supports any docker image repository.
-  #[serde(default, alias = "docker_registry")]
+  #[serde(
+    default,
+    alias = "docker_registry",
+    skip_serializing_if = "Vec::is_empty"
+  )]
   pub docker_registries: Vec<DockerRegistry>,
 
   // ===========
@@ -495,7 +583,7 @@ pub struct CoreConfig {
   /// Configure core-based secrets. These will be preferentially interpolated into
   /// values if they contain a matching secret. Otherwise, the periphery will have to have the
   /// secret configured.
-  #[serde(default)]
+  #[serde(default, skip_serializing_if = "HashMap::is_empty")]
   pub secrets: HashMap<String, String>,
 
   // =======
@@ -539,6 +627,10 @@ fn default_title() -> String {
   String::from("Komodo")
 }
 
+fn default_host() -> String {
+  String::from("https://komodo.example.com")
+}
+
 fn default_core_port() -> u16 {
   9120
 }
@@ -547,12 +639,24 @@ fn default_core_bind_ip() -> String {
   "[::]".to_string()
 }
 
+fn default_passkey() -> String {
+  String::from("default-passkey-changeme")
+}
+
 fn default_frontend_path() -> String {
   "/app/frontend".to_string()
 }
 
+fn default_first_server_name() -> String {
+  String::from("Local")
+}
+
 fn default_jwt_ttl() -> Timelength {
   Timelength::OneDay
+}
+
+fn default_init_admin_password() -> String {
+  String::from("changeme")
 }
 
 fn default_sync_directory() -> PathBuf {
@@ -590,6 +694,68 @@ fn default_ssl_cert_file() -> PathBuf {
   "/config/ssl/cert.pem".parse().unwrap()
 }
 
+impl Default for CoreConfig {
+  fn default() -> Self {
+    Self {
+      title: default_title(),
+      host: default_host(),
+      port: default_core_port(),
+      bind_ip: default_core_bind_ip(),
+      internet_interface: Default::default(),
+      passkey: default_passkey(),
+      timezone: Default::default(),
+      ui_write_disabled: Default::default(),
+      disable_confirm_dialog: Default::default(),
+      disable_websocket_reconnect: Default::default(),
+      disable_init_resources: Default::default(),
+      enable_fancy_toml: Default::default(),
+      first_server: Default::default(),
+      first_server_name: default_first_server_name(),
+      frontend_path: default_frontend_path(),
+      database: Default::default(),
+      local_auth: Default::default(),
+      init_admin_username: Default::default(),
+      init_admin_password: default_init_admin_password(),
+      transparent_mode: Default::default(),
+      enable_new_users: Default::default(),
+      disable_user_registration: Default::default(),
+      lock_login_credentials_for: Default::default(),
+      disable_non_admin_create: Default::default(),
+      jwt_secret: Default::default(),
+      jwt_ttl: default_jwt_ttl(),
+      oidc_enabled: Default::default(),
+      oidc_provider: Default::default(),
+      oidc_redirect_host: Default::default(),
+      oidc_client_id: Default::default(),
+      oidc_client_secret: Default::default(),
+      oidc_use_full_email: Default::default(),
+      oidc_additional_audiences: Default::default(),
+      google_oauth: Default::default(),
+      github_oauth: Default::default(),
+      webhook_secret: Default::default(),
+      webhook_base_url: Default::default(),
+      github_webhook_app: Default::default(),
+      logging: Default::default(),
+      pretty_startup_config: Default::default(),
+      unsafe_unsanitized_startup_config: Default::default(),
+      keep_stats_for_days: default_prune_days(),
+      keep_alerts_for_days: default_prune_days(),
+      resource_poll_interval: default_poll_interval(),
+      monitoring_interval: default_monitoring_interval(),
+      aws: Default::default(),
+      git_providers: Default::default(),
+      docker_registries: Default::default(),
+      secrets: Default::default(),
+      ssl_enabled: Default::default(),
+      ssl_key_file: default_ssl_key_file(),
+      ssl_cert_file: default_ssl_cert_file(),
+      sync_directory: default_sync_directory(),
+      repo_directory: default_repo_directory(),
+      action_directory: default_action_directory(),
+    }
+  }
+}
+
 impl CoreConfig {
   pub fn sanitized(&self) -> CoreConfig {
     let config = self.clone();
@@ -601,27 +767,39 @@ impl CoreConfig {
       passkey: empty_or_redacted(&config.passkey),
       timezone: config.timezone,
       first_server: config.first_server,
+      first_server_name: config.first_server_name,
       frontend_path: config.frontend_path,
       jwt_secret: empty_or_redacted(&config.jwt_secret),
       jwt_ttl: config.jwt_ttl,
       repo_directory: config.repo_directory,
       action_directory: config.action_directory,
       sync_directory: config.sync_directory,
+      internet_interface: config.internet_interface,
       resource_poll_interval: config.resource_poll_interval,
       monitoring_interval: config.monitoring_interval,
       keep_stats_for_days: config.keep_stats_for_days,
       keep_alerts_for_days: config.keep_alerts_for_days,
       logging: config.logging,
       pretty_startup_config: config.pretty_startup_config,
+      unsafe_unsanitized_startup_config: config
+        .unsafe_unsanitized_startup_config,
       transparent_mode: config.transparent_mode,
       ui_write_disabled: config.ui_write_disabled,
       disable_confirm_dialog: config.disable_confirm_dialog,
       disable_websocket_reconnect: config.disable_websocket_reconnect,
+      disable_init_resources: config.disable_init_resources,
+      enable_fancy_toml: config.enable_fancy_toml,
       enable_new_users: config.enable_new_users,
       disable_user_registration: config.disable_user_registration,
       disable_non_admin_create: config.disable_non_admin_create,
       lock_login_credentials_for: config.lock_login_credentials_for,
       local_auth: config.local_auth,
+      init_admin_username: config
+        .init_admin_username
+        .map(|u| empty_or_redacted(&u)),
+      init_admin_password: empty_or_redacted(
+        &config.init_admin_password,
+      ),
       oidc_enabled: config.oidc_enabled,
       oidc_provider: config.oidc_provider,
       oidc_redirect_host: config.oidc_redirect_host,
@@ -648,14 +826,7 @@ impl CoreConfig {
       webhook_secret: empty_or_redacted(&config.webhook_secret),
       webhook_base_url: config.webhook_base_url,
       github_webhook_app: config.github_webhook_app,
-      database: DatabaseConfig {
-        uri: empty_or_redacted(&config.database.uri),
-        address: config.database.address,
-        username: empty_or_redacted(&config.database.username),
-        password: empty_or_redacted(&config.database.password),
-        app_name: config.database.app_name,
-        db_name: config.database.db_name,
-      },
+      database: config.database.sanitized(),
       aws: AwsCredentials {
         access_key_id: empty_or_redacted(&config.aws.access_key_id),
         secret_access_key: empty_or_redacted(
@@ -696,7 +867,7 @@ impl CoreConfig {
 }
 
 /// Generic Oauth credentials
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct OauthCredentials {
   /// Whether this oauth method is available for usage.
   #[serde(default)]
@@ -709,63 +880,8 @@ pub struct OauthCredentials {
   pub secret: String,
 }
 
-/// Provide database connection information.
-/// Komodo uses the MongoDB api driver for database communication,
-/// and FerretDB to support Postgres and Sqlite storage options.
-///
-/// Must provide ONE of:
-/// 1. `uri`
-/// 2. `address` + `username` + `password`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatabaseConfig {
-  /// Full mongo uri string, eg. `mongodb://username:password@your.mongo.int:27017`
-  #[serde(default)]
-  pub uri: String,
-  /// Just the address part of the mongo uri, eg `your.mongo.int:27017`
-  #[serde(default = "default_database_address")]
-  pub address: String,
-  /// Mongo user username
-  #[serde(default)]
-  pub username: String,
-  /// Mongo user password
-  #[serde(default)]
-  pub password: String,
-  /// Mongo app name. default: `komodo_core`
-  #[serde(default = "default_database_app_name")]
-  pub app_name: String,
-  /// Mongo db name. Which mongo database to create the collections in.
-  /// Default: `komodo`.
-  #[serde(default = "default_database_db_name")]
-  pub db_name: String,
-}
-
-fn default_database_address() -> String {
-  String::from("localhost:27017")
-}
-
-fn default_database_app_name() -> String {
-  "komodo_core".to_string()
-}
-
-fn default_database_db_name() -> String {
-  "komodo".to_string()
-}
-
-impl Default for DatabaseConfig {
-  fn default() -> Self {
-    Self {
-      uri: Default::default(),
-      address: default_database_address(),
-      username: Default::default(),
-      password: Default::default(),
-      app_name: default_database_app_name(),
-      db_name: default_database_db_name(),
-    }
-  }
-}
-
 /// Provide AWS credentials for Komodo to use.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct AwsCredentials {
   /// The aws ACCESS_KEY_ID
   pub access_key_id: String,
@@ -774,7 +890,7 @@ pub struct AwsCredentials {
 }
 
 /// Provide configuration for a Github Webhook app.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct GithubWebhookAppConfig {
   /// Github app id
   pub app_id: i64,
@@ -800,7 +916,7 @@ impl Default for GithubWebhookAppConfig {
 }
 
 /// Provide configuration for a Github Webhook app installation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct GithubWebhookAppInstallationConfig {
   /// The installation ID
   pub id: i64,

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use database::mungos::find::find_collect;
 use komodo_client::entities::{
   ResourceTargetVariant,
   sync::{DiffData, ResourceDiff},
   tag::Tag,
   toml::ResourceToml,
 };
-use mungos::find::find_collect;
 use partial_derive2::MaybeNone;
 
 use super::ResourceSyncTrait;

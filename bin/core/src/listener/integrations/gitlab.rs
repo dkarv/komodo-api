@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
   config::core_config,
-  listener::{VerifyBranch, VerifySecret},
+  listener::{ExtractBranch, VerifySecret},
 };
 
 /// Listener implementation for Gitlab type API
@@ -40,19 +40,12 @@ struct GitlabWebhookBody {
   branch: String,
 }
 
-impl VerifyBranch for Gitlab {
-  fn verify_branch(
-    body: &str,
-    expected_branch: &str,
-  ) -> anyhow::Result<()> {
+impl ExtractBranch for Gitlab {
+  fn extract_branch(body: &str) -> anyhow::Result<String> {
     let branch = serde_json::from_str::<GitlabWebhookBody>(body)
       .context("Failed to parse gitlab request body")?
       .branch
       .replace("refs/heads/", "");
-    if branch == expected_branch {
-      Ok(())
-    } else {
-      Err(anyhow!("request branch does not match expected"))
-    }
+    Ok(branch)
   }
 }

@@ -56,6 +56,23 @@ export function ThemeProvider({
     root.classList.add(theme);
   }, [theme]);
 
+  // For 'system' theme, need to poll
+  // matchMedia for update to theme.
+  useEffect(() => {
+    if (theme === "system") {
+      const interval = setInterval(() => {
+        const [systemTheme, other] = window.matchMedia(
+          "(prefers-color-scheme: dark)"
+        ).matches
+          ? ["dark", "light"]
+          : ["light", "dark"];
+        window.document.documentElement.classList.add(systemTheme);
+        window.document.documentElement.classList.remove(other);
+      }, 5_000);
+      return () => clearInterval(interval);
+    }
+  }, [theme]);
+
   const value = {
     theme,
     setTheme: (theme: Theme) => {

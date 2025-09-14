@@ -1,18 +1,18 @@
 use std::str::FromStr;
 
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  by_id::{find_one_by_id, update_one_by_id},
+  mongodb::{
+    bson::{Document, doc, oid::ObjectId, to_bson},
+    options::UpdateOptions,
+  },
+};
 use komodo_client::{
   api::write::*,
   entities::{
     ResourceTarget, ResourceTargetVariant,
     permission::{UserTarget, UserTargetVariant},
-  },
-};
-use mungos::{
-  by_id::{find_one_by_id, update_one_by_id},
-  mongodb::{
-    bson::{Document, doc, oid::ObjectId, to_bson},
-    options::UpdateOptions,
   },
 };
 use resolver_api::Resolve;
@@ -107,7 +107,7 @@ impl Resolve<WriteArgs> for UpdateUserBasePermissions {
     update_one_by_id(
       &db_client().users,
       &user_id,
-      mungos::update::Update::Set(update_doc),
+      database::mungos::update::Update::Set(update_doc),
       None,
     )
     .await?;

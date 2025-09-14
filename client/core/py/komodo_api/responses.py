@@ -16,9 +16,9 @@ class AuthApi:
             AuthRequestGetLoginOptions(params=params), GetLoginOptionsResponse
         )
 
-    def createLocalUser(self, params: CreateLocalUser) -> CreateLocalUserResponse:
+    def signUpLocalUser(self, params: SignUpLocalUser) -> SignUpLocalUserResponse:
         return self._auth(
-            AuthRequestCreateLocalUser(params=params), CreateLocalUserResponse
+            AuthRequestSignUpLocalUser(params=params), SignUpLocalUserResponse
         )
 
     def loginLocalUser(self, params: LoginLocalUser) -> LoginLocalUserResponse:
@@ -777,6 +777,11 @@ class WriteApi:
         return await self.request("/write", request, clz)
 
     # ==== USER ====
+    def createLocalUser(self, params: CreateLocalUser) -> CreateLocalUserResponse:
+        return self._write(
+            WriteRequestCreateLocalUser(params=params), CreateLocalUserResponse
+        )
+
     def updateUserUsername(
         self, params: UpdateUserUsername
     ) -> UpdateUserUsernameResponse:
@@ -1110,8 +1115,8 @@ class WriteApi:
     def renameResourceSync(self, params: RenameResourceSync) -> Update:
         return self._write(WriteRequestRenameResourceSync(params=params), Update)
 
-    def commitSync(self, params: CommitSync) -> ResourceSync:
-        return self._write(WriteRequestCommitSync(params=params), ResourceSync)
+    def commitSync(self, params: CommitSync) -> Update:
+        return self._write(WriteRequestCommitSync(params=params), Update)
 
     def writeSyncFileContents(self, params: WriteSyncFileContents) -> Update:
         return self._write(WriteRequestWriteSyncFileContents(params=params), Update)
@@ -1339,6 +1344,9 @@ class ExecuteApi:
 
     def destroyStack(self, params: DestroyStack) -> Update:
         return self._execute(ExecuteRequestDestroyStack(params=params), Update)
+    
+    def runStackService(self, params: RunStackService) -> Update:
+        return self._execute(ExecuteRequestRunStackService(params=params), Update)
 
     def batchDestroyStack(self, params: BatchDestroyStack) -> BatchExecutionResponse:
         return self._execute(ExecuteRequestBatchDestroyStack(params=params), BatchExecutionResponse)
@@ -1429,3 +1437,16 @@ class ExecuteApi:
     # ==== ALERTER ====
     def testAlerter(self, params: TestAlerter) -> Update:
         return self._execute(ExecuteRequestTestAlerter(params=params), Update)
+    
+    def sendAlert(self, params: SendAlert) -> Update:
+        return self._execute(ExecuteRequestSendAlert(params=params), Update)
+    
+    # ==== MAINTENANCE ====
+    def clearRepoCache(self, params: ClearRepoCache) -> Update:
+        return self._execute(ExecuteRequestClearRepoCache(params=params), Update)
+    
+    def backupCoreDatabase(self, params: BackupCoreDatabase) -> Update:
+        return self._execute(ExecuteRequestBackupCoreDatabase(params=params), Update)
+    
+    def globalAutoUpdate(self, params: GlobalAutoUpdate) -> Update:
+        return self._execute(ExecuteRequestGlobalAutoUpdate(params=params), Update)

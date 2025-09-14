@@ -279,7 +279,7 @@ export function KomodoClient(url, options) {
          * and gives a callback to handle the output as it comes in.
          *
          * ```ts
-         * const stream = await komodo.execute_terminal(
+         * await komodo.execute_terminal(
          *   {
          *     server: "my-server",
          *     terminal: "name",
@@ -335,7 +335,7 @@ export function KomodoClient(url, options) {
          * and gives a callback to handle the output as it comes in.
          *
          * ```ts
-         * const stream = await komodo.execute_container_exec(
+         * await komodo.execute_container_exec(
          *   {
          *     server: "my-server",
          *     container: "name",
@@ -386,7 +386,7 @@ export function KomodoClient(url, options) {
          * and gives a callback to handle the output as it comes in.
          *
          * ```ts
-         * const stream = await komodo.execute_deployment_exec(
+         * await komodo.execute_deployment_exec(
          *   {
          *     deployment: "my-deployment",
          *     shell: "bash",
@@ -435,7 +435,7 @@ export function KomodoClient(url, options) {
          * and gives a callback to handle the output as it comes in.
          *
          * ```ts
-         * const stream = await komodo.execute_stack_exec(
+         * await komodo.execute_stack_exec(
          *   {
          *     stack: "my-stack",
          *     service: "database"

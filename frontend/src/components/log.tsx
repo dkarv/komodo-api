@@ -35,7 +35,8 @@ export const LogSection = ({
   regular_logs: (
     timestamps: boolean,
     stream: LogStream,
-    tail: number
+    tail: number,
+    poll: boolean
   ) => {
     Log: ReactNode;
     refetch: () => void;
@@ -44,7 +45,8 @@ export const LogSection = ({
   search_logs: (
     timestamps: boolean,
     terms: string[],
-    invert: boolean
+    invert: boolean,
+    poll: boolean
   ) => { Log: ReactNode; refetch: () => void; stderr: boolean };
   titleOther?: ReactNode;
   extraParams?: ReactNode;
@@ -78,8 +80,8 @@ export const LogSection = ({
   };
 
   const { Log, refetch, stderr } = terms.length
-    ? search_logs(timestamps, terms, invert)
-    : regular_logs(timestamps, stream, Number(tail));
+    ? search_logs(timestamps, terms, invert, poll)
+    : regular_logs(timestamps, stream, Number(tail), poll);
 
   return (
     <Section

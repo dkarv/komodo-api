@@ -3,6 +3,7 @@ use std::{
 };
 
 use anyhow::Context;
+use database::mungos::find::find_collect;
 use formatting::{Color, bold, colored, muted};
 use indexmap::{IndexMap, IndexSet};
 use komodo_client::{
@@ -27,7 +28,6 @@ use komodo_client::{
     user_group::UserGroup,
   },
 };
-use mungos::find::find_collect;
 use resolver_api::Resolve;
 use serde::Serialize;
 

@@ -1,31 +1,25 @@
 # Runfile | https://crates.io/crates/runnables-cli
 
-[dev-frontend]
-description = "starts the frontend in dev mode"
-path = "frontend"
-cmd = "yarn dev"
-
 [dev-core]
+alias = "dc"
 description = "runs core --release pointing to .dev/core.config.toml"
 cmd = "KOMODO_CONFIG_PATH=.dev/core.config.toml cargo run -p komodo_core --release"
 
 [dev-periphery]
+alias = "dp"
 description = "runs periphery --release pointing to .dev/periphery.config.toml"
 cmd = "PERIPHERY_CONFIG_PATH=.dev/periphery.config.toml cargo run -p komodo_periphery --release"
-
-[dev-docsite]
-description = "starts the documentation site (https://komo.do) in dev mode"
-path = "docsite"
-cmd = "yarn && yarn start"
 
 [yarn-install]
 description = "downloads latest javacript dependencies for client and frontend"
 cmd = """
 cd frontend && yarn && \
+cd ../docsite && yarn && \
 cd ../client/core/ts && yarn
 """
 
 [gen-client]
+alias = "gc"
 description = "generates typescript types and build the ts client"
 after = "yarn-install"
 cmd = """
@@ -38,23 +32,7 @@ description = "yarn links the ts client to the frontend"
 after = "gen-client"
 cmd = """
 cd ./client/core/ts && yarn link && \
-cd ../../../frontend && yarn link komodo_client && yarn
-"""
-
-[build-frontend]
-description = "generates fresh ts client and builds the frontend"
-path = "frontend"
-cmd = "yarn build"
-after = "gen-client"
-
-[publish-ts-client]
-path = "client/core/ts"
-cmd = "npm publish"
-
-[publish-docsite]
-description = "publishes the documentation site (https://komo.do) to github pages"
-path = "docsite"
-cmd = "yarn && yarn deploy"
+cd ../../../frontend && yarn link komodo_client && yarn"""
 
 [dev-compose]
 description = "deploys dev.compose.yaml"
@@ -70,9 +48,12 @@ docker compose -p komodo-dev -f dev.compose.yaml -f expose.compose.yaml up -d"""
 
 [dev-compose-build]
 description = "builds and deploys dev.compose.yaml"
-cmd = """
-docker compose -p komodo-dev -f dev.compose.yaml build"""
+cmd = "docker compose -p komodo-dev -f dev.compose.yaml build"
 
 [dev-rustdoc]
 description = "starts the rustdoc site (https://docs.rs/komodo_client/latest/komodo_client/) in dev mode"
 cmd = "cargo doc --no-deps -p komodo_client && http-server -p 8050 target/doc"
+
+[deploy-komodo]
+alias = "dk"
+cmd = "deno run --allow-all deploy/komodo.ts"

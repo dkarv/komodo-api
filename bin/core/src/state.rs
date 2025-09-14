@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Context;
 use arc_swap::ArcSwap;
+use database::Client;
 use komodo_client::entities::{
   action::ActionState,
   build::BuildState,
@@ -21,7 +22,6 @@ use octorust::auth::{
 use crate::{
   auth::jwt::JwtClient,
   config::core_config,
-  db::DbClient,
   helpers::{
     action_state::ActionStates, all_resources::AllResourcesById,
     cache::Cache,
@@ -32,16 +32,16 @@ use crate::{
   },
 };
 
-static DB_CLIENT: OnceLock<DbClient> = OnceLock::new();
+static DB_CLIENT: OnceLock<Client> = OnceLock::new();
 
-pub fn db_client() -> &'static DbClient {
+pub fn db_client() -> &'static Client {
   DB_CLIENT
     .get()
     .expect("db_client accessed before initialized")
 }
 
 pub async fn init_db_client() {
-  let client = DbClient::new(&core_config().database)
+  let client = Client::new(&core_config().database)
     .await
     .context("failed to initialize database client")
     .unwrap();
@@ -134,11 +134,13 @@ pub fn action_states() -> &'static ActionStates {
   ACTION_STATES.get_or_init(ActionStates::default)
 }
 
+/// Cache of ids to status
 pub type DeploymentStatusCache = Cache<
   String,
   Arc<History<CachedDeploymentStatus, DeploymentState>>,
 >;
 
+/// Cache of ids to status
 pub fn deployment_status_cache() -> &'static DeploymentStatusCache {
   static DEPLOYMENT_STATUS_CACHE: OnceLock<DeploymentStatusCache> =
     OnceLock::new();

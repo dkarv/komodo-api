@@ -1,25 +1,17 @@
 use std::str::FromStr;
 
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  by_id::{delete_one_by_id, update_one_by_id},
+  mongodb::bson::{doc, oid::ObjectId},
+};
 use komodo_client::{
   api::write::{CreateTag, DeleteTag, RenameTag, UpdateTagColor},
   entities::{
-    action::Action,
-    alerter::Alerter,
-    build::Build,
-    builder::Builder,
-    deployment::Deployment,
-    procedure::Procedure,
-    repo::Repo,
-    server::Server,
-    stack::Stack,
-    sync::ResourceSync,
-    tag::{Tag, TagColor},
+    action::Action, alerter::Alerter, build::Build, builder::Builder,
+    deployment::Deployment, procedure::Procedure, repo::Repo,
+    server::Server, stack::Stack, sync::ResourceSync, tag::Tag,
   },
-};
-use mungos::{
-  by_id::{delete_one_by_id, update_one_by_id},
-  mongodb::bson::{doc, oid::ObjectId},
 };
 use resolver_api::Resolve;
 
@@ -44,7 +36,7 @@ impl Resolve<WriteArgs> for CreateTag {
     let mut tag = Tag {
       id: Default::default(),
       name: self.name,
-      color: TagColor::Slate,
+      color: self.color.unwrap_or_default(),
       owner: user.id.clone(),
     };
 

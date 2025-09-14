@@ -12,7 +12,7 @@ FROM ${AARCH64_BINARIES} AS aarch64
 
 FROM debian:bullseye-slim
 
-COPY ./bin/periphery/starship.toml /config/starship.toml
+COPY ./bin/periphery/starship.toml /starship.toml
 COPY ./bin/periphery/debian-deps.sh .
 RUN sh ./debian-deps.sh && rm ./debian-deps.sh
 
@@ -27,8 +27,8 @@ RUN mv /app/arch/${TARGETPLATFORM} /usr/local/bin/periphery && rm -r /app/arch
 
 EXPOSE 8120
 
+CMD [ "periphery" ]
+
 LABEL org.opencontainers.image.source=https://github.com/moghtech/komodo
 LABEL org.opencontainers.image.description="Komodo Periphery"
 LABEL org.opencontainers.image.licenses=GPL-3.0
-
-CMD [ "periphery" ]

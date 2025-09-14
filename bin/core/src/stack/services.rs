@@ -29,8 +29,11 @@ pub fn extract_services_into_res(
   compose_contents: &str,
   res: &mut Vec<StackServiceNames>,
 ) -> anyhow::Result<()> {
-  let compose = serde_yaml::from_str::<ComposeFile>(compose_contents)
-    .context("failed to parse service names from compose contents")?;
+  let compose =
+    serde_yaml_ng::from_str::<ComposeFile>(compose_contents)
+      .context(
+        "failed to parse service names from compose contents",
+      )?;
 
   let mut services = Vec::with_capacity(compose.services.capacity());
 

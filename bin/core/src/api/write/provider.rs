@@ -1,14 +1,14 @@
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  by_id::{delete_one_by_id, find_one_by_id, update_one_by_id},
+  mongodb::bson::{doc, to_document},
+};
 use komodo_client::{
   api::write::*,
   entities::{
     Operation, ResourceTarget,
     provider::{DockerRegistryAccount, GitProviderAccount},
   },
-};
-use mungos::{
-  by_id::{delete_one_by_id, find_one_by_id, update_one_by_id},
-  mongodb::bson::{doc, to_document},
 };
 use resolver_api::Resolve;
 
@@ -90,22 +90,22 @@ impl Resolve<WriteArgs> for UpdateGitProviderAccount {
       );
     }
 
-    if let Some(domain) = &self.account.domain {
-      if domain.is_empty() {
-        return Err(
-          anyhow!("cannot update git provider with empty domain")
-            .into(),
-        );
-      }
+    if let Some(domain) = &self.account.domain
+      && domain.is_empty()
+    {
+      return Err(
+        anyhow!("cannot update git provider with empty domain")
+          .into(),
+      );
     }
 
-    if let Some(username) = &self.account.username {
-      if username.is_empty() {
-        return Err(
-          anyhow!("cannot update git provider with empty username")
-            .into(),
-        );
-      }
+    if let Some(username) = &self.account.username
+      && username.is_empty()
+    {
+      return Err(
+        anyhow!("cannot update git provider with empty username")
+          .into(),
+      );
     }
 
     // Ensure update does not change id
@@ -283,26 +283,26 @@ impl Resolve<WriteArgs> for UpdateDockerRegistryAccount {
       );
     }
 
-    if let Some(domain) = &self.account.domain {
-      if domain.is_empty() {
-        return Err(
-          anyhow!(
-            "cannot update docker registry account with empty domain"
-          )
-          .into(),
-        );
-      }
+    if let Some(domain) = &self.account.domain
+      && domain.is_empty()
+    {
+      return Err(
+        anyhow!(
+          "cannot update docker registry account with empty domain"
+        )
+        .into(),
+      );
     }
 
-    if let Some(username) = &self.account.username {
-      if username.is_empty() {
-        return Err(
-          anyhow!(
-            "cannot update docker registry account with empty username"
-          )
-          .into(),
-        );
-      }
+    if let Some(username) = &self.account.username
+      && username.is_empty()
+    {
+      return Err(
+        anyhow!(
+          "cannot update docker registry account with empty username"
+        )
+        .into(),
+      );
     }
 
     self.account.id = None;

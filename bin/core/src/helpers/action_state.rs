@@ -63,7 +63,7 @@ impl<States: Default + Busy + Copy + Send + 'static>
   pub fn update(
     &self,
     handler: impl Fn(&mut States),
-  ) -> anyhow::Result<UpdateGuard<States>> {
+  ) -> anyhow::Result<UpdateGuard<'_, States>> {
     let mut lock = self
       .0
       .lock()

@@ -1,4 +1,4 @@
-import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
 /**
  * Creating a sidebar enables you to:
@@ -13,10 +13,9 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docs: [
     "intro",
-    "resources",
     {
       type: "category",
-      label: "Setup Komodo Core",
+      label: "Setup",
       link: {
         type: "doc",
         id: "setup/index",
@@ -24,48 +23,69 @@ const sidebars: SidebarsConfig = {
       items: [
         "setup/mongo",
         "setup/ferretdb",
+        "setup/connect-servers",
+        "setup/backup",
         "setup/advanced",
-      ],
-    },
-    "connect-servers",
-    {
-      type: "category",
-      label: "Build Images",
-      link: {
-        type: "doc",
-        id: "build-images/index",
-      },
-      items: [
-        "build-images/configuration",
-        "build-images/pre-build",
-        "build-images/builders",
-        "build-images/versioning",
+        "setup/version-upgrades",
       ],
     },
     {
       type: "category",
-      label: "Deploy Containers",
+      label: "Resources",
       link: {
         type: "doc",
-        id: "deploy-containers/index",
+        id: "resources/index",
       },
       items: [
-        "deploy-containers/configuration",
-        "deploy-containers/lifetime-management",
-        // "deploy-containers/choosing-builder",
-        // "deploy-containers/versioning",
+        {
+          type: "category",
+          label: "Build Images",
+          link: {
+            type: "doc",
+            id: "resources/build-images/index",
+          },
+          items: [
+            "resources/build-images/configuration",
+            "resources/build-images/pre-build",
+            "resources/build-images/builders",
+            "resources/build-images/versioning",
+          ],
+        },
+        {
+          type: "category",
+          label: "Deploy Containers",
+          link: {
+            type: "doc",
+            id: "resources/deploy-containers/index",
+          },
+          items: [
+            "resources/deploy-containers/configuration",
+            "resources/deploy-containers/lifetime-management",
+          ],
+        },
+        "resources/docker-compose",
+        "resources/auto-update",
+        "resources/variables",
+        "resources/procedures",
+        "resources/sync-resources",
+        "resources/webhooks",
+        "resources/permissioning",
       ],
     },
-    "docker-compose",
-    "variables",
-    "procedures",
-    "permissioning",
-    "sync-resources",
-    "webhooks",
-    "version-upgrades",
-    "api",
-    "development",
-    "other-resources"
+    {
+      type: "category",
+      label: "Ecosystem",
+      link: {
+        type: "doc",
+        id: "ecosystem/index",
+      },
+      items: [
+        "ecosystem/cli",
+        "ecosystem/api",
+        "ecosystem/community",
+        "ecosystem/development",
+      ],
+    },
   ],
 };
 

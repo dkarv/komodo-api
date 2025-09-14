@@ -329,17 +329,19 @@ pub fn conversions_from_str(
 /// - Running -> running.
 #[typeshare]
 #[derive(
-  Serialize,
-  Deserialize,
   Debug,
-  PartialEq,
-  Hash,
-  Eq,
   Clone,
   Copy,
+  PartialEq,
+  Eq,
+  Hash,
+  PartialOrd,
+  Ord,
   Default,
   Display,
   EnumString,
+  Serialize,
+  Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]

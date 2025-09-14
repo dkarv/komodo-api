@@ -1,12 +1,12 @@
 use std::{collections::HashMap, str::FromStr};
 
 use anyhow::anyhow;
+use database::mungos::mongodb::bson::oid::ObjectId;
 use komodo_client::entities::{
   ResourceTargetVariant,
   tag::Tag,
   toml::{ResourceToml, ResourcesToml},
 };
-use mungos::mongodb::bson::oid::ObjectId;
 use toml::ToToml;
 
 use crate::resource::KomodoResource;

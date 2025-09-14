@@ -12,14 +12,17 @@
 //! the configuration file.
 //!
 
-use std::{collections::HashMap, net::IpAddr, path::PathBuf};
-
 use clap::Parser;
+use ipnetwork::IpNetwork;
 use serde::Deserialize;
+use std::{collections::HashMap, path::PathBuf};
 
-use crate::entities::{
-  Timelength,
-  logger::{LogConfig, LogLevel, StdioLogMode},
+use crate::{
+  deserializers::ForgivingVec,
+  entities::{
+    Timelength,
+    logger::{LogConfig, LogLevel, StdioLogMode},
+  },
 };
 
 use super::{
@@ -48,23 +51,24 @@ use super::{
 pub struct CliArgs {
   /// Sets the path of a config file or directory to use.
   /// Can use multiple times
-  #[arg(short, long)]
-  pub config_path: Option<Vec<String>>,
+  #[arg(long, short = 'c')]
+  pub config_path: Option<Vec<PathBuf>>,
 
   /// Sets the keywords to match directory periphery config file names on.
-  /// Can use multiple times.
-  #[arg(long)]
+  /// Supports wildcard syntax.
+  /// Can use multiple times to match multiple patterns independently.
+  #[arg(long, short = 'm')]
   pub config_keyword: Option<Vec<String>>,
 
   /// Merges nested configs, eg. secrets, providers.
   /// Will override the equivalent env configuration.
-  /// Default: false
+  /// Default: true
   #[arg(long)]
   pub merge_nested_config: Option<bool>,
 
   /// Extends config arrays, eg. allowed_ips, passkeys.
   /// Will override the equivalent env configuration.
-  /// Default: false
+  /// Default: true
   #[arg(long)]
   pub extend_config_arrays: Option<bool>,
 
@@ -88,28 +92,32 @@ pub struct Env {
   ///
   /// Note. This is overridden if the equivalent arg is passed in [CliArgs].
   #[serde(default, alias = "periphery_config_path")]
-  pub periphery_config_paths: Vec<String>,
+  pub periphery_config_paths: Vec<PathBuf>,
   /// If specifying folders, use this to narrow down which
   /// files will be matched to parse into the final [PeripheryConfig].
-  /// Only files inside the folders which have names containing all keywords
+  /// Only files inside the folders which have names containing a keywords
   /// provided to `config_keywords` will be included.
+  /// Keywords support wildcard matching syntax.
   ///
   /// Note. This is overridden if the equivalent arg is passed in [CliArgs].
-  #[serde(default, alias = "periphery_config_keyword")]
+  #[serde(
+    default = "super::default_config_keywords",
+    alias = "periphery_config_keyword"
+  )]
   pub periphery_config_keywords: Vec<String>,
 
   /// Will merge nested config object (eg. secrets, providers) across multiple
-  /// config files. Default: `false`
+  /// config files. Default: `true`
   ///
   /// Note. This is overridden if the equivalent arg is passed in [CliArgs].
-  #[serde(default)]
+  #[serde(default = "super::default_merge_nested_config")]
   pub periphery_merge_nested_config: bool,
 
   /// Will extend config arrays (eg. `allowed_ips`, `passkeys`) across multiple config files.
-  /// Default: `false`
+  /// Default: `true`
   ///
   /// Note. This is overridden if the equivalent arg is passed in [CliArgs].
-  #[serde(default)]
+  #[serde(default = "super::default_extend_config_arrays")]
   pub periphery_extend_config_arrays: bool,
 
   /// Override `port`
@@ -142,6 +150,8 @@ pub struct Env {
   pub periphery_logging_stdio: Option<StdioLogMode>,
   /// Override `logging.pretty`
   pub periphery_logging_pretty: Option<bool>,
+  /// Override `logging.location`
+  pub periphery_logging_location: Option<bool>,
   /// Override `logging.otlp_endpoint`
   pub periphery_logging_otlp_endpoint: Option<String>,
   /// Override `logging.opentelemetry_service_name`
@@ -150,15 +160,15 @@ pub struct Env {
   pub periphery_pretty_startup_config: Option<bool>,
 
   /// Override `allowed_ips`
-  pub periphery_allowed_ips: Option<Vec<IpAddr>>,
+  pub periphery_allowed_ips: Option<ForgivingVec<IpNetwork>>,
   /// Override `passkeys`
   pub periphery_passkeys: Option<Vec<String>>,
   /// Override `passkeys` from file
   pub periphery_passkeys_file: Option<PathBuf>,
   /// Override `include_disk_mounts`
-  pub periphery_include_disk_mounts: Option<Vec<PathBuf>>,
+  pub periphery_include_disk_mounts: Option<ForgivingVec<PathBuf>>,
   /// Override `exclude_disk_mounts`
-  pub periphery_exclude_disk_mounts: Option<Vec<PathBuf>>,
+  pub periphery_exclude_disk_mounts: Option<ForgivingVec<PathBuf>>,
 
   /// Override `ssl_enabled`
   pub periphery_ssl_enabled: Option<bool>,
@@ -250,12 +260,12 @@ pub struct PeripheryConfig {
   #[serde(default)]
   pub pretty_startup_config: bool,
 
-  /// Limits which IPv4 addresses are allowed to call the api.
+  /// Limits which IP addresses are allowed to call the api.
   /// Default: none
   ///
   /// Note: this should be configured to increase security.
   #[serde(default)]
-  pub allowed_ips: Vec<IpAddr>,
+  pub allowed_ips: ForgivingVec<IpNetwork>,
 
   /// Limits the accepted passkeys.
   /// Default: none
@@ -266,11 +276,11 @@ pub struct PeripheryConfig {
 
   /// If non-empty, only includes specific mount paths in the disk report.
   #[serde(default)]
-  pub include_disk_mounts: Vec<PathBuf>,
+  pub include_disk_mounts: ForgivingVec<PathBuf>,
 
   /// Exclude specific mount paths in the disk report.
   #[serde(default)]
-  pub exclude_disk_mounts: Vec<PathBuf>,
+  pub exclude_disk_mounts: ForgivingVec<PathBuf>,
 
   /// Mapping on local periphery secrets. These can be interpolated into eg. Deployment environment variables.
   /// Default: none
@@ -280,12 +290,12 @@ pub struct PeripheryConfig {
   /// Configure git credentials used to clone private repos.
   /// Supports any git provider.
   #[serde(default, alias = "git_provider")]
-  pub git_providers: Vec<GitProvider>,
+  pub git_providers: ForgivingVec<GitProvider>,
 
   /// Configure docker credentials used to push / pull images.
   /// Supports any docker image repository.
   #[serde(default, alias = "docker_registry")]
-  pub docker_registries: Vec<DockerRegistry>,
+  pub docker_registries: ForgivingVec<DockerRegistry>,
 
   /// Whether to enable ssl.
   /// Default: true

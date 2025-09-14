@@ -1,0 +1,79 @@
+##########################
+# 🦎 KOMODO CLI CONFIG 🦎 #
+##########################
+
+## This is the offical "Default" config file for the Komodo CLI.
+## It serves as documentation for the meaning of the fields.
+## It is located at `https://github.com/moghtech/komodo/blob/main/config/komodo.cli.toml`.
+
+## Most fields can also be configured using cli arguments and environment variables.
+## These will will override values set in this file. (cli args > env > config files).
+
+## You can also use JSON or YAML if preferred. You can convert here:
+##   - YAML: https://it-tools.tech/toml-to-yaml
+##   - JSON: https://it-tools.tech/toml-to-json
+
+# Choose default profile to use with `km ...`
+default_profile = "Default"
+# default_profile = "Alt"
+
+# Set base values if they aren't defined in profile
+# Default: 14
+max_backups = 7
+
+# Options: HorizontalOnly, VeriticalOnly, OutsideOnly, InsideOnly, AllBorders
+# Default: HorizontalOnly
+table_format = "HorizontalOnly"
+
+[[profile]]
+name = "Default"
+aliases = ["d"] # Use `km -p d ...`
+#
+# Env: KOMODO_CLI_HOST > KOMODO_HOST
+host = "https://komodo.example.com"
+# Env: KOMODO_CLI_KEY
+key = "K-..."
+# Env: KOMODO_CLI_SECRET
+secret = "S-..."
+#
+# Env: KOMODO_CLI_BACKUPS_FOLDER
+backups_folder = "/backups"
+# Env: KOMODO_CLI_MAX_BACKUPS
+max_backups = 14
+#
+# DATABASE USED TO BACKUP / COPY FROM
+# 
+## Env: KOMODO_DATABASE_URI or KOMODO_DATABASE_URI_FILE
+database.uri = ""
+## ==== * OR * ==== ##
+# Construct the address as mongodb://{username}:{password}@{address}
+## Env: KOMODO_DATABASE_URI or KOMODO_DATABASE_URI_FILE
+database.address = "localhost:27017"
+## Env: KOMODO_DATABASE_USERNAME or KOMODO_DATABASE_USERNAME_FILE
+database.username = ""
+## Env: KOMODO_DATABASE_PASSWORD or KOMODO_DATABASE_PASSWORD_FILE
+database.password = ""
+## Env: KOMODO_DATABASE_DB_NAME
+## Default: komodo.
+database.db_name = "komodo"
+#
+# DATABASE USED TO RESTORE / COPY TO
+# 
+## Env: KOMODO_CLI_DATABASE_TARGET_URI
+database_target.uri = ""
+## ==== * OR * ==== ##
+# Construct the address as mongodb://{username}:{password}@{address}
+## Env: KOMODO_CLI_DATABASE_TARGET_URI
+database_target.address = "localhost:27017"
+## Env: KOMODO_CLI_DATABASE_TARGET_USERNAME
+database_target.username = ""
+## Env: KOMODO_CLI_DATABASE_TARGET_PASSWORD
+database_target.password = ""
+## Env: KOMODO_CLI_DATABASE_TARGET_DB_NAME
+## Default: komodo.
+database_target.db_name = "komodo"
+
+
+[[profile]]
+name = "Alt"
+# ... Configure same as above

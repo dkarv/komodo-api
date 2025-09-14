@@ -1,4 +1,4 @@
-import { AUTH_TOKEN_STORAGE_KEY, KOMODO_BASE_URL } from "@main";
+import { KOMODO_BASE_URL } from "@main";
 import { KomodoClient, Types } from "komodo_client";
 import {
   AuthResponses,
@@ -22,19 +22,109 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { has_minimum_permissions, RESOURCE_TARGETS } from "./utils";
 
+export const atomWithStorage = <T>(key: string, init: T) => {
+  const stored = localStorage.getItem(key);
+  const inner = atom(stored ? JSON.parse(stored) : init);
+
+  return atom(
+    (get) => get(inner),
+    (_, set, newValue) => {
+      set(inner, newValue);
+      localStorage.setItem(key, JSON.stringify(newValue));
+    }
+  );
+};
+
+type LoginTokens = {
+  /** Current User ID */
+  current: string | undefined;
+  /** Array of logged in user ids / tokens */
+  tokens: Array<Types.JwtResponse>;
+};
+
+const LOGIN_TOKENS_KEY = "komodo-auth-tokens-v1";
+
+export const LOGIN_TOKENS = (() => {
+  const stored = localStorage.getItem(LOGIN_TOKENS_KEY);
+
+  let tokens: LoginTokens = stored
+    ? JSON.parse(stored)
+    : { current: undefined, tokens: [] };
+
+  const update_local_storage = () => {
+    localStorage.setItem(LOGIN_TOKENS_KEY, JSON.stringify(tokens));
+  };
+
+  const accounts = () => {
+    const current = tokens.tokens.find((t) => t.user_id === tokens.current);
+    const filtered = tokens.tokens.filter((t) => t.user_id !== tokens.current);
+    return current ? [current, ...filtered] : filtered;
+  };
+
+  const add_and_change = (user_id: string, jwt: string) => {
+    const filtered = tokens.tokens.filter((t) => t.user_id !== user_id);
+    filtered.push({ user_id, jwt });
+    filtered.sort();
+    tokens = {
+      current: user_id,
+      tokens: filtered,
+    };
+    update_local_storage();
+  };
+
+  const remove = (user_id: string) => {
+    const filtered = tokens.tokens.filter((t) => t.user_id !== user_id);
+    tokens = {
+      current:
+        tokens.current === user_id ? filtered[0]?.user_id : tokens.current,
+      tokens: filtered,
+    };
+    update_local_storage();
+  };
+
+  const remove_all = () => {
+    tokens = {
+      current: undefined,
+      tokens: [],
+    };
+    update_local_storage();
+  };
+
+  const change = (to_id: string) => {
+    tokens = {
+      current: to_id,
+      tokens: tokens.tokens,
+    };
+    update_local_storage();
+  };
+
+  return {
+    jwt: () =>
+      tokens.current
+        ? (tokens.tokens.find((t) => t.user_id === tokens.current)?.jwt ?? "")
+        : "",
+    accounts,
+    add_and_change,
+    remove,
+    remove_all,
+    change,
+  };
+})();
+
+export const komodo_client = () =>
+  KomodoClient(KOMODO_BASE_URL, {
+    type: "jwt",
+    params: { jwt: LOGIN_TOKENS.jwt() },
+  });
+
 // ============== RESOLVER ==============
 
-const token = () => ({
-  jwt: localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? "",
-});
-export const komodo_client = () =>
-  KomodoClient(KOMODO_BASE_URL, { type: "jwt", params: token() });
-
-export const useLoginOptions = () =>
-  useQuery({
+export const useLoginOptions = () => {
+  return useQuery({
     queryKey: ["GetLoginOptions"],
     queryFn: () => komodo_client().auth("GetLoginOptions", {}),
   });
+};
 
 export const useUser = () => {
   const userReset = useUserReset();
@@ -82,12 +172,13 @@ export const useRead = <
   type: T,
   params: P,
   config?: C
-) =>
-  useQuery({
+) => {
+  return useQuery({
     queryKey: [type, params],
     queryFn: () => komodo_client().read<T, R>(type, params),
     ...config,
   });
+};
 
 export const useInvalidate = () => {
   const qc = useQueryClient();
@@ -347,19 +438,6 @@ export const useSetTitle = (more?: string) => {
   }, [title]);
 };
 
-export const atomWithStorage = <T>(key: string, init: T) => {
-  const stored = localStorage.getItem(key);
-  const inner = atom(stored ? JSON.parse(stored) : init);
-
-  return atom(
-    (get) => get(inner),
-    (_, set, newValue) => {
-      set(inner, newValue);
-      localStorage.setItem(key, JSON.stringify(newValue));
-    }
-  );
-};
-
 const tagsAtom = atomWithStorage<string[]>("tags-v0", []);
 
 export const useTags = () => {
@@ -459,6 +537,83 @@ export const useCtrlKeyListener = (listenKey: string, onPress: () => void) => {
     document.addEventListener("keydown", keydown);
     return () => document.removeEventListener("keydown", keydown);
   });
+};
+
+export interface PromptHotkeysConfig {
+  /** Function to call when Enter is pressed (confirm action) */
+  onConfirm?: () => void;
+  /** Function to call when Escape is pressed (cancel/close action) */
+  onCancel?: () => void;
+  /** Whether the hotkeys are enabled. Defaults to true */
+  enabled?: boolean;
+  /** Whether to ignore hotkeys when inside input/textarea elements. Defaults to true */
+  ignoreInputs?: boolean;
+  /** Whether the confirm action is disabled (e.g., form validation failed) */
+  confirmDisabled?: boolean;
+}
+
+/**
+ * Hook that provides standard prompt/dialog hotkey behavior:
+ * - Enter: Confirm/submit action
+ * - Escape: Cancel/close action
+ */
+export const usePromptHotkeys = ({
+  enabled = true,
+  onConfirm,
+  onCancel,
+  ignoreInputs = true,
+  confirmDisabled = false,
+}: PromptHotkeysConfig) => {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const findConfirmButton = (): HTMLButtonElement | null => {
+      const dialogContainers = document.querySelectorAll('[role="dialog"], [data-state="open"], .dialog-content');
+      for (const container of dialogContainers) {
+        const button = container.querySelector('[data-confirm-button]:not([disabled])') as HTMLButtonElement;
+        if (button) return button;
+      }
+
+      return document.querySelector('[data-confirm-button]:not([disabled])') as HTMLButtonElement;
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (ignoreInputs) {
+        const target = e.target as HTMLElement;
+        if (
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      switch (e.key) {
+        case "Enter":
+          if (onConfirm && !confirmDisabled) {
+            e.preventDefault();
+            const confirmButton = findConfirmButton();
+            if (confirmButton) {
+              confirmButton.click();
+            } else {
+              onConfirm();
+            }
+          }
+          break;
+        case "Escape":
+          if (onCancel) {
+            e.preventDefault();
+            onCancel();
+          }
+          break;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [enabled, onConfirm, onCancel, ignoreInputs, confirmDisabled]);
 };
 
 export type WebhookIntegration = "Github" | "Gitlab";
@@ -566,40 +721,44 @@ export const usePermissions = ({ type, id }: Types.ResourceTarget) => {
     Types.PermissionLevel.Execute
   );
 
-  if (type === "Server") {
-    return {
-      canWrite,
-      canExecute,
-      canCreate:
-        user?.admin ||
-        (!disable_non_admin_create && user?.create_server_permissions),
-      specific,
-    };
-  }
-  if (type === "Build") {
-    return {
-      canWrite,
-      canExecute,
-      canCreate:
-        user?.admin ||
-        (!disable_non_admin_create && user?.create_build_permissions),
-      specific,
-    };
-  }
-  if (type === "Alerter" || type === "Builder") {
-    return {
-      canWrite,
-      canExecute,
-      canCreate: user?.admin,
-      specific,
-    };
-  }
+  const [
+    specificLogs,
+    specificInspect,
+    specificTerminal,
+    specificAttach,
+    specificProcesses,
+  ] = [
+    specific.includes(Types.SpecificPermission.Logs),
+    specific.includes(Types.SpecificPermission.Inspect),
+    specific.includes(Types.SpecificPermission.Terminal),
+    specific.includes(Types.SpecificPermission.Attach),
+    specific.includes(Types.SpecificPermission.Processes),
+  ];
+
+  const canCreate =
+    type === "Server"
+      ? user?.admin ||
+        (!disable_non_admin_create && user?.create_server_permissions)
+      : type === "Build"
+        ? user?.admin ||
+          (!disable_non_admin_create && user?.create_build_permissions)
+        : type === "Alerter" ||
+            type === "Builder" ||
+            type === "Procedure" ||
+            type === "Action"
+          ? user?.admin
+          : user?.admin || !disable_non_admin_create;
 
   return {
     canWrite,
     canExecute,
-    canCreate: user?.admin || !disable_non_admin_create,
+    canCreate,
     specific,
+    specificLogs,
+    specificInspect,
+    specificTerminal,
+    specificAttach,
+    specificProcesses,
   };
 };
 
@@ -646,3 +805,24 @@ export const useContainerPortsMap = (ports: Types.Port[]) => {
     return map;
   }, [ports]);
 };
+
+/**
+ * A custom React hook that debounces a value, delaying its update until after
+ * a specified period of inactivity. This is useful for performance optimization
+ * in scenarios like search inputs, form validation, or API calls.
+ */
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}

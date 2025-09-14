@@ -1,4 +1,6 @@
 use anyhow::Context;
+use database::mongo_indexed::doc;
+use database::mungos::mongodb::Collection;
 use formatting::format_serror;
 use komodo_client::{
   api::write::RefreshResourceSyncPending,
@@ -18,8 +20,6 @@ use komodo_client::{
     user::{User, sync_user},
   },
 };
-use mongo_indexed::doc;
-use mungos::mongodb::Collection;
 use resolver_api::Resolve;
 
 use crate::{
@@ -221,18 +221,18 @@ async fn validate_config(
   config: &mut PartialResourceSyncConfig,
   user: &User,
 ) -> anyhow::Result<()> {
-  if let Some(linked_repo) = &config.linked_repo {
-    if !linked_repo.is_empty() {
-      let repo = get_check_permissions::<Repo>(
-        linked_repo,
-        user,
-        PermissionLevel::Read.attach(),
-      )
-      .await
-      .context("Cannot attach Repo to this Resource Sync")?;
-      // in case it comes in as name
-      config.linked_repo = Some(repo.id);
-    }
+  if let Some(linked_repo) = &config.linked_repo
+    && !linked_repo.is_empty()
+  {
+    let repo = get_check_permissions::<Repo>(
+      linked_repo,
+      user,
+      PermissionLevel::Read.attach(),
+    )
+    .await
+    .context("Cannot attach Repo to this Resource Sync")?;
+    // in case it comes in as name
+    config.linked_repo = Some(repo.id);
   }
   Ok(())
 }

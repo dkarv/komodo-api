@@ -1,0 +1,25 @@
+[package]
+name = "database"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+# local
+komodo_client = { workspace = true, features = ["mongo"] }
+# mogh
+mongo_indexed.workspace = true
+mungos.workspace = true
+# external
+async-compression.workspace = true
+futures-util.workspace = true
+serde_json.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+bcrypt.workspace = true
+chrono.workspace = true
+tokio.workspace = true

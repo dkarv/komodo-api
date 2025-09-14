@@ -27,7 +27,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ContainerLogs } from "./log";
 import { Actions } from "./actions";
-import { Types } from "komodo_client";
+import { ConnectExecQuery, Types } from "komodo_client";
 import { container_state_intention } from "@lib/color";
 import { UsableResource } from "@types";
 import { Fragment } from "react/jsx-runtime";
@@ -36,6 +36,7 @@ import { ResourceNotifications } from "@pages/resource-notifications";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@ui/tabs";
 import { ContainerTerminal } from "@components/terminal/container";
 import { ContainerInspect } from "./inspect";
+import { useMemo } from "react";
 
 export default function ContainerPage() {
   const { type, id, container } = useParams() as {
@@ -121,7 +122,7 @@ const ContainerPageInner = ({
                     />
                   </>
                 )}
-                {list_container?.networks.map((network) => (
+                {list_container?.networks?.map((network) => (
                   <Fragment key={network}>
                     |
                     <DockerResourceLink
@@ -132,7 +133,7 @@ const ContainerPageInner = ({
                     />
                   </Fragment>
                 ))}
-                {list_container?.volumes.map((volume) => (
+                {list_container?.volumes?.map((volume) => (
                   <Fragment key={volume}>
                     |
                     <DockerResourceLink
@@ -223,20 +224,18 @@ const ContainerTabs = ({
     `server-${server}-${container}-tabs-v1`,
     "Log"
   );
-  const { specific } = usePermissions({
+  const { specificLogs, specificInspect, specificTerminal } = usePermissions({
     type: "Server",
     id: server,
   });
   const container_exec_disabled =
     useServer(server)?.info.container_exec_disabled ?? true;
   const logDisabled =
-    !specific.includes(Types.SpecificPermission.Logs) ||
-    state === Types.ContainerStateStatusEnum.Empty;
+    !specificLogs || state === Types.ContainerStateStatusEnum.Empty;
   const inspectDisabled =
-    !specific.includes(Types.SpecificPermission.Inspect) ||
-    state === Types.ContainerStateStatusEnum.Empty;
+    !specificInspect || state === Types.ContainerStateStatusEnum.Empty;
   const terminalDisabled =
-    !specific.includes(Types.SpecificPermission.Terminal) ||
+    !specificTerminal ||
     container_exec_disabled ||
     state !== Types.ContainerStateStatusEnum.Running;
   const view =
@@ -244,25 +243,54 @@ const ContainerTabs = ({
     (terminalDisabled && _view === "Terminal")
       ? "Log"
       : _view;
-  const tabs = (
-    <TabsList className="justify-start w-fit">
-      <TabsTrigger value="Log" className="w-[110px]" disabled={logDisabled}>
-        Log
-      </TabsTrigger>
-      {specific.includes(Types.SpecificPermission.Inspect) && (
-        <TabsTrigger value="Inspect" className="w-[110px]">
-          Inspect
+  const tabs = useMemo(() => {
+    return (
+      <TabsList className="justify-start w-fit">
+        <TabsTrigger value="Log" className="w-[110px]" disabled={logDisabled}>
+          Log
         </TabsTrigger>
-      )}
-      {specific.includes(Types.SpecificPermission.Terminal) && (
-        <TabsTrigger value="Terminal" className="w-[110px]">
-          Terminal
-        </TabsTrigger>
-      )}
-    </TabsList>
+        {specificInspect && (
+          <TabsTrigger
+            value="Inspect"
+            className="w-[110px]"
+            disabled={inspectDisabled}
+          >
+            Inspect
+          </TabsTrigger>
+        )}
+        {specificTerminal && (
+          <TabsTrigger
+            value="Terminal"
+            className="w-[110px]"
+            disabled={terminalDisabled}
+          >
+            Terminal
+          </TabsTrigger>
+        )}
+      </TabsList>
+    );
+  }, [
+    logDisabled,
+    specificInspect,
+    inspectDisabled,
+    specificTerminal,
+    terminalDisabled,
+  ]);
+  const terminalQuery = useMemo(
+    () =>
+      ({
+        type: "container",
+        query: {
+          server,
+          container,
+          // This is handled inside ContainerTerminal
+          shell: "",
+        },
+      }) as ConnectExecQuery,
+    [server, container]
   );
   return (
-    <Tabs value={view} onValueChange={setView as any} className="grid gap-4">
+    <Tabs value={view} onValueChange={setView as any}>
       <TabsContent value="Log">
         <ContainerLogs
           id={server}
@@ -275,18 +303,7 @@ const ContainerTabs = ({
         <ContainerInspect id={server} container={container} titleOther={tabs} />
       </TabsContent>
       <TabsContent value="Terminal">
-        <ContainerTerminal
-          query={{
-            type: "container",
-            query: {
-              server,
-              container,
-              // This is handled inside ContainerTerminal
-              shell: "",
-            },
-          }}
-          titleOther={tabs}
-        />
+        <ContainerTerminal query={terminalQuery} titleOther={tabs} />
       </TabsContent>
     </Tabs>
   );

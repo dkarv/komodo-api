@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use database::mungos::find::find_collect;
 use formatting::{Color, bold, colored, muted};
 use komodo_client::entities::{
   ResourceTargetVariant, tag::Tag, toml::ResourceToml, update::Log,
   user::sync_user,
 };
-use mungos::find::find_collect;
 use partial_derive2::MaybeNone;
 
 use crate::{api::write::WriteArgs, resource::ResourceMetaUpdate};

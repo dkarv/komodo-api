@@ -1,36 +1,69 @@
-use std::sync::OnceLock;
+use std::{path::PathBuf, sync::OnceLock};
 
 use anyhow::Context;
+use colored::Colorize;
+use config::ConfigLoader;
 use environment_file::{
   maybe_read_item_from_file, maybe_read_list_from_file,
 };
 use komodo_client::entities::{
-  config::core::{
-    AwsCredentials, CoreConfig, DatabaseConfig, Env,
-    GithubWebhookAppConfig, GithubWebhookAppInstallationConfig,
-    OauthCredentials,
+  config::{
+    DatabaseConfig,
+    core::{
+      AwsCredentials, CoreConfig, Env, GithubWebhookAppConfig,
+      GithubWebhookAppInstallationConfig, OauthCredentials,
+    },
   },
   logger::LogConfig,
 };
-use merge_config_files::parse_config_file;
 
 pub fn core_config() -> &'static CoreConfig {
   static CORE_CONFIG: OnceLock<CoreConfig> = OnceLock::new();
   CORE_CONFIG.get_or_init(|| {
     let env: Env = match envy::from_env()
-      .context("failed to parse core Env") {
+      .context("Failed to parse Komodo Core environment") {
         Ok(env) => env,
         Err(e) => {
-          panic!("{e:#?}");
+          panic!("{e:?}");
         }
       };
-    let config_path = &env.komodo_config_path;
-    let config =
-      parse_config_file::<CoreConfig>(config_path.as_str())
-        .unwrap_or_else(|e| {
-          panic!("failed at parsing config at {config_path} | {e:#}")
-        });
-    let installations = match (maybe_read_list_from_file(env.komodo_github_webhook_app_installations_ids_file,env.komodo_github_webhook_app_installations_ids), env.komodo_github_webhook_app_installations_namespaces) {
+    let config = if env.komodo_config_paths.is_empty() {
+      println!(
+        "{}: No config paths found, using default config",
+        "INFO".green(),
+      );
+      CoreConfig::default()
+    } else {
+      let config_keywords = env.komodo_config_keywords
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+      println!(
+        "{}: {}: {config_keywords:?}",
+        "INFO".green(),
+        "Config File Keywords".dimmed(),
+      );
+      (ConfigLoader {
+        paths: &env.komodo_config_paths
+          .iter()
+          .map(PathBuf::as_path)
+          .collect::<Vec<_>>(),
+        match_wildcards: &config_keywords,
+        include_file_name: ".kcoreinclude",
+        merge_nested: env.komodo_merge_nested_config,
+        extend_array: env.komodo_extend_config_arrays,
+        debug_print: env.komodo_config_debug,
+      }).load::<CoreConfig>()
+      .expect("Failed at parsing config from paths")
+    };
+
+    let installations = match (
+      maybe_read_list_from_file(
+        env.komodo_github_webhook_app_installations_ids_file,
+        env.komodo_github_webhook_app_installations_ids
+      ),
+      env.komodo_github_webhook_app_installations_namespaces
+    ) {
       (Some(ids), Some(namespaces)) => {
         if ids.len() != namespaces.len() {
           panic!("KOMODO_GITHUB_WEBHOOK_APP_INSTALLATIONS_IDS length and KOMODO_GITHUB_WEBHOOK_APP_INSTALLATIONS_NAMESPACES length mismatch. Got {ids:?} and {namespaces:?}")
@@ -76,6 +109,14 @@ pub fn core_config() -> &'static CoreConfig {
           .komodo_database_db_name
           .unwrap_or(config.database.db_name),
       },
+      init_admin_username: maybe_read_item_from_file(
+        env.komodo_init_admin_username_file,
+        env.komodo_init_admin_username
+      ).or(config.init_admin_username),
+      init_admin_password: maybe_read_item_from_file(
+        env.komodo_init_admin_password_file,
+        env.komodo_init_admin_password
+      ).unwrap_or(config.init_admin_password),
       oidc_enabled: env.komodo_oidc_enabled.unwrap_or(config.oidc_enabled),
       oidc_provider: env.komodo_oidc_provider.unwrap_or(config.oidc_provider),
       oidc_redirect_host: env.komodo_oidc_redirect_host.unwrap_or(config.oidc_redirect_host),
@@ -136,7 +177,8 @@ pub fn core_config() -> &'static CoreConfig {
       port: env.komodo_port.unwrap_or(config.port),
       bind_ip: env.komodo_bind_ip.unwrap_or(config.bind_ip),
       timezone: env.komodo_timezone.unwrap_or(config.timezone),
-      first_server: env.komodo_first_server.unwrap_or(config.first_server),
+      first_server: env.komodo_first_server.or(config.first_server),
+      first_server_name: env.komodo_first_server_name.unwrap_or(config.first_server_name),
       frontend_path: env.komodo_frontend_path.unwrap_or(config.frontend_path),
       jwt_ttl: env
         .komodo_jwt_ttl
@@ -181,6 +223,10 @@ pub fn core_config() -> &'static CoreConfig {
         .unwrap_or(config.disable_user_registration),
       disable_non_admin_create: env.komodo_disable_non_admin_create
         .unwrap_or(config.disable_non_admin_create),
+      disable_init_resources: env.komodo_disable_init_resources
+        .unwrap_or(config.disable_init_resources),
+      enable_fancy_toml: env.komodo_enable_fancy_toml
+        .unwrap_or(config.enable_fancy_toml),
       lock_login_credentials_for: env.komodo_lock_login_credentials_for
         .unwrap_or(config.lock_login_credentials_for),
       local_auth: env.komodo_local_auth
@@ -192,7 +238,10 @@ pub fn core_config() -> &'static CoreConfig {
         stdio: env
           .komodo_logging_stdio
           .unwrap_or(config.logging.stdio),
-        pretty: env.komodo_logging_pretty.unwrap_or(config.logging.pretty),
+        pretty: env.komodo_logging_pretty
+          .unwrap_or(config.logging.pretty),
+        location: env.komodo_logging_location
+          .unwrap_or(config.logging.location),
         otlp_endpoint: env
           .komodo_logging_otlp_endpoint
           .unwrap_or(config.logging.otlp_endpoint),
@@ -201,6 +250,8 @@ pub fn core_config() -> &'static CoreConfig {
           .unwrap_or(config.logging.opentelemetry_service_name),
       },
       pretty_startup_config: env.komodo_pretty_startup_config.unwrap_or(config.pretty_startup_config),
+      unsafe_unsanitized_startup_config: env.komodo_unsafe_unsanitized_startup_config.unwrap_or(config.unsafe_unsanitized_startup_config),
+      internet_interface: env.komodo_internet_interface.unwrap_or(config.internet_interface),
       ssl_enabled: env.komodo_ssl_enabled.unwrap_or(config.ssl_enabled),
       ssl_key_file: env.komodo_ssl_key_file.unwrap_or(config.ssl_key_file),
       ssl_cert_file: env.komodo_ssl_cert_file.unwrap_or(config.ssl_cert_file),

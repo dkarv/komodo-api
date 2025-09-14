@@ -15,7 +15,7 @@
 //! - `KOMODO_API_SECRET`
 //!
 //! ## Client Example
-//! ```
+//! ```text
 //! dotenvy::dotenv().ok();
 //!
 //! let client = KomodoClient::new_from_env()?;
@@ -28,7 +28,7 @@
 //! let update = client.execute(RunBuild { build: "test-build".to_string() }).await?:
 //! ```
 
-use std::sync::OnceLock;
+use std::{sync::OnceLock, time::Duration};
 
 use anyhow::Context;
 use api::read::GetVersion;
@@ -109,7 +109,7 @@ impl KomodoClient {
 
   /// Add a healthcheck in the initialization pipeline:
   ///
-  /// ```rust
+  /// ```text
   /// let komodo = KomodoClient::new_from_env()?
   ///   .with_healthcheck().await?;
   /// ```
@@ -121,7 +121,7 @@ impl KomodoClient {
 
   /// Add a healthcheck in the initialization pipeline:
   ///
-  /// ```rust
+  /// ```text
   /// let komodo = KomodoClient::new_from_env()?
   ///   .with_healthcheck().await?;
   /// ```
@@ -189,6 +189,7 @@ impl KomodoClient {
       if update.status == entities::update::UpdateStatus::Complete {
         return Ok(update);
       }
+      tokio::time::sleep(Duration::from_millis(500)).await;
     }
   }
 

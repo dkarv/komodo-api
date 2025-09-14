@@ -1,6 +1,8 @@
 use std::{fmt::Write, time::Duration};
 
 use anyhow::{Context, anyhow};
+use database::mongo_indexed::Document;
+use database::mungos::mongodb::bson::{Bson, doc};
 use indexmap::IndexSet;
 use komodo_client::entities::{
   ResourceTarget,
@@ -13,8 +15,6 @@ use komodo_client::entities::{
   stack::Stack,
   user::User,
 };
-use mongo_indexed::Document;
-use mungos::mongodb::bson::{Bson, doc};
 use periphery_client::PeripheryClient;
 use rand::Rng;
 
@@ -52,15 +52,6 @@ pub fn random_string(length: usize) -> String {
     .take(length)
     .map(char::from)
     .collect()
-}
-
-const BCRYPT_COST: u32 = 10;
-pub fn hash_password<P>(password: P) -> anyhow::Result<String>
-where
-  P: AsRef<[u8]>,
-{
-  bcrypt::hash(password, BCRYPT_COST)
-    .context("failed to hash password")
 }
 
 /// First checks db for token, then checks core config.

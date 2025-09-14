@@ -1,16 +1,16 @@
 use std::str::FromStr;
 
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  by_id::find_one_by_id,
+  mongodb::bson::{doc, oid::ObjectId},
+};
 use komodo_client::{
   api::{user::CreateApiKey, write::*},
   entities::{
     komodo_timestamp,
     user::{User, UserConfig},
   },
-};
-use mungos::{
-  by_id::find_one_by_id,
-  mongodb::bson::{doc, oid::ObjectId},
 };
 use resolver_api::Resolve;
 

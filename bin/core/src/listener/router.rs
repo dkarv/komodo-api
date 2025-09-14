@@ -11,7 +11,7 @@ use tracing::Instrument;
 use crate::resource::KomodoResource;
 
 use super::{
-  CustomSecret, VerifyBranch, VerifySecret,
+  CustomSecret, ExtractBranch, VerifySecret,
   resources::{
     RepoWebhookOption, StackWebhookOption, SyncWebhookOption,
     handle_action_webhook, handle_build_webhook,
@@ -42,7 +42,7 @@ fn default_branch() -> String {
   String::from("main")
 }
 
-pub fn router<P: VerifySecret + VerifyBranch>() -> Router {
+pub fn router<P: VerifySecret + ExtractBranch>() -> Router {
   Router::new()
   .route(
     "/build/{id}",

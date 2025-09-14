@@ -27,12 +27,10 @@ pub async fn write_dockerfile(
       .collect::<PathBuf>();
 
     // Ensure parent directory exists
-    if let Some(parent) = full_dockerfile_path.parent() {
-      if !parent.exists() {
-        tokio::fs::create_dir_all(parent)
-          .await
-          .with_context(|| format!("Failed to initialize dockerfile parent directory {parent:?}"))?;
-      }
+    if let Some(parent) = full_dockerfile_path.parent() && !parent.exists() {
+      tokio::fs::create_dir_all(parent)
+        .await
+        .with_context(|| format!("Failed to initialize dockerfile parent directory {parent:?}"))?;
     }
 
     tokio::fs::write(&full_dockerfile_path, dockerfile).await.with_context(|| {
@@ -55,25 +53,31 @@ pub async fn write_dockerfile(
 }
 
 pub fn image_tags(
-  image_name: &str,
+  image_names: &[String],
   custom_tag: &str,
   version: &Version,
   additional: &[String],
-) -> String {
+) -> anyhow::Result<String> {
   let Version { major, minor, .. } = version;
   let custom_tag = if custom_tag.is_empty() {
     String::new()
   } else {
     format!("-{custom_tag}")
   };
-  let additional = additional
-    .iter()
-    .map(|tag| format!(" -t {image_name}:{tag}{custom_tag}"))
-    .collect::<Vec<_>>()
-    .join("");
-  format!(
-    " -t {image_name}:latest{custom_tag} -t {image_name}:{version}{custom_tag} -t {image_name}:{major}.{minor}{custom_tag} -t {image_name}:{major}{custom_tag}{additional}",
-  )
+
+  let mut res = String::new();
+
+  for image_name in image_names {
+    write!(
+      &mut res,
+      " -t {image_name}:latest{custom_tag} -t {image_name}:{version}{custom_tag} -t {image_name}:{major}.{minor}{custom_tag} -t {image_name}:{major}{custom_tag}"
+    )?;
+    for tag in additional {
+      write!(&mut res, " -t {image_name}:{tag}{custom_tag}")?;
+    }
+  }
+
+  Ok(res)
 }
 
 pub fn parse_build_args(build_args: &[EnvironmentVar]) -> String {

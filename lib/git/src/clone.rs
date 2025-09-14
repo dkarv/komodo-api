@@ -39,17 +39,16 @@ where
   };
 
   // Ensure parent folder exists
-  if let Some(parent) = res.path.parent() {
-    if let Err(e) = tokio::fs::create_dir_all(parent)
+  if let Some(parent) = res.path.parent()
+    && let Err(e) = tokio::fs::create_dir_all(parent)
       .await
       .context("Failed to create clone parent directory.")
-    {
-      res.logs.push(Log::error(
-        "Prepare Repo Root",
-        format_serror(&e.into()),
-      ));
-      return Ok(res);
-    }
+  {
+    res.logs.push(Log::error(
+      "Prepare Repo Root",
+      format_serror(&e.into()),
+    ));
+    return Ok(res);
   }
 
   match tokio::fs::remove_dir_all(&res.path).await {

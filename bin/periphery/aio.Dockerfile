@@ -1,6 +1,6 @@
 ## All in one, multi stage compile + runtime Docker build for your architecture.
 
-FROM rust:1.87.0-bullseye AS builder
+FROM rust:1.89.0-bullseye AS builder
 
 WORKDIR /builder
 COPY Cargo.toml Cargo.lock ./
@@ -15,7 +15,7 @@ RUN cargo build -p komodo_periphery --release
 # Final Image
 FROM debian:bullseye-slim
 
-COPY ./bin/periphery/starship.toml /config/starship.toml
+COPY ./bin/periphery/starship.toml /starship.toml
 COPY ./bin/periphery/debian-deps.sh .
 RUN sh ./debian-deps.sh && rm ./debian-deps.sh
 
@@ -23,8 +23,8 @@ COPY --from=builder /builder/target/release/periphery /usr/local/bin/periphery
 
 EXPOSE 8120
 
+CMD [ "periphery" ]
+
 LABEL org.opencontainers.image.source=https://github.com/moghtech/komodo
 LABEL org.opencontainers.image.description="Komodo Periphery"
 LABEL org.opencontainers.image.licenses=GPL-3.0
-
-CMD [ "periphery" ]

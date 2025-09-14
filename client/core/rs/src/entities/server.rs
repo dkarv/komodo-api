@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use derive_builder::Builder;
 use partial_derive2::Partial;
 use serde::{Deserialize, Serialize};
+use strum::Display;
 use typeshare::typeshare;
 
 use crate::{
@@ -25,7 +26,7 @@ pub type Server = Resource<ServerConfig, ()>;
 pub type ServerListItem = ResourceListItem<ServerListItemInfo>;
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerListItemInfo {
   /// The server's state.
   pub state: ServerState,
@@ -33,6 +34,10 @@ pub struct ServerListItemInfo {
   pub region: String,
   /// Address of the server.
   pub address: String,
+  /// External address of the server (reachable by users).
+  /// Used with links.
+  #[serde(default)] // API backward compat
+  pub external_address: String,
   /// The Komodo Periphery version of the server.
   pub version: String,
   /// Whether server is configured to send unreachable alerts.
@@ -43,6 +48,8 @@ pub struct ServerListItemInfo {
   pub send_mem_alerts: bool,
   /// Whether server is configured to send disk alerts.
   pub send_disk_alerts: bool,
+  /// Whether server is configured to send version mismatch alerts.
+  pub send_version_mismatch_alerts: bool,
   /// Whether terminals are disabled for this Server.
   pub terminals_disabled: bool,
   /// Whether container exec is disabled for this Server.
@@ -65,6 +72,12 @@ pub struct ServerConfig {
   #[partial_default(default_address())]
   pub address: String,
 
+  /// The address to use with links for containers on the server.
+  /// If empty, will use the 'address' for links.
+  #[serde(default)]
+  #[builder(default)]
+  pub external_address: String,
+
   /// An optional region label
   #[serde(default)]
   #[builder(default)]
@@ -73,7 +86,7 @@ pub struct ServerConfig {
   /// Whether a server is enabled.
   /// If a server is disabled,
   /// you won't be able to perform any actions on it or see deployment's status.
-  /// default: true
+  /// Default: false
   #[serde(default = "default_enabled")]
   #[builder(default = "default_enabled()")]
   #[partial_default(default_enabled())]
@@ -149,6 +162,12 @@ pub struct ServerConfig {
   #[builder(default = "default_send_alerts()")]
   #[partial_default(default_send_alerts())]
   pub send_disk_alerts: bool,
+
+  /// Whether to send alerts about the servers version mismatch with core
+  #[serde(default = "default_send_alerts")]
+  #[builder(default = "default_send_alerts()")]
+  #[partial_default(default_send_alerts())]
+  pub send_version_mismatch_alerts: bool,
 
   /// The percentage threshhold which triggers WARNING state for CPU.
   #[serde(default = "default_cpu_warning")]
@@ -249,7 +268,8 @@ fn default_disk_critical() -> f64 {
 impl Default for ServerConfig {
   fn default() -> Self {
     Self {
-      address: Default::default(),
+      address: default_address(),
+      external_address: Default::default(),
       enabled: default_enabled(),
       timeout_seconds: default_timeout_seconds(),
       ignore_mounts: Default::default(),
@@ -260,6 +280,7 @@ impl Default for ServerConfig {
       send_cpu_alerts: default_send_alerts(),
       send_mem_alerts: default_send_alerts(),
       send_disk_alerts: default_send_alerts(),
+      send_version_mismatch_alerts: default_send_alerts(),
       region: Default::default(),
       passkey: Default::default(),
       cpu_warning: default_cpu_warning(),
@@ -336,22 +357,26 @@ pub struct ServerActionState {
 
 #[typeshare]
 #[derive(
-  Serialize,
-  Deserialize,
   Debug,
-  PartialEq,
-  Hash,
-  Eq,
   Clone,
   Copy,
+  PartialEq,
+  Eq,
+  Hash,
+  PartialOrd,
+  Ord,
   Default,
+  Display,
+  Serialize,
+  Deserialize,
 )]
+#[strum(serialize_all = "kebab-case")]
 pub enum ServerState {
+  /// Server health check passing.
+  Ok,
   /// Server is unreachable.
   #[default]
   NotOk,
-  /// Server health check passing.
-  Ok,
   /// Server is disabled.
   Disabled,
 }

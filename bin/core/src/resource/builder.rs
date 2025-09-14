@@ -1,4 +1,8 @@
 use anyhow::Context;
+use database::mungos::mongodb::{
+  Collection,
+  bson::{Document, doc, to_document},
+};
 use indexmap::IndexSet;
 use komodo_client::entities::{
   MergePartial, Operation, ResourceTarget, ResourceTargetVariant,
@@ -12,10 +16,6 @@ use komodo_client::entities::{
   server::Server,
   update::Update,
   user::User,
-};
-use mungos::mongodb::{
-  Collection,
-  bson::{Document, doc, to_document},
 };
 
 use crate::state::db_client;
@@ -119,7 +119,8 @@ impl super::KomodoResource for Builder {
   fn update_document(
     original: Resource<Self::Config, Self::Info>,
     config: Self::PartialConfig,
-  ) -> Result<Document, mungos::mongodb::bson::ser::Error> {
+  ) -> Result<Document, database::mungos::mongodb::bson::ser::Error>
+  {
     let config = original.config.merge_partial(config);
     to_document(&config)
   }
@@ -151,7 +152,9 @@ impl super::KomodoResource for Builder {
       .builds
       .update_many(
         doc! { "config.builder_id": &resource.id },
-        mungos::update::Update::Set(doc! { "config.builder_id": "" }),
+        database::mungos::update::Update::Set(
+          doc! { "config.builder_id": "" },
+        ),
       )
       .await
       .context("failed to update_many builds on database")?;
@@ -159,7 +162,9 @@ impl super::KomodoResource for Builder {
       .repos
       .update_many(
         doc! { "config.builder_id": &resource.id },
-        mungos::update::Update::Set(doc! { "config.builder_id": "" }),
+        database::mungos::update::Update::Set(
+          doc! { "config.builder_id": "" },
+        ),
       )
       .await
       .context("failed to update_many repos on database")?;

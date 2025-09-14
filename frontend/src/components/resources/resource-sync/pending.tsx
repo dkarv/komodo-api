@@ -10,8 +10,7 @@ import { cn, sanitizeOnlySpan } from "@lib/utils";
 import { ConfirmButton } from "@components/util";
 import { SquarePlay } from "lucide-react";
 import { usePermissions } from "@lib/hooks";
-import { useFullResourceSync, usePendingView } from ".";
-import { Tabs, TabsList, TabsTrigger } from "@ui/tabs";
+import { useFullResourceSync, useResourceSyncTabsView } from ".";
 import { ResourceDiff } from "komodo_client/dist/types";
 
 export const ResourceSyncPending = ({
@@ -24,31 +23,16 @@ export const ResourceSyncPending = ({
   const syncing = useRead("GetResourceSyncActionState", { sync: id }).data
     ?.syncing;
   const sync = useFullResourceSync(id);
+  const { view } = useResourceSyncTabsView(sync);
   const { canExecute } = usePermissions({ type: "ResourceSync", id });
-  const [_pendingView, setPendingView] = usePendingView();
-  const pendingView = sync?.config?.managed ? _pendingView : "Execute";
   const { mutate, isPending } = useExecute("RunSync");
   const loading = isPending || syncing;
   return (
-    <Section
-      titleOther={titleOther}
-    >
-      <div className="flex items-center gap-4 py-2 flex-wrap">
-        {sync?.config?.managed && (
-          <Tabs value={pendingView} onValueChange={setPendingView as any}>
-            <TabsList className="justify-start w-fit">
-              <TabsTrigger value="Execute" className="w-[110px]">
-                Execute
-              </TabsTrigger>
-              <TabsTrigger value="Commit" className="w-[110px]">
-                Commit
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
-        <div className="text-muted-foreground">{pendingView} Mode:</div>
+    <Section titleOther={titleOther} className="min-h-[500px]">
+      <div className="flex items-center gap-4 pl-1 py-2 flex-wrap">
+        <div className="text-muted-foreground">{view} Mode:</div>
         <div className="flex items-center gap-1 flex-wrap">
-          {pendingView === "Execute" && (
+          {view === "Execute" && (
             <>
               Update resources in the
               <div className="font-bold">UI</div>
@@ -56,7 +40,7 @@ export const ResourceSyncPending = ({
               <div className="font-bold">file changes.</div>
             </>
           )}
-          {pendingView === "Commit" && (
+          {view === "Commit" && (
             <>
               Update resources in the
               <div className="font-bold">file</div>
@@ -89,7 +73,7 @@ export const ResourceSyncPending = ({
       ) : undefined}
 
       {/* Pending Deploy */}
-      {pendingView === "Execute" && sync?.info?.pending_deploy?.to_deploy ? (
+      {view === "Execute" && sync?.info?.pending_deploy?.to_deploy ? (
         <Card>
           <CardHeader
             className={cn(
@@ -118,13 +102,10 @@ export const ResourceSyncPending = ({
               <div className="flex items-center gap-4 font-mono">
                 <div
                   className={text_color_class_by_intention(
-                    diff_type_intention(
-                      update.data.type,
-                      pendingView === "Commit"
-                    )
+                    diff_type_intention(update.data.type, view === "Commit")
                   )}
                 >
-                  {pendingView === "Commit"
+                  {view === "Commit"
                     ? reverse_pending_type(update.data.type)
                     : update.data.type}{" "}
                   {update.target.type}
@@ -139,7 +120,7 @@ export const ResourceSyncPending = ({
                   />
                 )}
               </div>
-              {canExecute && pendingView === "Execute" && (
+              {canExecute && view === "Execute" && (
                 <ConfirmButton
                   title="Execute Change"
                   icon={<SquarePlay className="w-4 h-4" />}
@@ -162,25 +143,25 @@ export const ResourceSyncPending = ({
               {update.data.type === "Create" && (
                 <MonacoEditor
                   value={update.data.data.proposed}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly
                 />
               )}
               {update.data.type === "Update" && (
                 <>
-                  {pendingView === "Execute" && (
+                  {view === "Execute" && (
                     <MonacoDiffEditor
                       original={update.data.data.current}
                       modified={update.data.data.proposed}
-                      language="toml"
+                      language="fancy_toml"
                       readOnly
                     />
                   )}
-                  {pendingView === "Commit" && (
+                  {view === "Commit" && (
                     <MonacoDiffEditor
                       original={update.data.data.proposed}
                       modified={update.data.data.current}
-                      language="toml"
+                      language="fancy_toml"
                       readOnly
                     />
                   )}
@@ -189,7 +170,7 @@ export const ResourceSyncPending = ({
               {update.data.type === "Delete" && (
                 <MonacoEditor
                   value={update.data.data.current}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly
                 />
               )}
@@ -205,38 +186,36 @@ export const ResourceSyncPending = ({
               className={cn(
                 "font-mono pb-2",
                 text_color_class_by_intention(
-                  diff_type_intention(data.type, pendingView === "Commit")
+                  diff_type_intention(data.type, view === "Commit")
                 )
               )}
             >
-              {pendingView === "Commit"
-                ? reverse_pending_type(data.type)
-                : data.type}{" "}
+              {view === "Commit" ? reverse_pending_type(data.type) : data.type}{" "}
               Variable
             </CardHeader>
             <CardContent>
               {data.type === "Create" && (
                 <MonacoEditor
                   value={data.data.proposed}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly
                 />
               )}
               {data.type === "Update" && (
                 <>
-                  {pendingView === "Execute" && (
+                  {view === "Execute" && (
                     <MonacoDiffEditor
                       original={data.data.current}
                       modified={data.data.proposed}
-                      language="toml"
+                      language="fancy_toml"
                       readOnly
                     />
                   )}
-                  {pendingView === "Commit" && (
+                  {view === "Commit" && (
                     <MonacoDiffEditor
                       original={data.data.proposed}
                       modified={data.data.current}
-                      language="toml"
+                      language="fancy_toml"
                       readOnly
                     />
                   )}
@@ -245,7 +224,7 @@ export const ResourceSyncPending = ({
               {data.type === "Delete" && (
                 <MonacoEditor
                   value={data.data.current}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly
                 />
               )}
@@ -261,38 +240,36 @@ export const ResourceSyncPending = ({
               className={cn(
                 "font-mono pb-2",
                 text_color_class_by_intention(
-                  diff_type_intention(data.type, pendingView === "Commit")
+                  diff_type_intention(data.type, view === "Commit")
                 )
               )}
             >
-              {pendingView === "Commit"
-                ? reverse_pending_type(data.type)
-                : data.type}{" "}
+              {view === "Commit" ? reverse_pending_type(data.type) : data.type}{" "}
               User Group
             </CardHeader>
             <CardContent>
               {data.type === "Create" && (
                 <MonacoEditor
                   value={data.data.proposed}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly
                 />
               )}
               {data.type === "Update" && (
                 <>
-                  {pendingView === "Execute" && (
+                  {view === "Execute" && (
                     <MonacoDiffEditor
                       original={data.data.current}
                       modified={data.data.proposed}
-                      language="toml"
+                      language="fancy_toml"
                       readOnly
                     />
                   )}
-                  {pendingView === "Commit" && (
+                  {view === "Commit" && (
                     <MonacoDiffEditor
                       original={data.data.proposed}
                       modified={data.data.current}
-                      language="toml"
+                      language="fancy_toml"
                       readOnly
                     />
                   )}
@@ -301,7 +278,7 @@ export const ResourceSyncPending = ({
               {data.type === "Delete" && (
                 <MonacoEditor
                   value={data.data.current}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly
                 />
               )}

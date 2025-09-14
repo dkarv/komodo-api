@@ -1,0 +1,4 @@
+[install-cli]
+alias = "ic"
+description = "installs the komodo-cli, available on the command line as 'km'"
+cmd = "cargo install --path ."

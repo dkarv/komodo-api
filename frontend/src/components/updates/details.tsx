@@ -9,6 +9,7 @@ import {
 import {
   Calendar,
   Clock,
+  Link2,
   Loader2,
   Milestone,
   Settings,
@@ -33,7 +34,7 @@ import {
   version_is_none,
 } from "@lib/utils";
 import { UsableResource } from "@types";
-import { UserAvatar } from "@components/util";
+import { CopyButton, UserAvatar } from "@components/util";
 import { ResourceNameSimple } from "@components/resources/common";
 import { useWebsocketMessages } from "@lib/socket";
 import { MonacoDiffEditor } from "@components/monaco";
@@ -97,9 +98,9 @@ export const UpdateDetailsInner = ({
   setOpen,
 }: {
   id: string;
-  children?: ReactNode;
   open: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  children?: ReactNode;
 }) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -114,13 +115,13 @@ export const UpdateDetailsInner = ({
   );
 };
 
-const UpdateDetailsContent = ({
+export const UpdateDetailsContent = ({
   id,
   open,
   setOpen,
 }: {
   id: string;
-  open: boolean;
+  open?: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
   const { data: update, refetch } = useRead(
@@ -166,7 +167,7 @@ const UpdateDetailsContent = ({
               >
                 <div
                   className="flex items-center gap-2"
-                  onClick={() => setOpen(false)}
+                  onClick={() => setOpen?.(false)}
                 >
                   <Components.Icon id={update.target.id} />
                   <ResourceNameSimple
@@ -189,7 +190,7 @@ const UpdateDetailsContent = ({
               </div>
             )}
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               {new Date(update.start_ts).toLocaleString()}
@@ -200,6 +201,12 @@ const UpdateDetailsContent = ({
                 ? fmt_duration(update.start_ts, update.end_ts)
                 : "ongoing"}
             </div>
+            <CopyButton
+              content={`${location.origin}/updates/${update._id?.$oid}`}
+              className="flex gap-3 items-center"
+              icon={<Link2 className="w-4" />}
+              label={"shareable link"}
+            />
           </div>
         </SheetDescription>
       </SheetHeader>
@@ -213,7 +220,7 @@ const UpdateDetailsContent = ({
               <MonacoDiffEditor
                 original={update.prev_toml}
                 modified={update.current_toml}
-                language="toml"
+                language="fancy_toml"
                 readOnly
               />
             </CardContent>

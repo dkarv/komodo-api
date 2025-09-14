@@ -1,4 +1,9 @@
 use anyhow::Context;
+use database::mungos::{
+  by_id::find_one_by_id,
+  find::find_collect,
+  mongodb::{bson::doc, options::FindOptions},
+};
 use komodo_client::{
   api::read::{
     GetAlert, GetAlertResponse, ListAlerts, ListAlertsResponse,
@@ -7,11 +12,6 @@ use komodo_client::{
     deployment::Deployment, server::Server, stack::Stack,
     sync::ResourceSync,
   },
-};
-use mungos::{
-  by_id::find_one_by_id,
-  find::find_collect,
-  mongodb::{bson::doc, options::FindOptions},
 };
 use resolver_api::Resolve;
 

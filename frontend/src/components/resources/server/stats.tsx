@@ -1,8 +1,8 @@
 import { Section } from "@components/layouts";
 import { Card, CardContent, CardHeader, CardTitle } from "@ui/card";
 import { Progress } from "@ui/progress";
-import { Cpu, Database, Loader2, MemoryStick } from "lucide-react";
-import { usePermissions, useRead } from "@lib/hooks";
+import { Cpu, Database, Loader2, MemoryStick, Search } from "lucide-react";
+import { useLocalStorage, usePermissions, useRead } from "@lib/hooks";
 import { Types } from "komodo_client";
 import { DataTable, SortableHeader } from "@ui/data-table";
 import { ReactNode, useMemo, useState } from "react";
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@ui/select";
 import { DockerResourceLink, ShowHideButton } from "@components/util";
+import { filterBySplit } from "@lib/utils";
 
 export const ServerStats = ({
   id,
@@ -40,7 +41,21 @@ export const ServerStats = ({
   const containers = useRead("ListDockerContainers", {
     server: id,
   }).data?.filter((c) => c.stats);
+  const [showContainers, setShowContainers] = useLocalStorage(
+    "stats-show-container-table-v1",
+    true
+  );
+  const [containerSearch, setContainerSearch] = useState("");
+  const filteredContainers = filterBySplit(
+    containers,
+    containerSearch,
+    (container) => container.name
+  );
 
+  const [showDisks, setShowDisks] = useLocalStorage(
+    "stats-show-disks-table-v1",
+    true
+  );
   const disk_used = stats?.disks.reduce(
     (acc, curr) => (acc += curr.used_gb),
     0
@@ -53,7 +68,7 @@ export const ServerStats = ({
   return (
     <Section titleOther={titleOther}>
       <div className="flex flex-col gap-8">
-        {/* Stats */}
+        {/* System Info */}
         <Section title="System Info">
           <DataTable
             tableKey="system-info"
@@ -96,8 +111,10 @@ export const ServerStats = ({
           />
         </Section>
 
+        {/* Current Overview */}
         <Section title="Current">
           <div className="flex flex-col xl:flex-row gap-4">
+            <LOAD_AVERAGE id={id} stats={stats} />
             <CPU stats={stats} />
             <RAM stats={stats} />
             <DISK stats={stats} />
@@ -105,72 +122,175 @@ export const ServerStats = ({
           </div>
         </Section>
 
-        <Section title="Containers">
-          <DataTable
-            tableKey="container-stats"
-            data={containers ?? []}
-            columns={[
-              {
-                accessorKey: "name",
-                size: 200,
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="Name" />
-                ),
-                cell: ({ row }) => (
-                  <DockerResourceLink
-                    type="container"
-                    server_id={id}
-                    name={row.original.name}
-                  />
-                ),
-              },
-              {
-                accessorKey: "stats.cpu_perc",
-                size: 100,
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="CPU" />
-                ),
-              },
-              {
-                accessorKey: "stats.mem_perc",
-                size: 200,
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="Memory" />
-                ),
-                cell: ({ row }) => (
-                  <div className="flex items-center gap-2">
-                    {row.original.stats?.mem_perc}
-                    <div className="text-muted-foreground text-sm">
-                      ({row.original.stats?.mem_usage})
+        {/* Container Breakdown */}
+        <Section
+          title="Containers"
+          actions={
+            <div className="flex gap-4 items-center">
+              <div className="relative">
+                <Search className="w-4 absolute top-[50%] left-3 -translate-y-[50%] text-muted-foreground" />
+                <Input
+                  value={containerSearch}
+                  onChange={(e) => setContainerSearch(e.target.value)}
+                  placeholder="search..."
+                  className="pl-8 w-[200px] lg:w-[300px]"
+                />
+              </div>
+              <ShowHideButton
+                show={showContainers}
+                setShow={setShowContainers}
+              />
+            </div>
+          }
+        >
+          {showContainers && (
+            <DataTable
+              tableKey="container-stats"
+              data={filteredContainers}
+              columns={[
+                {
+                  accessorKey: "name",
+                  size: 200,
+                  header: ({ column }) => (
+                    <SortableHeader column={column} title="Name" />
+                  ),
+                  cell: ({ row }) => (
+                    <DockerResourceLink
+                      type="container"
+                      server_id={id}
+                      name={row.original.name}
+                    />
+                  ),
+                },
+                {
+                  accessorKey: "stats.cpu_perc",
+                  size: 100,
+                  header: ({ column }) => (
+                    <SortableHeader column={column} title="CPU" />
+                  ),
+                },
+                {
+                  accessorKey: "stats.mem_perc",
+                  size: 200,
+                  header: ({ column }) => (
+                    <SortableHeader column={column} title="Memory" />
+                  ),
+                  cell: ({ row }) => (
+                    <div className="flex items-center gap-2">
+                      {row.original.stats?.mem_perc}
+                      <div className="text-muted-foreground text-sm">
+                        ({row.original.stats?.mem_usage})
+                      </div>
                     </div>
-                  </div>
-                ),
-              },
-              {
-                accessorKey: "stats.net_io",
-                size: 150,
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="Net I/O" />
-                ),
-              },
-              {
-                accessorKey: "stats.block_io",
-                size: 150,
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="Block I/O" />
-                ),
-              },
-              {
-                accessorKey: "stats.pids",
-                size: 100,
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="PIDs" />
-                ),
-              },
-            ]}
-          />
+                  ),
+                },
+                {
+                  accessorKey: "stats.net_io",
+                  size: 150,
+                  header: ({ column }) => (
+                    <SortableHeader column={column} title="Net I/O" />
+                  ),
+                },
+                {
+                  accessorKey: "stats.block_io",
+                  size: 150,
+                  header: ({ column }) => (
+                    <SortableHeader column={column} title="Block I/O" />
+                  ),
+                },
+                {
+                  accessorKey: "stats.pids",
+                  size: 100,
+                  header: ({ column }) => (
+                    <SortableHeader column={column} title="PIDs" />
+                  ),
+                },
+              ]}
+            />
+          )}
         </Section>
 
+        {/* Current Disk Breakdown */}
+        <Section
+          title="Disks"
+          actions={
+            <div className="flex gap-4 items-center">
+              <div className="flex gap-2 items-center">
+                <div className="text-muted-foreground">Used:</div>
+                {disk_used?.toFixed(2)} GB
+              </div>
+              <div className="flex gap-2 items-center">
+                <div className="text-muted-foreground">Total:</div>
+                {disk_total?.toFixed(2)} GB
+              </div>
+              <ShowHideButton show={showDisks} setShow={setShowDisks} />
+            </div>
+          }
+        >
+          {showDisks && (
+            <DataTable
+              sortDescFirst
+              tableKey="server-disks"
+              data={
+                stats?.disks.map((disk) => ({
+                  ...disk,
+                  percentage: 100 * (disk.used_gb / disk.total_gb),
+                })) ?? []
+              }
+              columns={[
+                {
+                  header: "Path",
+                  cell: ({ row }) => (
+                    <div className="overflow-hidden overflow-ellipsis">
+                      {row.original.mount}
+                    </div>
+                  ),
+                },
+                {
+                  accessorKey: "used_gb",
+                  header: ({ column }) => (
+                    <SortableHeader
+                      column={column}
+                      title="Used"
+                      sortDescFirst
+                    />
+                  ),
+                  cell: ({ row }) => <>{row.original.used_gb.toFixed(2)} GB</>,
+                },
+                {
+                  accessorKey: "total_gb",
+                  header: ({ column }) => (
+                    <SortableHeader
+                      column={column}
+                      title="Total"
+                      sortDescFirst
+                    />
+                  ),
+                  cell: ({ row }) => <>{row.original.total_gb.toFixed(2)} GB</>,
+                },
+                {
+                  accessorKey: "percentage",
+                  header: ({ column }) => (
+                    <SortableHeader
+                      column={column}
+                      title="Percentage"
+                      sortDescFirst
+                    />
+                  ),
+                  cell: ({ row }) => (
+                    <>{row.original.percentage.toFixed(2)}% Full</>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </Section>
+
+        {specific.includes(Types.SpecificPermission.Processes) && (
+          <Processes id={id} />
+        )}
+
+        {/* Historical Charts */}
         <Section
           title="Historical"
           actions={
@@ -210,6 +330,11 @@ export const ServerStats = ({
           }
         >
           <div className="flex flex-col gap-8">
+            <StatChart
+              server_id={id}
+              type="Load Average"
+              className="w-full h-[250px]"
+            />
             <StatChart server_id={id} type="Cpu" className="w-full h-[250px]" />
             <StatChart
               server_id={id}
@@ -233,74 +358,6 @@ export const ServerStats = ({
             />
           </div>
         </Section>
-
-        <Section
-          title="Disks"
-          actions={
-            <div className="flex gap-4 items-center">
-              <div className="flex gap-2 items-center">
-                <div className="text-muted-foreground">Used:</div>
-                {disk_used?.toFixed(2)} GB
-              </div>
-              <div className="flex gap-2 items-center">
-                <div className="text-muted-foreground">Total:</div>
-                {disk_total?.toFixed(2)} GB
-              </div>
-            </div>
-          }
-        >
-          <DataTable
-            sortDescFirst
-            tableKey="server-disks"
-            data={
-              stats?.disks.map((disk) => ({
-                ...disk,
-                percentage: 100 * (disk.used_gb / disk.total_gb),
-              })) ?? []
-            }
-            columns={[
-              {
-                header: "Path",
-                cell: ({ row }) => (
-                  <div className="overflow-hidden overflow-ellipsis">
-                    {row.original.mount}
-                  </div>
-                ),
-              },
-              {
-                accessorKey: "used_gb",
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="Used" sortDescFirst />
-                ),
-                cell: ({ row }) => <>{row.original.used_gb.toFixed(2)} GB</>,
-              },
-              {
-                accessorKey: "total_gb",
-                header: ({ column }) => (
-                  <SortableHeader column={column} title="Total" sortDescFirst />
-                ),
-                cell: ({ row }) => <>{row.original.total_gb.toFixed(2)} GB</>,
-              },
-              {
-                accessorKey: "percentage",
-                header: ({ column }) => (
-                  <SortableHeader
-                    column={column}
-                    title="Percentage"
-                    sortDescFirst
-                  />
-                ),
-                cell: ({ row }) => (
-                  <>{row.original.percentage.toFixed(2)}% Full</>
-                ),
-              },
-            ]}
-          />
-        </Section>
-
-        {specific.includes(Types.SpecificPermission.Processes) && (
-          <Processes id={id} />
-        )}
       </div>
     </Section>
   );
@@ -313,14 +370,19 @@ const Processes = ({ id }: { id: string }) => {
   return (
     <Section
       title="Processes"
-      titleRight={<ShowHideButton show={show} setShow={setShow} />}
       actions={
-        <Input
-          placeholder="Search Processes"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-[300px]"
-        />
+        <div className="flex gap-4 items-center">
+          <div className="relative">
+            <Search className="w-4 absolute top-[50%] left-3 -translate-y-[50%] text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="search..."
+              className="pl-8 w-[200px] lg:w-[300px]"
+            />
+          </div>
+          <ShowHideButton show={show} setShow={setShow} />
+        </div>
       }
     >
       {show && <ProcessesInner id={id} searchSplit={searchSplit} />}
@@ -430,6 +492,82 @@ const CPU = ({ stats }: { stats: Types.SystemStats | undefined }) => {
       icon={<Cpu className="w-5 h-5" />}
       percentage={stats?.cpu_perc}
     />
+  );
+};
+
+const LOAD_AVERAGE = ({
+  id,
+  stats,
+}: {
+  id: string;
+  stats: Types.SystemStats | undefined;
+}) => {
+  if (!stats?.load_average) return null;
+  const { one = 0, five = 0, fifteen = 0 } = stats.load_average || {};
+  const cores = useRead("GetSystemInformation", { server: id }).data
+    ?.core_count;
+
+  const pct = (load: number) =>
+    cores && cores > 0 ? Math.min((load / cores) * 100, 100) : undefined;
+  const textColor = (load: number) => {
+    const p = pct(load);
+    if (p === undefined) return "text-muted-foreground";
+    return p <= 50
+      ? "text-green-600"
+      : p <= 80
+        ? "text-yellow-600"
+        : "text-red-600";
+  };
+
+  return (
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle>Load Average</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Current Load */}
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <span
+              className={`text-3xl font-bold tabular-nums ${textColor(one)}`}
+            >
+              {one.toFixed(2)}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {cores && cores > 0
+                ? `${(pct(one) ?? 0).toFixed(0)}% of ${cores} cores`
+                : "N/A"}
+            </span>
+          </div>
+          <Progress value={pct(one) ?? 0} className="h-2" />
+        </div>
+
+        {/* Time Intervals */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            {[
+              ["1m", one],
+              ["5m", five],
+              ["15m", fifteen],
+            ].map(([label, value]) => (
+              <div className="space-y-1" key={label as string}>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span
+                    className={`font-medium tabular-nums ${textColor(value as number)}`}
+                  >
+                    {(value as number).toFixed(2)}
+                  </span>
+                </div>
+                <Progress value={pct(value as number) ?? 0} className="h-1" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

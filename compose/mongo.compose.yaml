@@ -38,14 +38,14 @@ services:
       KOMODO_DATABASE_USERNAME: ${KOMODO_DB_USERNAME}
       KOMODO_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD}
     volumes:
-      ## Core cache for repos for latest commit hash / contents
-      - repo-cache:/repo-cache
+      ## Store dated backups of the database - https://komo.do/docs/setup/backup
+      - ${COMPOSE_KOMODO_BACKUPS_PATH}:/backups
       ## Store sync files on server
       # - /path/to/syncs:/syncs
       ## Optionally mount a custom core.config.toml
       # - /path/to/core.config.toml:/config/config.toml
     ## Allows for systemd Periphery connection at 
-    ## "http://host.docker.internal:8120"
+    ## "https://host.docker.internal:8120"
     # extra_hosts:
     #   - host.docker.internal:host-gateway
 
@@ -73,5 +73,3 @@ volumes:
   # Mongo
   mongo-data:
   mongo-config:
-  # Core
-  repo-cache:

@@ -290,6 +290,7 @@ fn core_info() -> &'static GetCoreInfoResponse {
       disable_confirm_dialog: config.disable_confirm_dialog,
       disable_non_admin_create: config.disable_non_admin_create,
       disable_websocket_reconnect: config.disable_websocket_reconnect,
+      enable_fancy_toml: config.enable_fancy_toml,
       github_webhook_owners: config
         .github_webhook_app
         .installations

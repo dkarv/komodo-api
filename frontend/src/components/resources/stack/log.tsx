@@ -57,22 +57,24 @@ const StackLogsInner = ({
   const selected = services.filter((s) => s.selected);
   return (
     <LogSection
-      regular_logs={(timestamps, stream, tail) =>
+      regular_logs={(timestamps, stream, tail, poll) =>
         NoSearchLogs(
           id,
           services.filter((s) => s.selected).map((s) => s.service),
           tail,
           timestamps,
-          stream
+          stream,
+          poll
         )
       }
-      search_logs={(timestamps, terms, invert) =>
+      search_logs={(timestamps, terms, invert, poll) =>
         SearchLogs(
           id,
           services.filter((s) => s.selected).map((s) => s.service),
           terms,
           invert,
-          timestamps
+          timestamps,
+          poll
         )
       }
       titleOther={titleOther}
@@ -120,14 +122,19 @@ const NoSearchLogs = (
   services: string[],
   tail: number,
   timestamps: boolean,
-  stream: string
+  stream: string,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("GetStackLog", {
-    stack: id,
-    services,
-    tail,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "GetStackLog",
+    {
+      stack: id,
+      services,
+      tail,
+      timestamps,
+    },
+    { refetchInterval: poll ? 3000 : false }
+  );
   return {
     Log: (
       <div className="relative">
@@ -144,16 +151,21 @@ const SearchLogs = (
   services: string[],
   terms: string[],
   invert: boolean,
-  timestamps: boolean
+  timestamps: boolean,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("SearchStackLog", {
-    stack: id,
-    services,
-    terms,
-    combinator: Types.SearchCombinator.And,
-    invert,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "SearchStackLog",
+    {
+      stack: id,
+      services,
+      terms,
+      combinator: Types.SearchCombinator.And,
+      invert,
+      timestamps,
+    },
+    { refetchInterval: poll ? 10000 : false }
+  );
   return {
     Log: (
       <div className="h-full relative">

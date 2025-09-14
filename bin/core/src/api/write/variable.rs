@@ -1,9 +1,9 @@
 use anyhow::{Context, anyhow};
+use database::mungos::mongodb::bson::doc;
 use komodo_client::{
   api::write::*,
   entities::{Operation, ResourceTarget, variable::Variable},
 };
-use mungos::mongodb::bson::doc;
 use resolver_api::Resolve;
 
 use crate::{

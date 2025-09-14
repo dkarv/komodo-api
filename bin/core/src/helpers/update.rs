@@ -1,4 +1,8 @@
 use anyhow::Context;
+use database::mungos::{
+  by_id::{find_one_by_id, update_one_by_id},
+  mongodb::bson::to_document,
+};
 use komodo_client::entities::{
   Operation, ResourceTarget,
   action::Action,
@@ -13,10 +17,6 @@ use komodo_client::entities::{
   sync::ResourceSync,
   update::{Update, UpdateListItem},
   user::User,
-};
-use mungos::{
-  by_id::{find_one_by_id, update_one_by_id},
-  mongodb::bson::to_document,
 };
 
 use crate::{
@@ -77,7 +77,7 @@ pub async fn add_update_without_send(
 
 #[instrument(level = "debug")]
 pub async fn update_update(update: Update) -> anyhow::Result<()> {
-  update_one_by_id(&db_client().updates, &update.id, mungos::update::Update::Set(to_document(&update)?), None)
+  update_one_by_id(&db_client().updates, &update.id, database::mungos::update::Update::Set(to_document(&update)?), None)
     .await
     .context("failed to update the update on db. the update build process was deleted")?;
   let update = update_list_item(update).await?;
@@ -492,6 +492,13 @@ pub async fn init_execution_update(
       return Ok(Default::default());
     }
 
+    ExecuteRequest::RunStackService(data) => (
+      Operation::RunStackService,
+      ResourceTarget::Stack(
+        resource::get::<Stack>(&data.stack).await?.id,
+      ),
+    ),
+
     // Alerter
     ExecuteRequest::TestAlerter(data) => (
       Operation::TestAlerter,
@@ -499,6 +506,20 @@ pub async fn init_execution_update(
         resource::get::<Alerter>(&data.alerter).await?.id,
       ),
     ),
+    ExecuteRequest::SendAlert(_) => {
+      (Operation::SendAlert, ResourceTarget::system())
+    }
+
+    // Maintenance
+    ExecuteRequest::ClearRepoCache(_data) => {
+      (Operation::ClearRepoCache, ResourceTarget::system())
+    }
+    ExecuteRequest::BackupCoreDatabase(_data) => {
+      (Operation::BackupCoreDatabase, ResourceTarget::system())
+    }
+    ExecuteRequest::GlobalAutoUpdate(_data) => {
+      (Operation::GlobalAutoUpdate, ResourceTarget::system())
+    }
   };
 
   let mut update = make_update(target, operation, user);

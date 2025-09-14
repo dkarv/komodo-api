@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, anyhow};
+use database::mungos::{
+  by_id::find_one_by_id,
+  find::find_collect,
+  mongodb::{bson::doc, options::FindOptions},
+};
 use komodo_client::{
   api::read::{GetUpdate, ListUpdates, ListUpdatesResponse},
   entities::{
@@ -19,11 +24,6 @@ use komodo_client::{
     update::{Update, UpdateListItem},
     user::User,
   },
-};
-use mungos::{
-  by_id::find_one_by_id,
-  find::find_collect,
-  mongodb::{bson::doc, options::FindOptions},
 };
 use resolver_api::Resolve;
 

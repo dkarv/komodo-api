@@ -25,11 +25,11 @@ export const ContainerLogs = ({
   return (
     <LogSection
       titleOther={titleOther}
-      regular_logs={(timestamps, stream, tail) =>
-        NoSearchLogs(id, container_name, tail, timestamps, stream)
+      regular_logs={(timestamps, stream, tail, poll) =>
+        NoSearchLogs(id, container_name, tail, timestamps, stream, poll)
       }
-      search_logs={(timestamps, terms, invert) =>
-        SearchLogs(id, container_name, terms, invert, timestamps)
+      search_logs={(timestamps, terms, invert, poll) =>
+        SearchLogs(id, container_name, terms, invert, timestamps, poll)
       }
     />
   );
@@ -40,14 +40,19 @@ const NoSearchLogs = (
   container: string,
   tail: number,
   timestamps: boolean,
-  stream: string
+  stream: string,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("GetContainerLog", {
-    server: id,
-    container,
-    tail: Number(tail),
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "GetContainerLog",
+    {
+      server: id,
+      container,
+      tail: Number(tail),
+      timestamps,
+    },
+    { refetchInterval: poll ? 3000 : false }
+  );
   return {
     Log: (
       <div className="relative">
@@ -64,16 +69,21 @@ const SearchLogs = (
   container: string,
   terms: string[],
   invert: boolean,
-  timestamps: boolean
+  timestamps: boolean,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("SearchContainerLog", {
-    server: id,
-    container,
-    terms,
-    combinator: Types.SearchCombinator.And,
-    invert,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "SearchContainerLog",
+    {
+      server: id,
+      container,
+      terms,
+      combinator: Types.SearchCombinator.And,
+      invert,
+      timestamps,
+    },
+    { refetchInterval: poll ? 10000 : false }
+  );
   return {
     Log: (
       <div className="h-full relative">

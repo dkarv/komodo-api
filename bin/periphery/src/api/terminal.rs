@@ -193,14 +193,11 @@ async fn handle_terminal_websocket(
             // println!("Got ws read bytes - for resize");
             if let Ok(dimensions) =
               serde_json::from_slice::<ResizeDimensions>(&bytes[1..])
+                && let Err(e) = terminal.stdin.send(StdinMsg::Resize(dimensions)).await
             {
-              if let Err(e) =
-                terminal.stdin.send(StdinMsg::Resize(dimensions)).await
-              {
-                debug!("WS -> PTY channel send error: {e:}");
-                terminal.cancel();
-                break;
-              };
+              debug!("WS -> PTY channel send error: {e:}");
+              terminal.cancel();
+              break;
             }
           }
           Some(Ok(Message::Text(text))) => {
@@ -350,7 +347,7 @@ async fn execute_command_on_terminal(
   );
 
   let full_command = format!(
-    "printf '\n{START_OF_OUTPUT}\n\n'; {command}; rc=$? printf '\n{KOMODO_EXIT_CODE}%d\n{END_OF_OUTPUT}\n' \"$rc\"\n"
+    "printf '\n{START_OF_OUTPUT}\n\n'; {command}; rc=$?; printf '\n{KOMODO_EXIT_CODE}%d\n{END_OF_OUTPUT}\n' \"$rc\"\n"
   );
 
   terminal

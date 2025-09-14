@@ -1,4 +1,8 @@
 use anyhow::{Context, anyhow};
+use database::mongo_indexed::doc;
+use database::mungos::{
+  by_id::update_one_by_id, mongodb::bson::to_document,
+};
 use formatting::format_serror;
 use komodo_client::{
   api::write::*,
@@ -13,8 +17,6 @@ use komodo_client::{
     update::{Log, Update},
   },
 };
-use mongo_indexed::doc;
-use mungos::{by_id::update_one_by_id, mongodb::bson::to_document};
 use octorust::types::{
   ReposCreateWebhookRequest, ReposCreateWebhookRequestConfig,
 };
@@ -117,7 +119,7 @@ impl Resolve<WriteArgs> for RenameRepo {
     update_one_by_id(
       &db_client().repos,
       &repo.id,
-      mungos::update::Update::Set(
+      database::mungos::update::Update::Set(
         doc! { "name": &name, "updated_at": komodo_timestamp() },
       ),
       None,

@@ -4,13 +4,15 @@ use anyhow::{Context, anyhow};
 use axum::{
   Extension, Json, Router, extract::Path, middleware, routing::post,
 };
+use database::mongo_indexed::doc;
+use database::mungos::{
+  by_id::update_one_by_id, mongodb::bson::to_bson,
+};
 use derive_variants::EnumVariants;
 use komodo_client::{
   api::user::*,
   entities::{api_key::ApiKey, komodo_timestamp, user::User},
 };
-use mongo_indexed::doc;
-use mungos::{by_id::update_one_by_id, mongodb::bson::to_bson};
 use resolver_api::Resolve;
 use response::Response;
 use serde::{Deserialize, Serialize};
@@ -116,7 +118,7 @@ impl Resolve<UserArgs> for PushRecentlyViewed {
     update_one_by_id(
       &db_client().users,
       &user.id,
-      mungos::update::Update::Set(update),
+      database::mungos::update::Update::Set(update),
       None,
     )
     .await
@@ -141,7 +143,7 @@ impl Resolve<UserArgs> for SetLastSeenUpdate {
     update_one_by_id(
       &db_client().users,
       &user.id,
-      mungos::update::Update::Set(doc! {
+      database::mungos::update::Update::Set(doc! {
         "last_update_view": komodo_timestamp()
       }),
       None,

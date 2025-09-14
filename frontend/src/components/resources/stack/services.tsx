@@ -114,10 +114,10 @@ export const StackServices = ({
                 <SortableHeader column={column} title="Networks" />
               ),
               cell: ({ row }) =>
-                (row.original.container?.networks.length ?? 0) > 0 ? (
+                (row.original.container?.networks?.length ?? 0) > 0 ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     {server_id &&
-                      row.original.container?.networks.map((network, i) => (
+                      row.original.container?.networks?.map((network, i) => (
                         <Fragment key={network}>
                           <DockerResourceLink
                             type="network"
@@ -125,7 +125,7 @@ export const StackServices = ({
                             name={network}
                           />
                           {i !==
-                            row.original.container!.networks.length - 1 && (
+                            row.original.container!.networks!.length - 1 && (
                             <div className="text-muted-foreground">|</div>
                           )}
                         </Fragment>

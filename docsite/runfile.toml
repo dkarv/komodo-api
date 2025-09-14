@@ -1,0 +1,8 @@
+[dev-docsite]
+alias = "dd"
+description = "starts the documentation site (https://komo.do) in dev mode"
+cmd = "yarn && yarn start"
+
+[publish-docsite]
+description = "publishes the documentation site (https://komo.do) to github pages"
+cmd = "yarn && yarn deploy"

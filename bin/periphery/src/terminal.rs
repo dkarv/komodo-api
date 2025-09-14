@@ -36,16 +36,16 @@ pub async fn create_terminal(
   );
   let mut terminals = terminals().write().await;
   use TerminalRecreateMode::*;
-  if matches!(recreate, Never | DifferentCommand) {
-    if let Some(terminal) = terminals.get(&name) {
-      if terminal.command == command {
-        return Ok(());
-      } else if matches!(recreate, Never) {
-        return Err(anyhow!(
-          "Terminal {name} already exists, but has command {} instead of {command}",
-          terminal.command
-        ));
-      }
+  if matches!(recreate, Never | DifferentCommand)
+    && let Some(terminal) = terminals.get(&name)
+  {
+    if terminal.command == command {
+      return Ok(());
+    } else if matches!(recreate, Never) {
+      return Err(anyhow!(
+        "Terminal {name} already exists, but has command {} instead of {command}",
+        terminal.command
+      ));
     }
   }
   if let Some(prev) = terminals.insert(

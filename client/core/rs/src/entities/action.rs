@@ -10,7 +10,7 @@ use crate::{
   deserializers::{
     file_contents_deserializer, option_file_contents_deserializer,
   },
-  entities::{I64, NoData},
+  entities::{FileFormat, I64, NoData},
 };
 
 use super::{
@@ -38,7 +38,17 @@ pub struct ActionListItemInfo {
 
 #[typeshare]
 #[derive(
-  Debug, Clone, Copy, Default, Serialize, Deserialize, Display,
+  Debug,
+  Clone,
+  Copy,
+  Default,
+  PartialEq,
+  Eq,
+  PartialOrd,
+  Ord,
+  Display,
+  Serialize,
+  Deserialize,
 )]
 pub enum ActionState {
   /// Unknown case
@@ -63,6 +73,12 @@ pub type _PartialActionConfig = PartialActionConfig;
 #[partial_derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[partial(skip_serializing_none, from, diff)]
 pub struct ActionConfig {
+  /// Whether this action should run at startup.
+  #[serde(default = "default_run_at_startup")]
+  #[builder(default = "default_run_at_startup()")]
+  #[partial_default(default_run_at_startup())]
+  pub run_at_startup: bool,
+
   /// Choose whether to specify schedule as regular CRON, or using the english to CRON parser.
   #[serde(default)]
   #[builder(default)]
@@ -75,13 +91,13 @@ pub struct ActionConfig {
   /// 1. Regular CRON expression:
   ///
   /// (second, minute, hour, day, month, day-of-week)
-  /// ```
+  /// ```text
   /// 0 0 0 1,15 * ?
   /// ```
   ///
   /// 2. "English" expression via [english-to-cron](https://crates.io/crates/english-to-cron):
   ///
-  /// ```
+  /// ```text
   /// at midnight on the 1st and 15th of the month
   /// ```
   #[serde(default)]
@@ -140,6 +156,21 @@ pub struct ActionConfig {
   ))]
   #[builder(default)]
   pub file_contents: String,
+
+  /// Specify the format in which the arguments are defined.
+  /// Default: `key_value` (like environment)
+  #[serde(default)]
+  #[builder(default)]
+  pub arguments_format: FileFormat,
+
+  /// Default arguments to give to the Action for use in the script at `ARGS`.
+  #[serde(default, deserialize_with = "file_contents_deserializer")]
+  #[partial_attr(serde(
+    default,
+    deserialize_with = "option_file_contents_deserializer"
+  ))]
+  #[builder(default)]
+  pub arguments: String,
 }
 
 fn default_schedule_enabled() -> bool {
@@ -152,6 +183,10 @@ fn default_schedule_alert() -> bool {
 
 fn default_failure_alert() -> bool {
   true
+}
+
+fn default_run_at_startup() -> bool {
+  false
 }
 
 fn default_webhook_enabled() -> bool {
@@ -171,12 +206,15 @@ impl Default for ActionConfig {
       schedule: Default::default(),
       schedule_enabled: default_schedule_enabled(),
       schedule_timezone: Default::default(),
+      run_at_startup: default_run_at_startup(),
       schedule_alert: default_schedule_alert(),
       failure_alert: default_failure_alert(),
       webhook_enabled: default_webhook_enabled(),
       webhook_secret: Default::default(),
       reload_deno_deps: Default::default(),
+      arguments_format: Default::default(),
       file_contents: Default::default(),
+      arguments: Default::default(),
     }
   }
 }

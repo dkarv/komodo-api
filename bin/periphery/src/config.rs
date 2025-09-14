@@ -1,12 +1,13 @@
-use std::sync::OnceLock;
+use std::{path::PathBuf, sync::OnceLock};
 
 use clap::Parser;
+use colored::Colorize;
+use config::ConfigLoader;
 use environment_file::maybe_read_list_from_file;
 use komodo_client::entities::{
   config::periphery::{CliArgs, Env, PeripheryConfig},
   logger::{LogConfig, LogLevel},
 };
-use merge_config_files::parse_config_paths;
 
 pub fn periphery_config() -> &'static PeripheryConfig {
   static PERIPHERY_CONFIG: OnceLock<PeripheryConfig> =
@@ -17,19 +18,41 @@ pub fn periphery_config() -> &'static PeripheryConfig {
     let args = CliArgs::parse();
     let config_paths =
       args.config_path.unwrap_or(env.periphery_config_paths);
+
     let config = if config_paths.is_empty() {
+      println!(
+        "{}: No config paths found, using default config",
+        "INFO".green(),
+      );
       PeripheryConfig::default()
     } else {
-      parse_config_paths::<PeripheryConfig>(
-        config_paths,
-        args.config_keyword.unwrap_or(env.periphery_config_keywords),
-        args
+      (ConfigLoader {
+        paths: &config_paths
+          .iter()
+          .map(PathBuf::as_path)
+          .collect::<Vec<_>>(),
+        match_wildcards: &args
+          .config_keyword
+          .unwrap_or(env.periphery_config_keywords)
+          .iter()
+          .map(String::as_str)
+          .collect::<Vec<_>>(),
+        include_file_name: ".peripheryinclude",
+        merge_nested: args
           .merge_nested_config
           .unwrap_or(env.periphery_merge_nested_config),
-        args
+        extend_array: args
           .extend_config_arrays
           .unwrap_or(env.periphery_extend_config_arrays),
-      )
+        debug_print: args
+          .log_level
+          .map(|level| {
+            level == tracing::Level::DEBUG
+              || level == tracing::Level::TRACE
+          })
+          .unwrap_or_default(),
+      })
+      .load()
       .expect("failed at parsing config from paths")
     };
 
@@ -69,6 +92,9 @@ pub fn periphery_config() -> &'static PeripheryConfig {
         pretty: env
           .periphery_logging_pretty
           .unwrap_or(config.logging.pretty),
+        location: env
+          .periphery_logging_location
+          .unwrap_or(config.logging.location),
         otlp_endpoint: env
           .periphery_logging_otlp_endpoint
           .unwrap_or(config.logging.otlp_endpoint),

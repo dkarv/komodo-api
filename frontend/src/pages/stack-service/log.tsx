@@ -49,11 +49,11 @@ const StackLogsInner = ({
   return (
     <LogSection
       titleOther={titleOther}
-      regular_logs={(timestamps, stream, tail) =>
-        NoSearchLogs(id, service, tail, timestamps, stream)
+      regular_logs={(timestamps, stream, tail, poll) =>
+        NoSearchLogs(id, service, tail, timestamps, stream, poll)
       }
-      search_logs={(timestamps, terms, invert) =>
-        SearchLogs(id, service, terms, invert, timestamps)
+      search_logs={(timestamps, terms, invert, poll) =>
+        SearchLogs(id, service, terms, invert, timestamps, poll)
       }
     />
   );
@@ -64,14 +64,19 @@ const NoSearchLogs = (
   service: string,
   tail: number,
   timestamps: boolean,
-  stream: string
+  stream: string,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("GetStackLog", {
-    stack: id,
-    services: [service],
-    tail,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "GetStackLog",
+    {
+      stack: id,
+      services: [service],
+      tail,
+      timestamps,
+    },
+    { refetchInterval: poll ? 3000 : false }
+  );
   return {
     Log: (
       <div className="relative">
@@ -88,16 +93,21 @@ const SearchLogs = (
   service: string,
   terms: string[],
   invert: boolean,
-  timestamps: boolean
+  timestamps: boolean,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("SearchStackLog", {
-    stack: id,
-    services: [service],
-    terms,
-    combinator: Types.SearchCombinator.And,
-    invert,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "SearchStackLog",
+    {
+      stack: id,
+      services: [service],
+      terms,
+      combinator: Types.SearchCombinator.And,
+      invert,
+      timestamps,
+    },
+    { refetchInterval: poll ? 10000 : false }
+  );
   return {
     Log: (
       <div className="h-full relative">

@@ -1,5 +1,5 @@
 import { useLocalStorage, useRead } from "@lib/hooks";
-import { Types } from "komodo_client";
+import { ConnectExecQuery, Types } from "komodo_client";
 import { RequiredResourceComponents } from "@types";
 import { CircleArrowUp, HardDrive, Rocket, Server } from "lucide-react";
 import { cn } from "@lib/utils";
@@ -38,6 +38,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@ui/tooltip";
 import { usePermissions } from "@lib/hooks";
 import { ContainerTerminal } from "@components/terminal/container";
 import { DeploymentInspect } from "./inspect";
+import { useMemo } from "react";
 
 // const configOrLog = atomWithStorage("config-or-log-v1", "Config");
 
@@ -65,7 +66,7 @@ const ConfigTabsInner = ({
   const [_view, setView] = useLocalStorage<
     "Config" | "Log" | "Inspect" | "Terminal"
   >("deployment-tabs-v1", "Config");
-  const { specific } = usePermissions({
+  const { specificLogs, specificInspect, specificTerminal } = usePermissions({
     type: "Deployment",
     id: deployment.id,
   });
@@ -73,17 +74,17 @@ const ConfigTabsInner = ({
     useServer(deployment.info.server_id)?.info.container_exec_disabled ?? true;
   const state = deployment.info.state;
   const logsDisabled =
-    !specific.includes(Types.SpecificPermission.Logs) ||
+    !specificLogs ||
     state === undefined ||
     state === Types.DeploymentState.Unknown ||
     state === Types.DeploymentState.NotDeployed;
   const inspectDisabled =
-    !specific.includes(Types.SpecificPermission.Inspect) ||
+    !specificInspect ||
     state === undefined ||
     state === Types.DeploymentState.Unknown ||
     state === Types.DeploymentState.NotDeployed;
   const terminalDisabled =
-    !specific.includes(Types.SpecificPermission.Terminal) ||
+    !specificTerminal ||
     container_exec_disabled ||
     state !== Types.DeploymentState.Running;
   const view =
@@ -93,38 +94,64 @@ const ConfigTabsInner = ({
       ? "Config"
       : _view;
 
-  const tabs = (
-    <TabsList className="justify-start w-fit">
-      <TabsTrigger value="Config" className="w-[110px]">
-        Config
-      </TabsTrigger>
-      {specific.includes(Types.SpecificPermission.Logs) && (
-        <TabsTrigger value="Log" className="w-[110px]" disabled={logsDisabled}>
-          Log
+  const tabs = useMemo(
+    () => (
+      <TabsList className="justify-start w-fit">
+        <TabsTrigger value="Config" className="w-[110px]">
+          Config
         </TabsTrigger>
-      )}
-      {specific.includes(Types.SpecificPermission.Inspect) && (
-        <TabsTrigger
-          value="Inspect"
-          className="w-[110px]"
-          disabled={inspectDisabled}
-        >
-          Inspect
-        </TabsTrigger>
-      )}
-      {specific.includes(Types.SpecificPermission.Terminal) && (
-        <TabsTrigger
-          value="Terminal"
-          className="w-[110px]"
-          disabled={terminalDisabled}
-        >
-          Terminal
-        </TabsTrigger>
-      )}
-    </TabsList>
+        {specificLogs && (
+          <TabsTrigger
+            value="Log"
+            className="w-[110px]"
+            disabled={logsDisabled}
+          >
+            Log
+          </TabsTrigger>
+        )}
+        {specificInspect && (
+          <TabsTrigger
+            value="Inspect"
+            className="w-[110px]"
+            disabled={inspectDisabled}
+          >
+            Inspect
+          </TabsTrigger>
+        )}
+        {specificTerminal && (
+          <TabsTrigger
+            value="Terminal"
+            className="w-[110px]"
+            disabled={terminalDisabled}
+          >
+            Terminal
+          </TabsTrigger>
+        )}
+      </TabsList>
+    ),
+    [
+      specificLogs,
+      logsDisabled,
+      specificInspect,
+      inspectDisabled,
+      specificTerminal,
+      terminalDisabled,
+    ]
+  );
+  const terminalQuery = useMemo(
+    () =>
+      ({
+        type: "deployment",
+        query: {
+          deployment: deployment.id,
+          // This is handled inside ContainerTerminal
+          shell: "",
+        },
+      }) as ConnectExecQuery,
+    [deployment.id]
   );
   return (
-    <Tabs value={view} onValueChange={setView as any} className="grid gap-4">
+    <Tabs value={view} onValueChange={setView as any}>
       <TabsContent value="Config">
         <DeploymentConfig id={deployment.id} titleOther={tabs} />
       </TabsContent>
@@ -135,17 +162,7 @@ const ConfigTabsInner = ({
         <DeploymentInspect id={deployment.id} titleOther={tabs} />
       </TabsContent>
       <TabsContent value="Terminal">
-        <ContainerTerminal
-          query={{
-            type: "deployment",
-            query: {
-              deployment: deployment.id,
-              // This is handled inside ContainerTerminal
-              shell: "",
-            },
-          }}
-          titleOther={tabs}
-        />
+        <ContainerTerminal query={terminalQuery} titleOther={tabs} />
       </TabsContent>
     </Tabs>
   );
@@ -314,7 +331,7 @@ export const DeploymentComponents: RequiredResourceComponents = {
       if (!container) return null;
       return (
         <ContainerPortsTableView
-          ports={container?.ports}
+          ports={container?.ports ?? []}
           server_id={deployment?.info.server_id}
         />
       );

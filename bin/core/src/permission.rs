@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
 use anyhow::{Context, anyhow};
+use database::mongo_indexed::doc;
+use database::mungos::find::find_collect;
 use futures::{FutureExt, future::BoxFuture};
 use indexmap::IndexSet;
 use komodo_client::{
@@ -11,8 +13,6 @@ use komodo_client::{
     user::User,
   },
 };
-use mongo_indexed::doc;
-use mungos::find::find_collect;
 use resolver_api::Resolve;
 
 use crate::{
@@ -83,6 +83,8 @@ pub fn get_user_permission_on_resource<'a, T: KomodoResource>(
     let resource = get::<T>(resource_id).await?;
     let initial_specific = if let Some(additional_target) =
       T::inherit_specific_permissions_from(&resource)
+      // Ensure target is actually assigned
+      && !additional_target.is_empty()
     {
       GetPermission {
         target: additional_target,
@@ -174,19 +176,19 @@ pub async fn get_resource_ids_for_user<T: KomodoResource>(
   let resource_type = T::resource_type();
 
   // Check user 'all' on variant
-  if let Some(permission) = user.all.get(&resource_type).cloned() {
-    if permission.level > PermissionLevel::None {
-      return Ok(None);
-    }
+  if let Some(permission) = user.all.get(&resource_type).cloned()
+    && permission.level > PermissionLevel::None
+  {
+    return Ok(None);
   }
 
   // Check user groups 'all' on variant
   let groups = get_user_user_groups(&user.id).await?;
   for group in &groups {
-    if let Some(permission) = group.all.get(&resource_type).cloned() {
-      if permission.level > PermissionLevel::None {
-        return Ok(None);
-      }
+    if let Some(permission) = group.all.get(&resource_type).cloned()
+      && permission.level > PermissionLevel::None
+    {
+      return Ok(None);
     }
   }
 

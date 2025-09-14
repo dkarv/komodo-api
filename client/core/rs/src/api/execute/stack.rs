@@ -1,10 +1,12 @@
+use crate::entities::update::Update;
+use anyhow::Context;
+use clap::ArgAction::SetTrue;
 use clap::Parser;
 use derive_empty_traits::EmptyTraits;
 use resolver_api::Resolve;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use typeshare::typeshare;
-
-use crate::entities::update::Update;
 
 use super::{BatchExecutionResponse, KomodoExecuteRequest};
 
@@ -57,7 +59,7 @@ pub struct BatchDeployStack {
   /// Supports multiline and comma delineated combinations of the above.
   ///
   /// Example:
-  /// ```
+  /// ```text
   /// # match all foo-* stacks
   /// foo-*
   /// # add some more
@@ -115,7 +117,7 @@ pub struct BatchDeployStackIfChanged {
   /// Supports multiline and comma delineated combinations of the above.
   ///
   /// Example:
-  /// ```
+  /// ```text
   /// # match all foo-* stacks
   /// foo-*
   /// # add some more
@@ -172,7 +174,7 @@ pub struct BatchPullStack {
   /// Supports multiline and comma delineated combinations of the above.
   ///
   /// Example:
-  /// ```
+  /// ```text
   /// # match all foo-* stacks
   /// foo-*
   /// # add some more
@@ -348,6 +350,64 @@ pub struct DestroyStack {
 
 //
 
+/// Runs a one-time command against a service using `docker compose run`. Response: [Update]
+#[typeshare]
+#[derive(
+  Debug,
+  Clone,
+  PartialEq,
+  Serialize,
+  Deserialize,
+  Resolve,
+  EmptyTraits,
+  Parser,
+)]
+#[empty_traits(KomodoExecuteRequest)]
+#[response(Update)]
+#[error(serror::Error)]
+pub struct RunStackService {
+  /// Id or name
+  pub stack: String,
+  /// Service to run
+  pub service: String,
+  /// Command and args to pass to the service container
+  #[arg(trailing_var_arg = true, num_args = 1.., allow_hyphen_values = true)]
+  pub command: Option<Vec<String>>,
+  /// Do not allocate TTY
+  #[arg(long = "no-tty", action = SetTrue)]
+  pub no_tty: Option<bool>,
+  /// Do not start linked services
+  #[arg(long = "no-deps", action = SetTrue)]
+  pub no_deps: Option<bool>,
+  /// Detach container on run
+  #[arg(long = "detach", action = SetTrue)]
+  pub detach: Option<bool>,
+  /// Map service ports to the host
+  #[arg(long = "service-ports", action = SetTrue)]
+  pub service_ports: Option<bool>,
+  /// Extra environment variables for the run
+  #[arg(long = "env", short = 'e', value_parser = env_parser)]
+  pub env: Option<HashMap<String, String>>,
+  /// Working directory inside the container
+  #[arg(long = "workdir")]
+  pub workdir: Option<String>,
+  /// User to run as inside the container
+  #[arg(long = "user")]
+  pub user: Option<String>,
+  /// Override the default entrypoint
+  #[arg(long = "entrypoint")]
+  pub entrypoint: Option<String>,
+  /// Pull the image before running
+  #[arg(long = "pull", action = SetTrue)]
+  pub pull: Option<bool>,
+}
+
+fn env_parser(args: &str) -> anyhow::Result<HashMap<String, String>> {
+  serde_qs::from_str(args).context("Failed to parse env")
+}
+
+//
+
 /// Destroys multiple Stacks in parallel that match pattern. Response: [BatchExecutionResponse].
 #[typeshare]
 #[derive(
@@ -368,7 +428,7 @@ pub struct BatchDestroyStack {
   /// Supports multiline and comma delineated combinations of the above.
   ///d
   /// Example:
-  /// ```
+  /// ```text
   /// # match all foo-* stacks
   /// foo-*
   /// # add some more

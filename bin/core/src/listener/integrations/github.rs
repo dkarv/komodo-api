@@ -7,7 +7,7 @@ use sha2::Sha256;
 
 use crate::{
   config::core_config,
-  listener::{VerifyBranch, VerifySecret},
+  listener::{ExtractBranch, VerifySecret},
 };
 
 type HmacSha256 = Hmac<Sha256>;
@@ -53,19 +53,12 @@ struct GithubWebhookBody {
   branch: String,
 }
 
-impl VerifyBranch for Github {
-  fn verify_branch(
-    body: &str,
-    expected_branch: &str,
-  ) -> anyhow::Result<()> {
+impl ExtractBranch for Github {
+  fn extract_branch(body: &str) -> anyhow::Result<String> {
     let branch = serde_json::from_str::<GithubWebhookBody>(body)
       .context("Failed to parse github request body")?
       .branch
       .replace("refs/heads/", "");
-    if branch == expected_branch {
-      Ok(())
-    } else {
-      Err(anyhow!("request branch does not match expected"))
-    }
+    Ok(branch)
   }
 }

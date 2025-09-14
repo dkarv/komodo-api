@@ -31,11 +31,11 @@ const DeploymentLogsInner = ({
 }) => {
   return (
     <LogSection
-      regular_logs={(timestamps, stream, tail) =>
-        NoSearchLogs(id, tail, timestamps, stream)
+      regular_logs={(timestamps, stream, tail, poll) =>
+        NoSearchLogs(id, tail, timestamps, stream, poll)
       }
-      search_logs={(timestamps, terms, invert) =>
-        SearchLogs(id, terms, invert, timestamps)
+      search_logs={(timestamps, terms, invert, poll) =>
+        SearchLogs(id, terms, invert, timestamps, poll)
       }
       titleOther={titleOther}
     />
@@ -46,13 +46,18 @@ const NoSearchLogs = (
   id: string,
   tail: number,
   timestamps: boolean,
-  stream: string
+  stream: string,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("GetDeploymentLog", {
-    deployment: id,
-    tail,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "GetDeploymentLog",
+    {
+      deployment: id,
+      tail,
+      timestamps,
+    },
+    { refetchInterval: poll ? 3000 : false }
+  );
   return {
     Log: (
       <div className="relative">
@@ -68,15 +73,20 @@ const SearchLogs = (
   id: string,
   terms: string[],
   invert: boolean,
-  timestamps: boolean
+  timestamps: boolean,
+  poll: boolean
 ) => {
-  const { data: log, refetch } = useRead("SearchDeploymentLog", {
-    deployment: id,
-    terms,
-    combinator: Types.SearchCombinator.And,
-    invert,
-    timestamps,
-  });
+  const { data: log, refetch } = useRead(
+    "SearchDeploymentLog",
+    {
+      deployment: id,
+      terms,
+      combinator: Types.SearchCombinator.And,
+      invert,
+      timestamps,
+    },
+    { refetchInterval: poll ? 10000 : false }
+  );
   return {
     Log: (
       <div className="h-full relative">

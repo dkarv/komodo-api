@@ -85,6 +85,7 @@ pub enum PeripheryRequest {
   ComposePull(ComposePull),
   ComposeUp(ComposeUp),
   ComposeExecution(ComposeExecution),
+  ComposeRun(ComposeRun),
 
   // Container (Read)
   InspectContainer(InspectContainer),
@@ -182,7 +183,7 @@ impl Resolve<Args> for ListGitProviders {
     self,
     _: &Args,
   ) -> serror::Result<Vec<GitProvider>> {
-    Ok(periphery_config().git_providers.clone())
+    Ok(periphery_config().git_providers.0.clone())
   }
 }
 
@@ -196,7 +197,7 @@ impl Resolve<Args> for ListDockerRegistries {
     self,
     _: &Args,
   ) -> serror::Result<Vec<DockerRegistry>> {
-    Ok(periphery_config().docker_registries.clone())
+    Ok(periphery_config().docker_registries.0.clone())
   }
 }
 

@@ -23,6 +23,35 @@ pub async fn send_alert(
       ];
       (text, blocks.into())
     }
+    AlertData::ServerVersionMismatch {
+      id,
+      name,
+      region,
+      server_version,
+      core_version,
+    } => {
+      let region = fmt_region(region);
+      let text = match alert.level {
+        SeverityLevel::Ok => {
+          format!(
+            "{level} | *{name}*{region} | Periphery version now matches Core version ✅"
+          )
+        }
+        _ => {
+          format!(
+            "{level} | *{name}*{region} | Version mismatch detected ⚠️\nPeriphery: {server_version} | Core: {core_version}"
+          )
+        }
+      };
+      let blocks = vec![
+        Block::header(text.clone()),
+        Block::section(resource_link(
+          ResourceTargetVariant::Server,
+          id,
+        )),
+      ];
+      (text, blocks.into())
+    }
     AlertData::ServerUnreachable {
       id,
       name,
@@ -429,6 +458,12 @@ pub async fn send_alert(
       ];
       (text, blocks.into())
     }
+    AlertData::Custom { message, details } => {
+      let text = format!("{level} | {message}");
+      let blocks =
+        vec![Block::header(text.clone()), Block::section(details)];
+      (text, blocks.into())
+    }
     AlertData::None {} => Default::default(),
   };
   if !text.is_empty() {
@@ -450,8 +485,7 @@ pub async fn send_alert(
       let sanitized_error =
         svi::replace_in_string(&format!("{e:?}"), &replacers);
       anyhow::Error::msg(format!(
-        "Error with slack request: {}",
-        sanitized_error
+        "Error with slack request: {sanitized_error}"
       ))
     })?;
   }

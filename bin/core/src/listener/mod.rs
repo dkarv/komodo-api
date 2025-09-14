@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use axum::{Router, http::HeaderMap};
 use komodo_client::entities::resource::Resource;
 use tokio::sync::Mutex;
@@ -37,13 +38,16 @@ trait VerifySecret {
 }
 
 /// Implemented on the integration struct, eg [integrations::github::Github]
-trait VerifyBranch {
-  /// Returns Err if the branch extracted from request
-  /// body does not match the expected branch.
-  fn verify_branch(
-    body: &str,
-    expected_branch: &str,
-  ) -> anyhow::Result<()>;
+trait ExtractBranch {
+  fn extract_branch(body: &str) -> anyhow::Result<String>;
+  fn verify_branch(body: &str, expected: &str) -> anyhow::Result<()> {
+    let branch = Self::extract_branch(body)?;
+    if branch == expected {
+      Ok(())
+    } else {
+      Err(anyhow!("request branch does not match expected"))
+    }
+  }
 }
 
 /// For Procedures and Actions, incoming webhook

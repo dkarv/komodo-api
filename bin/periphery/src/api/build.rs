@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+  collections::{HashMap, HashSet},
+  path::PathBuf,
+};
 
 use anyhow::{Context, anyhow};
 use command::{
@@ -9,7 +12,7 @@ use interpolate::Interpolator;
 use komodo_client::entities::{
   EnvironmentVar, all_logs_success,
   build::{Build, BuildConfig},
-  environment_vars_from_str, get_image_name, optional_string,
+  environment_vars_from_str, get_image_names, optional_string,
   to_path_compatible_name,
   update::Log,
 };
@@ -96,12 +99,12 @@ impl Resolve<super::Args> for WriteDockerfileContentsToHost {
       .components()
       .collect::<PathBuf>();
     // Ensure parent directory exists
-    if let Some(parent) = full_path.parent() {
-      if !parent.exists() {
-        tokio::fs::create_dir_all(parent)
-            .await
-            .with_context(|| format!("Failed to initialize dockerfile parent directory {parent:?}"))?;
-      }
+    if let Some(parent) = full_path.parent()
+      && !parent.exists()
+    {
+      tokio::fs::create_dir_all(parent)
+        .await
+        .with_context(|| format!("Failed to initialize dockerfile parent directory {parent:?}"))?;
     }
     fs::write(&full_path, contents).await.with_context(|| {
       format!("Failed to write dockerfile contents to {full_path:?}")
@@ -122,7 +125,7 @@ impl Resolve<super::Args> for build::Build {
     let build::Build {
       mut build,
       repo: linked_repo,
-      registry_token,
+      registry_tokens,
       additional_tags,
       mut replacers,
     } = self;
@@ -169,25 +172,41 @@ impl Resolve<super::Args> for build::Build {
       return Err(anyhow!("Build must be files on host mode, have a repo attached, or have dockerfile contents set to build").into());
     }
 
+    let registry_tokens = registry_tokens
+      .iter()
+      .map(|(domain, account, token)| {
+        ((domain.as_str(), account.as_str()), token.as_str())
+      })
+      .collect::<HashMap<_, _>>();
+
     // Maybe docker login
-    let should_push = match docker_login(
-      &image_registry.domain,
-      &image_registry.account,
-      registry_token.as_deref(),
-    )
-    .await
+    let mut should_push = false;
+    for (domain, account) in image_registry
+      .iter()
+      .map(|r| (r.domain.as_str(), r.account.as_str()))
+      // This ensures uniqueness / prevents redundant logins
+      .collect::<HashSet<_>>()
     {
-      Ok(should_push) => should_push,
-      Err(e) => {
-        logs.push(Log::error(
-          "Docker Login",
-          format_serror(
-            &e.context("failed to login to docker registry").into(),
-          ),
-        ));
-        return Ok(logs);
-      }
-    };
+      match docker_login(
+        domain,
+        account,
+        registry_tokens.get(&(domain, account)).copied(),
+      )
+      .await
+      {
+        Ok(logged_in) if logged_in => should_push = true,
+        Ok(_) => {}
+        Err(e) => {
+          logs.push(Log::error(
+            "Docker Login",
+            format_serror(
+              &e.context("failed to login to docker registry").into(),
+            ),
+          ));
+          return Ok(logs);
+        }
+      };
+    }
 
     let build_path = if let Some(repo) = &linked_repo {
       periphery_config()
@@ -245,8 +264,8 @@ impl Resolve<super::Args> for build::Build {
     }
 
     // Get command parts
-    let image_name =
-      get_image_name(&build).context("failed to make image name")?;
+
+    let image_names = get_image_names(&build);
 
     // Add VERSION to build args (if not already there)
     let mut build_args = environment_vars_from_str(build_args)
@@ -267,10 +286,15 @@ impl Resolve<super::Args> for build::Build {
     let labels = parse_labels(
       &environment_vars_from_str(labels).context("Invalid labels")?,
     );
+
     let extra_args = parse_extra_args(extra_args);
+
     let buildx = if *use_buildx { " buildx" } else { "" };
+
     let image_tags =
-      image_tags(&image_name, image_tag, version, &additional_tags);
+      image_tags(&image_names, image_tag, version, &additional_tags)
+        .context("Failed to parse image tags into command")?;
+
     let maybe_push = if should_push { " --push" } else { "" };
 
     // Construct command

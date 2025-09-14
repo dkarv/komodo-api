@@ -100,14 +100,18 @@ impl Default for AlerterConfig {
   Debug, Clone, PartialEq, Serialize, Deserialize, EnumVariants,
 )]
 #[variant_derive(
-  Serialize,
-  Deserialize,
   Debug,
   Clone,
   Copy,
+  PartialEq,
+  Eq,
+  PartialOrd,
+  Ord,
   Display,
   EnumString,
-  AsRefStr
+  AsRefStr,
+  Serialize,
+  Deserialize
 )]
 #[serde(tag = "type", content = "params")]
 pub enum AlerterEndpoint {

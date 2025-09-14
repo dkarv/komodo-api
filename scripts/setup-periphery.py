@@ -27,6 +27,7 @@ def load_paths():
 	user_install = sys.argv.count("--user") > 0
 	if user_install:
 		return [
+			# Is user install
 			True,
 			# home_dir
 			home_dir,
@@ -39,6 +40,7 @@ def load_paths():
 		]
 	else:
 		return [
+			# Not user install
 			False,
 			# home_dir
 			home_dir,
@@ -94,7 +96,7 @@ def copy_config(config_dir):
 	if not os.path.isdir(config_dir):
 		os.makedirs(config_dir)
 
-	print(os.popen(f'curl -sSL https://raw.githubusercontent.com/moghtech/komodo/main/config/periphery.config.toml > {config_dir}/periphery.config.toml').read())
+	print(os.popen(f'curl -sSL https://raw.githubusercontent.com/moghtech/komodo/main/config/periphery.config.toml > {config_file}').read())
 
 def copy_service_file(home_dir, bin_dir, config_dir, service_dir, user_install):
 	service_file = f'{service_dir}/periphery.service'

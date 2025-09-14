@@ -192,11 +192,6 @@ export const ResourceSyncConfig = ({
         description:
           "Enabled managed mode / the 'Commit' button. Commit is the 'reverse' of Execute, and will update the sync file with your configs updated in the UI.",
       },
-      pending_alert: {
-        label: "Pending Alerts",
-        description:
-          "Send a message to your Alerters when the Sync has Pending Changes",
-      },
     },
   };
 
@@ -234,6 +229,17 @@ export const ResourceSyncConfig = ({
     },
   };
 
+  const pending_alerts: ConfigComponent<Types.ResourceSyncConfig> = {
+    label: "Alerts",
+    components: {
+      pending_alert: {
+        label: "Pending Alerts",
+        description:
+          "Send a message to your Alerters when the Sync has Pending Changes",
+      },
+    },
+  };
+
   if (mode === undefined) {
     components = {
       "": [choose_mode],
@@ -259,80 +265,250 @@ export const ResourceSyncConfig = ({
             ...general_common.components,
           },
         },
-        include_toggles,
         match_tags,
+        include_toggles,
+        pending_alerts,
       ],
     };
   } else if (mode === "Git Repo") {
     const repo_linked = !!(update.linked_repo ?? config.linked_repo);
+    const source_config: ConfigComponent<Types.ResourceSyncConfig> = {
+      label: "Source",
+      contentHidden: !show.git,
+      actions: (
+        <ShowHideButton
+          show={show.git}
+          setShow={(git) => setShow({ ...show, git })}
+        />
+      ),
+      components: {
+        linked_repo: (linked_repo, set) => (
+          <LinkedRepoConfig
+            linked_repo={linked_repo}
+            repo_linked={repo_linked}
+            set={set}
+            disabled={disabled}
+          />
+        ),
+        ...(!repo_linked
+          ? {
+              git_provider: (provider: string | undefined, set) => {
+                const https = update.git_https ?? config.git_https;
+                return (
+                  <ProviderSelectorConfig
+                    account_type="git"
+                    selected={provider}
+                    disabled={disabled}
+                    onSelect={(git_provider) => set({ git_provider })}
+                    https={https}
+                    onHttpsSwitch={() => set({ git_https: !https })}
+                  />
+                );
+              },
+              git_account: (value: string | undefined, set) => {
+                return (
+                  <AccountSelectorConfig
+                    account_type="git"
+                    type="None"
+                    provider={update.git_provider ?? config.git_provider}
+                    selected={value}
+                    onSelect={(git_account) => set({ git_account })}
+                    disabled={disabled}
+                    placeholder="None"
+                  />
+                );
+              },
+              repo: {
+                placeholder: "Enter repo",
+                description:
+                  "The repo path on the provider. {namespace}/{repo_name}",
+              },
+              branch: {
+                placeholder: "Enter branch",
+                description: "Select a custom branch, or default to 'main'.",
+              },
+              commit: {
+                label: "Commit Hash",
+                placeholder: "Input commit hash",
+                description:
+                  "Optional. Switch to a specific commit hash after cloning the branch.",
+              },
+            }
+          : {}),
+      },
+    };
+    const webhooks_config: ConfigComponent<Types.ResourceSyncConfig> = {
+      label: "Git Webhooks",
+      description: `Copy the webhook given here, and configure your ${webhook_integration}-style repo provider to send webhooks to Komodo`,
+      contentHidden: !show.webhooks,
+      actions: (
+        <ShowHideButton
+          show={show.webhooks}
+          setShow={(webhooks) => setShow({ ...show, webhooks })}
+        />
+      ),
+      components: {
+        ["Guard" as any]: () => {
+          if (update.branch ?? config.branch) {
+            return null;
+          }
+          return (
+            <ConfigItem label="Configure Branch">
+              <div>Must configure Branch before webhooks will work.</div>
+            </ConfigItem>
+          );
+        },
+        ["Builder" as any]: () => (
+          <WebhookBuilder git_provider={git_provider} />
+        ),
+        ["Refresh" as any]: () => (
+          <ConfigItem
+            label="Webhook Url - Refresh Pending"
+            description="Trigger an update of the pending sync cache, to display the changes in the UI on push."
+          >
+            <CopyWebhook
+              integration={webhook_integration}
+              path={`/sync/${id_or_name === "Id" ? id : encodeURIComponent(name ?? "...")}/refresh`}
+            />
+          </ConfigItem>
+        ),
+        ["Sync" as any]: () => (
+          <ConfigItem
+            label="Webhook Url - Execute Sync"
+            description="Trigger an execution of the sync on push."
+          >
+            <CopyWebhook
+              integration={webhook_integration}
+              path={`/sync/${id_or_name === "Id" ? id : encodeURIComponent(name ?? "...")}/sync`}
+            />
+          </ConfigItem>
+        ),
+        webhook_enabled: webhooks !== undefined && !webhooks.managed,
+        webhook_secret: {
+          description:
+            "Provide a custom webhook secret for this resource, or use the global default.",
+          placeholder: "Input custom secret",
+        },
+        ["managed" as any]: () => {
+          const inv = useInvalidate();
+          const { toast } = useToast();
+          const { mutate: createWebhook, isPending: createPending } = useWrite(
+            "CreateSyncWebhook",
+            {
+              onSuccess: () => {
+                toast({ title: "Webhook Created" });
+                inv(["GetSyncWebhooksEnabled", { sync: id }]);
+              },
+            }
+          );
+          const { mutate: deleteWebhook, isPending: deletePending } = useWrite(
+            "DeleteSyncWebhook",
+            {
+              onSuccess: () => {
+                toast({ title: "Webhook Deleted" });
+                inv(["GetSyncWebhooksEnabled", { sync: id }]);
+              },
+            }
+          );
+          if (!webhooks || !webhooks.managed) return;
+          return (
+            <ConfigItem label="Manage Webhook">
+              {webhooks.sync_enabled && (
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    Incoming webhook is{" "}
+                    <div className={text_color_class_by_intention("Good")}>
+                      ENABLED
+                    </div>
+                    and will trigger
+                    <div className={text_color_class_by_intention("Neutral")}>
+                      SYNC EXECUTION
+                    </div>
+                  </div>
+                  <ConfirmButton
+                    title="Disable"
+                    icon={<Ban className="w-4 h-4" />}
+                    variant="destructive"
+                    onClick={() =>
+                      deleteWebhook({
+                        sync: id,
+                        action: Types.SyncWebhookAction.Sync,
+                      })
+                    }
+                    loading={deletePending}
+                    disabled={disabled || deletePending}
+                  />
+                </div>
+              )}
+              {!webhooks.sync_enabled && webhooks.refresh_enabled && (
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    Incoming webhook is{" "}
+                    <div className={text_color_class_by_intention("Good")}>
+                      ENABLED
+                    </div>
+                    and will trigger
+                    <div className={text_color_class_by_intention("Neutral")}>
+                      PENDING REFRESH
+                    </div>
+                  </div>
+                  <ConfirmButton
+                    title="Disable"
+                    icon={<Ban className="w-4 h-4" />}
+                    variant="destructive"
+                    onClick={() =>
+                      deleteWebhook({
+                        sync: id,
+                        action: Types.SyncWebhookAction.Refresh,
+                      })
+                    }
+                    loading={deletePending}
+                    disabled={disabled || deletePending}
+                  />
+                </div>
+              )}
+              {!webhooks.sync_enabled && !webhooks.refresh_enabled && (
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    Incoming webhook is{" "}
+                    <div className={text_color_class_by_intention("Critical")}>
+                      DISABLED
+                    </div>
+                  </div>
+                  <ConfirmButton
+                    title="Enable Refresh"
+                    icon={<CirclePlus className="w-4 h-4" />}
+                    onClick={() =>
+                      createWebhook({
+                        sync: id,
+                        action: Types.SyncWebhookAction.Refresh,
+                      })
+                    }
+                    loading={createPending}
+                    disabled={disabled || createPending}
+                  />
+                  <ConfirmButton
+                    title="Enable Sync"
+                    icon={<CirclePlus className="w-4 h-4" />}
+                    onClick={() =>
+                      createWebhook({
+                        sync: id,
+                        action: Types.SyncWebhookAction.Sync,
+                      })
+                    }
+                    loading={createPending}
+                    disabled={disabled || createPending}
+                  />
+                </div>
+              )}
+            </ConfigItem>
+          );
+        },
+      },
+    };
     components = {
       "": [
-        {
-          label: "Source",
-          contentHidden: !show.git,
-          actions: (
-            <ShowHideButton
-              show={show.git}
-              setShow={(git) => setShow({ ...show, git })}
-            />
-          ),
-          components: {
-            linked_repo: (linked_repo, set) => (
-              <LinkedRepoConfig
-                linked_repo={linked_repo}
-                repo_linked={repo_linked}
-                set={set}
-                disabled={disabled}
-              />
-            ),
-            ...(!repo_linked
-              ? {
-                  git_provider: (provider: string | undefined, set) => {
-                    const https = update.git_https ?? config.git_https;
-                    return (
-                      <ProviderSelectorConfig
-                        account_type="git"
-                        selected={provider}
-                        disabled={disabled}
-                        onSelect={(git_provider) => set({ git_provider })}
-                        https={https}
-                        onHttpsSwitch={() => set({ git_https: !https })}
-                      />
-                    );
-                  },
-                  git_account: (value: string | undefined, set) => {
-                    return (
-                      <AccountSelectorConfig
-                        account_type="git"
-                        type="None"
-                        provider={update.git_provider ?? config.git_provider}
-                        selected={value}
-                        onSelect={(git_account) => set({ git_account })}
-                        disabled={disabled}
-                        placeholder="None"
-                      />
-                    );
-                  },
-                  repo: {
-                    placeholder: "Enter repo",
-                    description:
-                      "The repo path on the provider. {namespace}/{repo_name}",
-                  },
-                  branch: {
-                    placeholder: "Enter branch",
-                    description:
-                      "Select a custom branch, or default to 'main'.",
-                  },
-                  commit: {
-                    label: "Commit Hash",
-                    placeholder: "Input commit hash",
-                    description:
-                      "Optional. Switch to a specific commit hash after cloning the branch.",
-                  },
-                }
-              : {}),
-          },
-        },
+        source_config,
         {
           label: "General",
           components: {
@@ -351,179 +527,10 @@ export const ResourceSyncConfig = ({
             ...general_common.components,
           },
         },
-        include_toggles,
         match_tags,
-        {
-          label: "Git Webhooks",
-          description: `Copy the webhook given here, and configure your ${webhook_integration}-style repo provider to send webhooks to Komodo`,
-          contentHidden: !show.webhooks,
-          actions: (
-            <ShowHideButton
-              show={show.webhooks}
-              setShow={(webhooks) => setShow({ ...show, webhooks })}
-            />
-          ),
-          components: {
-            ["Guard" as any]: () => {
-              if (update.branch ?? config.branch) {
-                return null;
-              }
-              return (
-                <ConfigItem label="Configure Branch">
-                  <div>Must configure Branch before webhooks will work.</div>
-                </ConfigItem>
-              );
-            },
-            ["Builder" as any]: () => (
-              <WebhookBuilder git_provider={git_provider} />
-            ),
-            ["Refresh" as any]: () => (
-              <ConfigItem
-                label="Webhook Url - Refresh Pending"
-                description="Trigger an update of the pending sync cache, to display the changes in the UI on push."
-              >
-                <CopyWebhook
-                  integration={webhook_integration}
-                  path={`/sync/${id_or_name === "Id" ? id : encodeURIComponent(name ?? "...")}/refresh`}
-                />
-              </ConfigItem>
-            ),
-            ["Sync" as any]: () => (
-              <ConfigItem
-                label="Webhook Url - Execute Sync"
-                description="Trigger an execution of the sync on push."
-              >
-                <CopyWebhook
-                  integration={webhook_integration}
-                  path={`/sync/${id_or_name === "Id" ? id : encodeURIComponent(name ?? "...")}/sync`}
-                />
-              </ConfigItem>
-            ),
-            webhook_enabled: webhooks !== undefined && !webhooks.managed,
-            webhook_secret: {
-              description:
-                "Provide a custom webhook secret for this resource, or use the global default.",
-              placeholder: "Input custom secret",
-            },
-            ["managed" as any]: () => {
-              const inv = useInvalidate();
-              const { toast } = useToast();
-              const { mutate: createWebhook, isPending: createPending } =
-                useWrite("CreateSyncWebhook", {
-                  onSuccess: () => {
-                    toast({ title: "Webhook Created" });
-                    inv(["GetSyncWebhooksEnabled", { sync: id }]);
-                  },
-                });
-              const { mutate: deleteWebhook, isPending: deletePending } =
-                useWrite("DeleteSyncWebhook", {
-                  onSuccess: () => {
-                    toast({ title: "Webhook Deleted" });
-                    inv(["GetSyncWebhooksEnabled", { sync: id }]);
-                  },
-                });
-              if (!webhooks || !webhooks.managed) return;
-              return (
-                <ConfigItem label="Manage Webhook">
-                  {webhooks.sync_enabled && (
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        Incoming webhook is{" "}
-                        <div className={text_color_class_by_intention("Good")}>
-                          ENABLED
-                        </div>
-                        and will trigger
-                        <div
-                          className={text_color_class_by_intention("Neutral")}
-                        >
-                          SYNC EXECUTION
-                        </div>
-                      </div>
-                      <ConfirmButton
-                        title="Disable"
-                        icon={<Ban className="w-4 h-4" />}
-                        variant="destructive"
-                        onClick={() =>
-                          deleteWebhook({
-                            sync: id,
-                            action: Types.SyncWebhookAction.Sync,
-                          })
-                        }
-                        loading={deletePending}
-                        disabled={disabled || deletePending}
-                      />
-                    </div>
-                  )}
-                  {!webhooks.sync_enabled && webhooks.refresh_enabled && (
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        Incoming webhook is{" "}
-                        <div className={text_color_class_by_intention("Good")}>
-                          ENABLED
-                        </div>
-                        and will trigger
-                        <div
-                          className={text_color_class_by_intention("Neutral")}
-                        >
-                          PENDING REFRESH
-                        </div>
-                      </div>
-                      <ConfirmButton
-                        title="Disable"
-                        icon={<Ban className="w-4 h-4" />}
-                        variant="destructive"
-                        onClick={() =>
-                          deleteWebhook({
-                            sync: id,
-                            action: Types.SyncWebhookAction.Refresh,
-                          })
-                        }
-                        loading={deletePending}
-                        disabled={disabled || deletePending}
-                      />
-                    </div>
-                  )}
-                  {!webhooks.sync_enabled && !webhooks.refresh_enabled && (
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        Incoming webhook is{" "}
-                        <div
-                          className={text_color_class_by_intention("Critical")}
-                        >
-                          DISABLED
-                        </div>
-                      </div>
-                      <ConfirmButton
-                        title="Enable Refresh"
-                        icon={<CirclePlus className="w-4 h-4" />}
-                        onClick={() =>
-                          createWebhook({
-                            sync: id,
-                            action: Types.SyncWebhookAction.Refresh,
-                          })
-                        }
-                        loading={createPending}
-                        disabled={disabled || createPending}
-                      />
-                      <ConfirmButton
-                        title="Enable Sync"
-                        icon={<CirclePlus className="w-4 h-4" />}
-                        onClick={() =>
-                          createWebhook({
-                            sync: id,
-                            action: Types.SyncWebhookAction.Sync,
-                          })
-                        }
-                        loading={createPending}
-                        disabled={disabled || createPending}
-                      />
-                    </div>
-                  )}
-                </ConfigItem>
-              );
-            },
-          },
-        },
+        include_toggles,
+        pending_alerts,
+        webhooks_config,
       ],
     };
   } else if (mode === "UI Defined") {
@@ -549,7 +556,7 @@ export const ResourceSyncConfig = ({
                     "# Initialize the sync to import your current resources.\n"
                   }
                   onValueChange={(file_contents) => set({ file_contents })}
-                  language="toml"
+                  language="fancy_toml"
                   readOnly={disabled}
                 />
               );
@@ -557,8 +564,9 @@ export const ResourceSyncConfig = ({
           },
         },
         general_common,
-        include_toggles,
         match_tags,
+        include_toggles,
+        pending_alerts,
       ],
     };
   }
@@ -574,7 +582,7 @@ export const ResourceSyncConfig = ({
         await mutateAsync({ id, config: update });
       }}
       components={components}
-      file_contents_language="toml"
+      file_contents_language="fancy_toml"
     />
   );
 };

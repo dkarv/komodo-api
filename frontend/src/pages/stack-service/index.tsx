@@ -25,7 +25,7 @@ import {
   useContainerPortsMap,
 } from "@lib/hooks";
 import { cn } from "@lib/utils";
-import { Types } from "komodo_client";
+import { ConnectExecQuery, Types } from "komodo_client";
 import { ChevronLeft, Clapperboard, Layers2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { StackServiceLogs } from "./log";
@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@ui/tabs";
 import { ContainerTerminal } from "@components/terminal/container";
 import { useServer } from "@components/resources/server";
 import { StackServiceInspect } from "./inspect";
+import { useMemo } from "react";
 
 type IdServiceComponent = React.FC<{ id: string; service?: string }>;
 
@@ -143,7 +144,7 @@ const StackServicePageInner = ({
                   </>
                 )}
                 {stack?.info.server_id &&
-                  container?.networks.map((network) => (
+                  container?.networks?.map((network) => (
                     <Fragment key={network}>
                       |
                       <DockerResourceLink
@@ -156,7 +157,7 @@ const StackServicePageInner = ({
                   ))}
                 {stack?.info.server_id &&
                   container &&
-                  container.volumes.map((volume) => (
+                  container.volumes?.map((volume) => (
                     <Fragment key={volume}>
                       |
                       <DockerResourceLink
@@ -234,20 +235,19 @@ const StackServiceTabs = ({
     `stack-${stack.id}-${service}-tabs-v1`,
     "Log"
   );
-  const { specific } = usePermissions({
+  const { specificLogs, specificInspect, specificTerminal } = usePermissions({
     type: "Stack",
     id: stack.id,
   });
   const container_exec_disabled =
     useServer(stack.info.server_id)?.info.container_exec_disabled ?? true;
   const logDisabled =
-    !specific.includes(Types.SpecificPermission.Logs) ||
-    container_state === Types.ContainerStateStatusEnum.Empty;
+    !specificLogs || container_state === Types.ContainerStateStatusEnum.Empty;
   const inspectDisabled =
-    !specific.includes(Types.SpecificPermission.Inspect) ||
+    !specificInspect ||
     container_state === Types.ContainerStateStatusEnum.Empty;
   const terminalDisabled =
-    !specific.includes(Types.SpecificPermission.Terminal) ||
+    !specificTerminal ||
     container_exec_disabled ||
     container_state !== Types.ContainerStateStatusEnum.Running;
   const view =
@@ -255,33 +255,55 @@ const StackServiceTabs = ({
     (terminalDisabled && _view === "Terminal")
       ? "Log"
       : _view;
-  const tabs = (
-    <TabsList className="justify-start w-fit">
-      <TabsTrigger value="Log" className="w-[110px]" disabled={logDisabled}>
-        Log
-      </TabsTrigger>
-      {specific.includes(Types.SpecificPermission.Inspect) && (
-        <TabsTrigger
-          value="Inspect"
-          className="w-[110px]"
-          disabled={inspectDisabled}
-        >
-          Inspect
+  const tabs = useMemo(
+    () => (
+      <TabsList className="justify-start w-fit">
+        <TabsTrigger value="Log" className="w-[110px]" disabled={logDisabled}>
+          Log
         </TabsTrigger>
-      )}
-      {specific.includes(Types.SpecificPermission.Terminal) && (
-        <TabsTrigger
-          value="Terminal"
-          className="w-[110px]"
-          disabled={terminalDisabled}
-        >
-          Terminal
-        </TabsTrigger>
-      )}
-    </TabsList>
+        {specificInspect && (
+          <TabsTrigger
+            value="Inspect"
+            className="w-[110px]"
+            disabled={inspectDisabled}
+          >
+            Inspect
+          </TabsTrigger>
+        )}
+        {specificTerminal && (
+          <TabsTrigger
+            value="Terminal"
+            className="w-[110px]"
+            disabled={terminalDisabled}
+          >
+            Terminal
+          </TabsTrigger>
+        )}
+      </TabsList>
+    ),
+    [
+      logDisabled,
+      specificInspect,
+      inspectDisabled,
+      specificTerminal,
+      terminalDisabled,
+    ]
+  );
+  const terminalQuery = useMemo(
+    () =>
+      ({
+        type: "stack",
+        query: {
+          stack: stack.id,
+          service,
+          // This is handled inside ContainerTerminal
+          shell: "",
+        },
+      }) as ConnectExecQuery,
+    [stack.id, service]
   );
   return (
-    <Tabs value={view} onValueChange={setView as any} className="grid gap-4">
+    <Tabs value={view} onValueChange={setView as any}>
       <TabsContent value="Log">
         <StackServiceLogs
           id={stack.id}
@@ -298,18 +320,7 @@ const StackServiceTabs = ({
         />
       </TabsContent>
       <TabsContent value="Terminal">
-        <ContainerTerminal
-          query={{
-            type: "stack",
-            query: {
-              stack: stack.id,
-              service,
-              // This is handled inside ContainerTerminal
-              shell: "",
-            },
-          }}
-          titleOther={tabs}
-        />
+        <ContainerTerminal query={terminalQuery} titleOther={tabs} />
       </TabsContent>
     </Tabs>
   );

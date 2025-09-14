@@ -2,6 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use async_timing_util::unix_timestamp_ms;
+use database::mungos::{
+  find::find_collect,
+  mongodb::{bson::doc, options::FindOptions},
+};
 use futures::TryStreamExt;
 use komodo_client::{
   api::read::*,
@@ -12,10 +16,6 @@ use komodo_client::{
     permission::PermissionLevel,
     update::UpdateStatus,
   },
-};
-use mungos::{
-  find::find_collect,
-  mongodb::{bson::doc, options::FindOptions},
 };
 use resolver_api::Resolve;
 

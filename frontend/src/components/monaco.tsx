@@ -7,38 +7,72 @@ import * as prettier from "prettier/standalone";
 import * as pluginTypescript from "prettier/plugins/typescript";
 import * as pluginEsTree from "prettier/plugins/estree";
 import * as pluginYaml from "prettier/plugins/yaml";
-import { useWindowDimensions } from "@lib/hooks";
+import { useRead, useWindowDimensions } from "@lib/hooks";
 
 const MIN_EDITOR_HEIGHT = 56;
 
 export type MonacoLanguage =
   | "yaml"
   | "toml"
+  | "fancy_toml"
   | "json"
   | "key_value"
+  | "ini"
   | "string_list"
   | "shell"
   | "dockerfile"
   | "rust"
   | "javascript"
-  | "typescript"
-  | undefined;
+  | "typescript";
+
+const LANGUAGE_EXTENSIONS: Record<MonacoLanguage, string[]> = {
+  yaml: [".yaml", ".yml"],
+  toml: [".toml"],
+  fancy_toml: [],
+  json: [".json"],
+  key_value: [".env", ".conf"],
+  ini: [".ini"],
+  string_list: [],
+  shell: [".sh", ".bash", ".zsh"],
+  dockerfile: ["Dockerfile"],
+  rust: [".rs"],
+  javascript: [".js", ".jsx", ".mjs", ".cjs"],
+  typescript: [".ts", ".tsx"],
+};
+
+export const language_from_path = (path: string) => {
+  for (const [lang, extensions] of Object.entries(LANGUAGE_EXTENSIONS)) {
+    for (const extension of extensions) {
+      if (path.endsWith(extension)) {
+        return lang as MonacoLanguage;
+      }
+    }
+  }
+  return undefined;
+};
 
 export const MonacoEditor = ({
   value,
   onValueChange,
-  language,
+  language: _language,
   readOnly,
+  filename,
   minHeight,
   className,
 }: {
   value: string | undefined;
   onValueChange?: (value: string) => void;
-  language: MonacoLanguage;
+  language: MonacoLanguage | undefined;
+  filename?: string;
   readOnly?: boolean;
   minHeight?: number;
   className?: string;
 }) => {
+  const enable_fancy_toml =
+    useRead("GetCoreInfo", {}).data?.enable_fancy_toml ?? false;
+  const language = (
+    _language === "fancy_toml" && !enable_fancy_toml ? "toml" : _language
+  ) as MonacoLanguage;
   const dimensions = useWindowDimensions();
   const [editor, setEditor] =
     useState<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -138,12 +172,21 @@ export const MonacoEditor = ({
         language={language}
         value={value}
         theme={theme}
+        defaultPath={defaultPath(filename)}
         options={options}
         onChange={(v) => onValueChange?.(v ?? "")}
         onMount={(editor) => setEditor(editor)}
       />
     </div>
   );
+};
+
+const defaultPath = (filename?: string) => {
+  if (!filename) return undefined;
+  // Extract only the filename part of path,
+  // avoiding critical issue when path starts with '/'
+  const split = filename.split("/");
+  return split[split.length - 1];
 };
 
 const MIN_DIFF_HEIGHT = 100;
@@ -153,7 +196,7 @@ export const MonacoDiffEditor = ({
   original,
   modified,
   onModifiedValueChange,
-  language,
+  language: _language,
   readOnly,
   containerClassName,
   hideUnchangedRegions = true,
@@ -161,11 +204,17 @@ export const MonacoDiffEditor = ({
   original: string | undefined;
   modified: string | undefined;
   onModifiedValueChange?: (value: string) => void;
-  language: MonacoLanguage;
+  language: MonacoLanguage | undefined;
   readOnly?: boolean;
   containerClassName?: string;
   hideUnchangedRegions?: boolean;
 }) => {
+  const enable_fancy_toml =
+    useRead("GetCoreInfo", {}).data?.enable_fancy_toml ?? false;
+  const language = (
+    _language === "fancy_toml" && !enable_fancy_toml ? "toml" : _language
+  ) as MonacoLanguage;
+
   const [editor, setEditor] =
     useState<monaco.editor.IStandaloneDiffEditor | null>(null);
 

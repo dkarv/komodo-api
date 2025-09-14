@@ -25,6 +25,7 @@ use crate::{
 
 use super::Variant;
 
+#[derive(Default)]
 pub struct AuthArgs {
   pub headers: HeaderMap,
 }
@@ -41,7 +42,7 @@ pub struct AuthArgs {
 #[allow(clippy::enum_variant_names, clippy::large_enum_variant)]
 pub enum AuthRequest {
   GetLoginOptions(GetLoginOptions),
-  CreateLocalUser(CreateLocalUser),
+  SignUpLocalUser(SignUpLocalUser),
   LoginLocalUser(LoginLocalUser),
   ExchangeForJwt(ExchangeForJwt),
   GetUser(GetUser),
@@ -62,7 +63,7 @@ pub fn router() -> Router {
   }
 
   if google_oauth_client().is_some() {
-    info!("🔑 Github Login Enabled");
+    info!("🔑 Google Login Enabled");
     router = router.nest("/google", google::router())
   }
 
@@ -138,8 +139,10 @@ impl Resolve<AuthArgs> for ExchangeForJwt {
     self,
     _: &AuthArgs,
   ) -> serror::Result<ExchangeForJwtResponse> {
-    let jwt = jwt_client().redeem_exchange_token(&self.token).await?;
-    Ok(ExchangeForJwtResponse { jwt })
+    jwt_client()
+      .redeem_exchange_token(&self.token)
+      .await
+      .map_err(Into::into)
   }
 }
 

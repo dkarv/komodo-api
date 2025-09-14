@@ -1,37 +1,114 @@
 use std::str::FromStr;
 
+use colored::Colorize;
+use database::mungos::{
+  find::find_collect,
+  mongodb::bson::{Document, doc, oid::ObjectId, to_document},
+};
 use futures::future::join_all;
 use komodo_client::{
-  api::write::{CreateBuilder, CreateServer},
+  api::{
+    auth::SignUpLocalUser,
+    execute::{
+      BackupCoreDatabase, Execution, GlobalAutoUpdate, RunAction,
+    },
+    write::{
+      CreateBuilder, CreateProcedure, CreateServer, CreateTag,
+      UpdateResourceMeta,
+    },
+  },
   entities::{
     ResourceTarget,
     builder::{PartialBuilderConfig, PartialServerBuilderConfig},
     komodo_timestamp,
+    procedure::{EnabledExecution, ProcedureConfig, ProcedureStage},
     server::{PartialServerConfig, Server},
     sync::ResourceSync,
+    tag::TagColor,
     update::Log,
-    user::system_user,
+    user::{action_user, system_user},
   },
-};
-use mungos::{
-  find::find_collect,
-  mongodb::bson::{Document, doc, oid::ObjectId, to_document},
 };
 use resolver_api::Resolve;
 
 use crate::{
-  api::write::WriteArgs, config::core_config, helpers::random_string,
-  resource, state::db_client,
+  api::{
+    auth::AuthArgs,
+    execute::{ExecuteArgs, ExecuteRequest},
+    write::WriteArgs,
+  },
+  config::core_config,
+  helpers::update::init_execution_update,
+  network, resource,
+  state::db_client,
 };
+
+/// Runs the Actions with `run_at_startup: true`
+pub async fn run_startup_actions() {
+  let startup_actions = match find_collect(
+    &db_client().actions,
+    doc! { "config.run_at_startup": true },
+    None,
+  )
+  .await
+  {
+    Ok(actions) => actions,
+    Err(e) => {
+      error!("Failed to fetch actions for startup | {e:#?}");
+      return;
+    }
+  };
+
+  for action in startup_actions {
+    let name = action.name;
+    let id = action.id;
+    let update = match init_execution_update(
+      &ExecuteRequest::RunAction(RunAction {
+        action: name.clone(),
+        args: Default::default(),
+      }),
+      action_user(),
+    )
+    .await
+    {
+      Ok(update) => update,
+      Err(e) => {
+        error!(
+          "Failed to initialize update for action {name} ({id}) | {e:#?}"
+        );
+        continue;
+      }
+    };
+
+    if let Err(e) = (RunAction {
+      action: name.clone(),
+      args: Default::default(),
+    })
+    .resolve(&ExecuteArgs {
+      user: action_user().to_owned(),
+      update,
+    })
+    .await
+    {
+      error!(
+        "Failed to execute startup action {name} ({id}) | {e:#?}"
+      );
+    }
+  }
+}
 
 /// This function should be run on startup,
 /// after the db client has been initialized
 pub async fn on_startup() {
+  // Configure manual network interface if specified
+  network::configure_internet_gateway().await;
+
   tokio::join!(
     in_progress_update_cleanup(),
     open_alert_cleanup(),
-    ensure_first_server_and_builder(),
     clean_up_server_templates(),
+    ensure_first_server_and_builder(),
+    ensure_init_user_and_resources(),
   );
 }
 
@@ -120,10 +197,10 @@ async fn open_alert_cleanup() {
 
 /// Ensures a default server / builder exists with the defined address
 async fn ensure_first_server_and_builder() {
-  let first_server = &core_config().first_server;
-  if first_server.is_empty() {
+  let config = core_config();
+  let Some(address) = config.first_server.clone() else {
     return;
-  }
+  };
   let db = db_client();
   let Ok(server) = db
     .servers
@@ -137,9 +214,9 @@ async fn ensure_first_server_and_builder() {
     server
   } else {
     match (CreateServer {
-      name: format!("server-{}", random_string(5)),
+      name: config.first_server_name.clone(),
       config: PartialServerConfig {
-        address: Some(first_server.to_string()),
+        address: Some(address),
         enabled: Some(true),
         ..Default::default()
       },
@@ -165,7 +242,7 @@ async fn ensure_first_server_and_builder() {
       return;
     };
   if let Err(e) = (CreateBuilder {
-    name: String::from("local"),
+    name: config.first_server_name.clone(),
     config: PartialBuilderConfig::Server(
       PartialServerBuilderConfig {
         server_id: Some(server.id),
@@ -182,6 +259,160 @@ async fn ensure_first_server_and_builder() {
       e.error
     );
   }
+}
+
+async fn ensure_init_user_and_resources() {
+  let db = db_client();
+
+  // Assumes if there are any existing users, procedures, or tags,
+  // the default procedures do not need to be set up.
+  let Ok((None, None, None)) = tokio::try_join!(
+    db.users.find_one(Document::new()),
+    db.procedures.find_one(Document::new()),
+    db.tags.find_one(Document::new()),
+  ).inspect_err(|e| error!("Failed to initialize default procedures | Failed to query db | {e:?}")) else {
+    return
+  };
+
+  let config = core_config();
+
+  // Init admin user if set in config.
+  if let Some(username) = &config.init_admin_username {
+    info!("Creating init admin user...");
+    SignUpLocalUser {
+      username: username.clone(),
+      password: config.init_admin_password.clone(),
+    }
+    .resolve(&AuthArgs::default())
+    .await
+    .expect("Failed to initialize default admin user.");
+    db.users
+      .find_one(doc! { "username": username })
+      .await
+      .expect("Failed to query database for initial user")
+      .expect("Failed to find initial user after creation");
+  };
+
+  if config.disable_init_resources {
+    info!("System resources init {}", "DISABLED".red());
+    return;
+  }
+
+  info!("Creating init system resources...");
+
+  let write_args = WriteArgs {
+    user: system_user().to_owned(),
+  };
+
+  // Create default 'system' tag
+  let default_tags = match (CreateTag {
+    name: String::from("system"),
+    color: Some(TagColor::Red),
+  })
+  .resolve(&write_args)
+  .await
+  {
+    Ok(tag) => vec![tag.id],
+    Err(e) => {
+      warn!("Failed to create default tag | {:#}", e.error);
+      Vec::new()
+    }
+  };
+
+  // Backup Core Database
+  async {
+    let Ok(config) = ProcedureConfig::builder()
+      .stages(vec![ProcedureStage {
+        name: String::from("Stage 1"),
+        enabled: true,
+        executions: vec![
+          EnabledExecution {
+            execution: Execution::BackupCoreDatabase(BackupCoreDatabase {}),
+            enabled: true
+          }
+        ]
+      }])
+      .schedule(String::from("Every day at 01:00"))
+      .build()
+      .inspect_err(|e| error!("Failed to initialize backup core database procedure | Failed to build Procedure | {e:?}")) else {
+      return;
+    };
+    let procedure = match (CreateProcedure {
+      name: String::from("Backup Core Database"),
+      config: config.into()
+    }).resolve(&write_args).await {
+      Ok(procedure) => procedure,
+      Err(e) => {
+        error!(
+          "Failed to initialize default database backup Procedure | Failed to create Procedure | {:#}",
+          e.error
+        );
+        return;
+      }
+    };
+    if let Err(e) = (UpdateResourceMeta {
+      target: ResourceTarget::Procedure(procedure.id),
+      tags: Some(default_tags.clone()),
+      description: Some(String::from(
+        "Triggers the Core database backup at the scheduled time.",
+      )),
+      template: None,
+    }).resolve(&write_args).await {
+      warn!("Failed to update default database backup Procedure tags / description | {:#}", e.error);
+    }
+  }.await;
+
+  // GlobalAutoUpdate
+  async {
+    let Ok(config) = ProcedureConfig::builder()
+      .stages(vec![ProcedureStage {
+        name: String::from("Stage 1"),
+        enabled: true,
+        executions: vec![
+          EnabledExecution {
+            execution: Execution::GlobalAutoUpdate(GlobalAutoUpdate {}),
+            enabled: true
+          }
+        ]
+      }])
+      .schedule(String::from("Every day at 03:00"))
+      .build()
+      .inspect_err(|e| error!("Failed to initialize global auto update procedure | Failed to build Procedure | {e:?}")) else {
+      return;
+    };
+    let procedure = match (CreateProcedure {
+      name: String::from("Global Auto Update"),
+      config: config.into(),
+    })
+    .resolve(&write_args)
+    .await
+    {
+      Ok(procedure) => procedure,
+      Err(e) => {
+        error!(
+          "Failed to initialize global auto update Procedure | Failed to create Procedure | {:#}",
+          e.error
+        );
+        return;
+      }
+    };
+    if let Err(e) = (UpdateResourceMeta {
+      target: ResourceTarget::Procedure(procedure.id),
+      tags: Some(default_tags.clone()),
+      description: Some(String::from(
+        "Pulls and auto updates Stacks and Deployments using 'poll_for_updates' or 'auto_update'.",
+      )),
+      template: None,
+    })
+    .resolve(&write_args)
+    .await
+    {
+      warn!(
+        "Failed to update global auto update Procedure tags / description | {:#}",
+        e.error
+      );
+    }
+  }.await;
 }
 
 /// v1.17.5 removes the ServerTemplate resource.

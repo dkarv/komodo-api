@@ -1,6 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Context;
+use database::mungos::{
+  find::find_collect,
+  mongodb::{Collection, bson::doc, options::FindOneOptions},
+};
 use komodo_client::entities::{
   NoData, Operation, ResourceTarget, ResourceTargetVariant,
   action::{
@@ -11,10 +15,6 @@ use komodo_client::entities::{
   resource::Resource,
   update::Update,
   user::User,
-};
-use mungos::{
-  find::find_collect,
-  mongodb::{Collection, bson::doc, options::FindOneOptions},
 };
 
 use crate::{
@@ -155,6 +155,7 @@ impl super::KomodoResource for Action {
     _update: &mut Update,
   ) -> anyhow::Result<()> {
     cancel_schedule(&ResourceTarget::Action(resource.id.clone()));
+    action_state_cache().remove(&resource.id).await;
     Ok(())
   }
 }
@@ -221,4 +222,7 @@ async fn get_action_state_from_db(id: &str) -> ActionState {
 const DEFAULT_ACTION_FILE_CONTENTS: &str =
   "// Run actions using the pre initialized 'komodo' client.
 const version: Types.GetVersionResponse = await komodo.read('GetVersion', {});
-console.log('🦎 Komodo version:', version.version, '🦎\\n');";
+console.log('🦎 Komodo version:', version.version, '🦎\\n');
+
+// Access arguments using the 'ARGS' object.
+console.log(ARGS);";

@@ -9,12 +9,15 @@ use komodo_client::{
     read::ListBuildVersions,
   },
   entities::{
-    FileContents, ResourceTarget,
+    ResourceTarget,
     deployment::{
       Deployment, DeploymentConfig, DeploymentImage, DeploymentState,
       PartialDeploymentConfig,
     },
-    stack::{PartialStackConfig, Stack, StackConfig, StackState},
+    stack::{
+      PartialStackConfig, Stack, StackConfig,
+      StackRemoteFileContents, StackState,
+    },
     sync::SyncDeployUpdate,
     toml::ResourceToml,
     update::Log,
@@ -181,7 +184,7 @@ pub async fn deploy_from_cache(
     "\n{}: finished after {} round{}",
     muted("INFO"),
     bold(round),
-    (round > 1).then_some("s").unwrap_or_default()
+    if round > 1 { "s" } else { Default::default() }
   ));
 
   logs.push(Log::simple("Sync Deploy", log));
@@ -554,7 +557,13 @@ fn build_cache_for_stack<'a>(
           &original.info.remote_contents,
         ) {
           (Some(deployed_contents), Some(remote_contents)) => {
-            for FileContents { path, contents } in remote_contents {
+            for StackRemoteFileContents {
+              path,
+              contents,
+              services: _services,
+              requires: _requires,
+            } in remote_contents
+            {
               if let Some(deployed) =
                 deployed_contents.iter().find(|c| &c.path == path)
               {
