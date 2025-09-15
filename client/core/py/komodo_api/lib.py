@@ -116,7 +116,7 @@ class KomodoClient(AuthApi):
                     )
             else:
                 error = await response.json()
-                _logger.warn(f"Api error {error}")
+                _logger.warning(f"Api error {error}")
                 raise KomodoException(error, response.status)
 
     # CAUTION: completely untested!
