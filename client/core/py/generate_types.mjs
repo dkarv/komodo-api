@@ -23,7 +23,7 @@ exec(gen_command, (error, _stdout, _stderr) => {
 function fixMongoDocument(input) {
   return input
     .flatMap(line => 
-      line.includes('[MongoDocument]') ? [
+      (line.includes('[MongoDocument]') || line.includes('[JsonObject]')) ? [
         '    model_config = ConfigDict(arbitrary_types_allowed=True)',
         line
       ] : [line]
