@@ -10946,6 +10946,7 @@ class RestartStack(BaseModel):
     """
 
 class RunAction(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     """
     Runs the target Action. Response: [Update]
     """
@@ -10953,7 +10954,6 @@ class RunAction(BaseModel):
     """
     Id or name
     """
-    model_config = ConfigDict(arbitrary_types_allowed=True)
     args: Optional[JsonObject] = Field(default=None)
     """
     Custom arguments which are merged on top of the default arguments.
