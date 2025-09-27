@@ -6,7 +6,7 @@ use std::{
 use anyhow::{Context, anyhow};
 use formatting::format_serror;
 use komodo_client::{
-  entities::{EnvironmentVar, Version, update::Log},
+  entities::{EnvironmentVar, update::Log},
   parsers::QUOTE_PATTERN,
 };
 
@@ -50,34 +50,6 @@ pub async fn write_dockerfile(
   }.await {
     logs.push(Log::error("Write Dockerfile", format_serror(&e.into())));
   }
-}
-
-pub fn image_tags(
-  image_names: &[String],
-  custom_tag: &str,
-  version: &Version,
-  additional: &[String],
-) -> anyhow::Result<String> {
-  let Version { major, minor, .. } = version;
-  let custom_tag = if custom_tag.is_empty() {
-    String::new()
-  } else {
-    format!("-{custom_tag}")
-  };
-
-  let mut res = String::new();
-
-  for image_name in image_names {
-    write!(
-      &mut res,
-      " -t {image_name}:latest{custom_tag} -t {image_name}:{version}{custom_tag} -t {image_name}:{major}.{minor}{custom_tag} -t {image_name}:{major}{custom_tag}"
-    )?;
-    for tag in additional {
-      write!(&mut res, " -t {image_name}:{tag}{custom_tag}")?;
-    }
-  }
-
-  Ok(res)
 }
 
 pub fn parse_build_args(build_args: &[EnvironmentVar]) -> String {

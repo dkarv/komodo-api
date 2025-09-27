@@ -199,6 +199,11 @@ export function KomodoClient(url: string, options: InitOptions) {
     } else {
       // it is a single update
       const update = res as any as Update;
+
+      if (update.status === UpdateStatus.Complete || !update._id?.$oid) {
+        return update;
+      }
+
       return await poll_update_until_complete(update._id?.$oid!);
     }
   };
