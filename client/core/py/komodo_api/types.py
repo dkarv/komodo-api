@@ -2160,9 +2160,9 @@ ExportResourcesToTomlResponse = TomlResponse
 FindUserResponse = User
 
 class ActionActionState(BaseModel):
-    running: bool
+    running: int
     """
-    Whether the action is currently running.
+    Number of instances of the Action currently running
     """
 
 GetActionActionStateResponse = ActionActionState
