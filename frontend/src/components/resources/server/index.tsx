@@ -44,6 +44,12 @@ export const useServer = (id?: string) =>
     (d) => d.id === id
   );
 
+// Helper function to check if server is available for API calls
+export const useIsServerAvailable = (serverId?: string) => {
+  const server = useServer(serverId);
+  return server?.info.state === Types.ServerState.Ok;
+};
+
 export const useFullServer = (id: string) =>
   useRead("GetServer", { server: id }, { refetchInterval: 10_000 }).data;
 
@@ -51,24 +57,26 @@ export const useFullServer = (id: string) =>
 export const useVersionMismatch = (serverId?: string) => {
   const core_version = useRead("GetVersion", {}).data?.version;
   const server_version = useServer(serverId)?.info.version;
-  
+
   const unknown = !server_version || server_version === "Unknown";
-  const mismatch = !!server_version && !!core_version && server_version !== core_version;
-  
+  const mismatch =
+    !!server_version && !!core_version && server_version !== core_version;
+
   return { unknown, mismatch, hasVersionMismatch: mismatch && !unknown };
 };
 
 const Icon = ({ id, size }: { id?: string; size: number }) => {
   const state = useServer(id)?.info.state;
   const { hasVersionMismatch } = useVersionMismatch(id);
-  
+
   return (
     <Server
       className={cn(
         `w-${size} h-${size}`,
-        state && stroke_color_class_by_intention(
-          server_state_intention(state, hasVersionMismatch)
-        )
+        state &&
+          stroke_color_class_by_intention(
+            server_state_intention(state, hasVersionMismatch)
+          )
       )}
     />
   );
@@ -137,10 +145,7 @@ const ConfigTabs = ({ id }: { id: string }) => {
     </TabsList>
   );
   return (
-    <Tabs
-      value={currentView}
-      onValueChange={setView as any}
-    >
+    <Tabs value={currentView} onValueChange={setView as any}>
       <TabsContent value="Config">
         <ServerConfig id={id} titleOther={tabsList} />
       </TabsContent>
@@ -221,10 +226,10 @@ export const ServerVersion = ({ id }: { id: string }) => {
   const core_version = useRead("GetVersion", {}).data?.version;
   const version = useServer(id)?.info.version;
   const server_state = useServer(id)?.info.state;
-  
+
   const unknown = !version || version === "Unknown";
   const mismatch = !!version && !!core_version && version !== core_version;
-  
+
   // Don't show version for disabled servers
   if (server_state === Types.ServerState.Disabled) {
     return (
@@ -242,13 +247,14 @@ export const ServerVersion = ({ id }: { id: string }) => {
         </TooltipTrigger>
         <TooltipContent>
           <div>
-            Server is <span className="font-bold">disabled</span> - version unknown.
+            Server is <span className="font-bold">disabled</span> - version
+            unknown.
           </div>
         </TooltipContent>
       </Tooltip>
     );
   }
-  
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -306,7 +312,11 @@ export const ServerComponents: RequiredResourceComponents = {
   ),
 
   Dashboard: () => {
-    const summary = useRead("GetServersSummary", {}, { refetchInterval: 15_000 }).data;
+    const summary = useRead(
+      "GetServersSummary",
+      {},
+      { refetchInterval: 15_000 }
+    ).data;
     return (
       <DashboardPieChart
         data={[
@@ -363,18 +373,19 @@ export const ServerComponents: RequiredResourceComponents = {
   State: ({ id }) => {
     const state = useServer(id)?.info.state;
     const { hasVersionMismatch } = useVersionMismatch(id);
-    
+
     // Show full version mismatch text
-    const displayState = state === Types.ServerState.Ok && hasVersionMismatch 
-      ? "Version Mismatch" 
-      : state === Types.ServerState.NotOk 
-        ? "Not Ok" 
-        : state;
-    
+    const displayState =
+      state === Types.ServerState.Ok && hasVersionMismatch
+        ? "Version Mismatch"
+        : state === Types.ServerState.NotOk
+          ? "Not Ok"
+          : state;
+
     return (
-      <StatusBadge 
-        text={displayState} 
-        intent={server_state_intention(state, hasVersionMismatch)} 
+      <StatusBadge
+        text={displayState}
+        intent={server_state_intention(state, hasVersionMismatch)}
       />
     );
   },
@@ -384,13 +395,13 @@ export const ServerComponents: RequiredResourceComponents = {
   Info: {
     Version: ServerVersion,
     Cpu: ({ id }) => {
-      const server = useServer(id);
+      const isServerAvailable = useIsServerAvailable(id);
       const core_count =
         useRead(
           "GetSystemInformation",
           { server: id },
           {
-            enabled: server ? server.info.state !== "Disabled" : false,
+            enabled: isServerAvailable,
             refetchInterval: 5000,
           }
         ).data?.core_count ?? 0;
@@ -402,19 +413,19 @@ export const ServerComponents: RequiredResourceComponents = {
       );
     },
     LoadAvg: ({ id }) => {
-      const server = useServer(id);
+      const isServerAvailable = useIsServerAvailable(id);
       const stats = useRead(
         "GetSystemStats",
         { server: id },
         {
-          enabled: server ? server.info.state !== "Disabled" : false,
+          enabled: isServerAvailable,
           refetchInterval: 5000,
         }
       ).data;
-      
+
       if (!stats?.load_average) return null;
       const one = stats.load_average?.one;
-      
+
       return (
         <div className="flex gap-2 items-center">
           <Cpu className="w-4 h-4" />
@@ -423,12 +434,12 @@ export const ServerComponents: RequiredResourceComponents = {
       );
     },
     Mem: ({ id }) => {
-      const server = useServer(id);
+      const isServerAvailable = useIsServerAvailable(id);
       const stats = useRead(
         "GetSystemStats",
         { server: id },
         {
-          enabled: server ? server.info.state !== "Disabled" : false,
+          enabled: isServerAvailable,
           refetchInterval: 5000,
         }
       ).data;
@@ -440,12 +451,12 @@ export const ServerComponents: RequiredResourceComponents = {
       );
     },
     Disk: ({ id }) => {
-      const server = useServer(id);
+      const isServerAvailable = useIsServerAvailable(id);
       const stats = useRead(
         "GetSystemStats",
         { server: id },
         {
-          enabled: server ? server.info.state !== "Disabled" : false,
+          enabled: isServerAvailable,
           refetchInterval: 5000,
         }
       ).data;
@@ -616,11 +627,12 @@ export const ServerComponents: RequiredResourceComponents = {
     const { hasVersionMismatch } = useVersionMismatch(id);
 
     // Determine display state for header (longer text is okay in header)
-    const displayState = server?.info.state === Types.ServerState.Ok && hasVersionMismatch
-      ? "Version Mismatch"
-      : server?.info.state === Types.ServerState.NotOk
-        ? "Not Ok"
-        : server?.info.state;
+    const displayState =
+      server?.info.state === Types.ServerState.Ok && hasVersionMismatch
+        ? "Version Mismatch"
+        : server?.info.state === Types.ServerState.NotOk
+          ? "Not Ok"
+          : server?.info.state;
 
     return (
       <ResourcePageHeader

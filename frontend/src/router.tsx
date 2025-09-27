@@ -3,7 +3,14 @@ import { LOGIN_TOKENS, useAuth, useUser } from "@lib/hooks";
 import UpdatePage from "@pages/update";
 import { Loader2 } from "lucide-react";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 
 // Lazy import pages
 const Resources = lazy(() => import("@pages/resources"));
@@ -128,7 +135,7 @@ const RequireAuth = () => {
   const { data: user, error } = useUser();
   const location = useLocation();
 
-  if (error) {
+  if (!LOGIN_TOKENS.jwt() || error) {
     if (location.pathname === "/") {
       return <Navigate to="/login" replace />;
     }
@@ -148,5 +155,3 @@ const RequireAuth = () => {
 
   return <Outlet />;
 };
-
-
