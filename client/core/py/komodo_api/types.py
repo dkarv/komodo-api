@@ -836,6 +836,18 @@ class BuildConfig(BaseModel):
     with different configs to push to the same image registry, under different,
     independantly versioned tags.
     """
+    include_latest_tag: bool
+    """
+    Push `:latest` / `:latest-image_tag` tags.
+    """
+    include_version_tags: bool
+    """
+    Push build version semver `:1.19.5` + `1.19` / `:1.19.5-image_tag` tags.
+    """
+    include_commit_tag: bool
+    """
+    Push commit hash `:a6v8h83` / `:a6v8h83-image_tag` tags.
+    """
     links: Optional[List[str]] = Field(default=None)
     """
     Configure quick links that are displayed in the resource header
