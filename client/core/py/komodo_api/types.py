@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set
+from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set, Any
 
 Config = TypeVar("Config")
 Info = TypeVar("Info")
@@ -5488,9 +5488,9 @@ InspectDockerVolumeResponse = Volume
 
 InspectStackContainerResponse = Container
 
-JsonObject = any
+JsonObject = Any
 
-JsonValue = any
+JsonValue = Any
 
 ListActionsResponse = List[ActionListItem]
 
@@ -6417,7 +6417,7 @@ LoginLocalUserResponse = JwtResponse
 """
 The response for [LoginLocalUser]
 """
-MongoDocument = any
+MongoDocument = Any
 
 class ProcedureQuerySpecifics(BaseModel):
     pass

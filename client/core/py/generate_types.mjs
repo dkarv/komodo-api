@@ -51,13 +51,14 @@ function fix_types() {
     .replaceAll('"\\^','"\\\\^')
     // IndexMap and IndexSet don't exist
     .replaceAll("from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union",
-      "from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set")
+      "from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set, Any")
     .replaceAll("IndexMap", "Mapping")
     .replaceAll("IndexSet", "Set")
     .replaceAll("AlertDataVariant", "AlertDataTypes")
     .replaceAll("AlerterEndpointVariant", "AlerterEndpointTypes")
     .replaceAll("ResourceTargetVariant", "ResourceTargetTypes")
     .replaceAll("PathBuf", "str")
+    .replaceAll(" = any", " = Any")
     // TODO look into proper Partial
     .replace(/Partial\[(\w+)\]/g, '$1')
     .split("\n");
