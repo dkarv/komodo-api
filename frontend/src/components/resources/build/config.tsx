@@ -163,6 +163,7 @@ export const BuildConfig = ({
 
   const version_component: ConfigComponent<Types.BuildConfig> = {
     label: "Version",
+    labelHidden: true,
     components: {
       version: (_version, set) => {
         const version =
@@ -173,6 +174,7 @@ export const BuildConfig = ({
           <ConfigInput
             className="text-lg w-[200px]"
             label="Version"
+            boldLabel
             description="Version the image with major.minor.patch. It can be interpolated using [[$VERSION]]."
             placeholder="0.0.0"
             value={version}
@@ -228,6 +230,8 @@ export const BuildConfig = ({
   };
 
   const imageName = (update.image_name ?? config.image_name) || name;
+  const customTag = update.image_tag ?? config.image_tag;
+  const customTagPostfix = customTag ? `-${customTag}` : "";
 
   const general_common: ConfigComponent<Types.BuildConfig>[] = [
     {
@@ -293,6 +297,29 @@ export const BuildConfig = ({
       },
     },
     {
+      label: "Tagging",
+      labelHidden: true,
+      components: {
+        image_name: {
+          description: "Push the image under a different name",
+          placeholder: "Custom image name",
+        },
+        image_tag: {
+          description: `Push a custom tag, plus postfix the other tags (eg ':latest-${customTag ? customTag : "<TAG>"}').`,
+          placeholder: "Custom image tag",
+        },
+        include_latest_tag: {
+          description: `:latest${customTagPostfix}`,
+        },
+        include_version_tags: {
+          description: `:X.Y.Z${customTagPostfix} + :X.Y${customTagPostfix} + :X${customTagPostfix}`,
+        },
+        include_commit_tag: {
+          description: `:ae8f8ff${customTagPostfix}`,
+        },
+      },
+    },
+    {
       label: "Links",
       labelHidden: true,
       components: {
@@ -314,19 +341,6 @@ export const BuildConfig = ({
   ];
 
   const advanced: ConfigComponent<Types.BuildConfig>[] = [
-    {
-      label: "Tagging",
-      components: {
-        image_name: {
-          description: "Push the image under a different name",
-          placeholder: "Custom image name",
-        },
-        image_tag: {
-          description: "Postfix the image version with a custom tag.",
-          placeholder: "Custom image tag",
-        },
-      },
-    },
     {
       label: "Pre Build",
       description:

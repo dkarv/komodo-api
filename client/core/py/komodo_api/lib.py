@@ -13,6 +13,15 @@ from .types import (
     UserRequest,
     WriteRequest,
     WsLoginMessage,
+    WsLoginMessageJwt,
+    WsLoginMessageApiKeys,
+    WsLoginMessageJwtInner,
+    WsLoginMessageApiKeysInner,
+    UpdateListItem,
+    Update,
+    GetUpdate,
+    UpdateStatus,
+    GetVersion,
 )
 
 from .exceptions import KomodoException
@@ -65,21 +74,23 @@ class KomodoClient(AuthApi):
     execute: ExecuteApi
     url: str
     _session: aiohttp.ClientSession
+    _ws_login: WsLoginMessage
 
     def __init__(self, url: str, options: InitOptions):
-        self.url = url
+        self.url = url if url.endswith("/") else url + "/"
         headers = {
             "content-type": "application/json",
-            **({"authorization": options.jwt} if options.type_ == "jwt" else {}),
-            **(
-                {
-                    "x-api-key": options.key,
-                    "x-api-secret": options.secret,
-                }
-                if options.type_ == "api-key"
-                else {}
-            ),
         }
+        if options.type_ == "jwt":
+            headers["authorization"] = options.jwt
+            self._ws_login = WsLoginMessageJwt(params=WsLoginMessageJwtInner(jwt = options.jwt))
+        elif options.type_ == "api-key":
+            headers["x-api-key"] = options.key
+            headers["x-api-secret"] = options.secret
+            self._ws_login = WsLoginMessageApiKeys(params=WsLoginMessageApiKeysInner(key = options.key, secret = options.secret))
+        else:
+            raise ValueError(f"Unknown InitOptions type: {options.type_}")
+        
         self._session = aiohttp.ClientSession(headers=headers)
 
         self.auth = AuthApi(self.request)
@@ -119,78 +130,52 @@ class KomodoClient(AuthApi):
                 _logger.warning(f"Api error {error}")
                 raise KomodoException(error, response.status)
 
-    # CAUTION: completely untested!
-    async def poll_update_until_complete(self, update_id: str) -> Any:
-        while True:
-            await asyncio.sleep(1)
-            update = await self.read("GetUpdate", {"id": update_id})
-            if update["status"] == "Complete":
-                return update
+    async def poll_update_until_complete(self, update: Update, sleep_seconds: int = 1) -> Update:
+        while not update.status == UpdateStatus.COMPLETE:
+            await asyncio.sleep(sleep_seconds)
+            update = await self.read.getUpdate(GetUpdate(id = update.id.oid))
+        return update
 
-    # CAUTION: completely untested!
-    async def execute_and_poll(self, type_: str, params: Dict[str, Any]) -> Any:
-        res = await self.execute(type_, params)
-        if isinstance(res, list):
-            return await asyncio.gather(
-                *[
-                    self.poll_update_until_complete(item["data"]["_id"]["$oid"])
-                    for item in res
-                    if item["status"] != "Err"
-                ]
-            )
-        else:
-            return await self.poll_update_until_complete(res["_id"]["$oid"])
-
-    # CAUTION: completely untested!
     async def core_version(self) -> str:
-        res = await self.read("GetVersion", {})
-        return res["version"]
+        res = await self.read.getVersion(GetVersion())
+        return res.version
 
-    # CAUTION: completely untested!
     async def get_update_websocket(
         self,
-        on_update: Callable[[Dict[str, Any]], None],
-        on_login: Optional[Callable[[], None]] = None,
-        on_open: Optional[Callable[[], None]] = None,
-        on_close: Optional[Callable[[], None]] = None,
+        on_update: Callable[[UpdateListItem], None],
+        on_login: Optional[Callable] = None,
+        on_open: Optional[Callable] = None,
+        on_close: Optional[Callable] = None,
     ):
-        async with websockets.connect(
-            self.url.replace("http", "ws") + "/ws/update"
+        async with self._session.ws_connect(
+            self.url.replace("http", "ws") + "ws/update"
         ) as ws:
             if on_open:
                 on_open()
-            login_msg = (
-                {"type": "Jwt", "params": {"jwt": self.options["params"]["jwt"]}}
-                if self.options["type"] == "jwt"
-                else {
-                    "type": "ApiKeys",
-                    "params": {
-                        "key": self.options["params"]["key"],
-                        "secret": self.options["params"]["secret"],
-                    },
-                }
-            )
-            await ws.send(json.dumps(login_msg))
-            async for message in ws:
-                if message == "LOGGED_IN":
-                    if on_login:
-                        on_login()
-                else:
-                    on_update(json.loads(message))
+            await ws.send_str(self._ws_login.model_dump_json(exclude_none=True))
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    if msg.data == "LOGGED_IN":
+                        if on_login:
+                            on_login()
+                    else:
+                        data = TypeAdapter(UpdateListItem).validate_json(msg.data)
+                        on_update(data)
+                if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    break
             if on_close:
                 on_close()
 
-    # CAUTION: completely untested!
     async def subscribe_to_update_websocket(
         self,
-        on_update: Callable[[Dict[str, Any]], None],
-        on_login: Optional[Callable[[], None]] = None,
-        on_open: Optional[Callable[[], None]] = None,
-        on_close: Optional[Callable[[], None]] = None,
+        on_update: Callable[[UpdateListItem], None],
+        on_login: Optional[Callable] = None,
+        on_open: Optional[Callable] = None,
+        on_close: Optional[Callable] = None,
         retry: bool = True,
         retry_timeout_ms: int = 5000,
         cancel: CancelToken = CancelToken(),
-        on_cancel: Optional[Callable[[], None]] = None,
+        on_cancel: Optional[Callable] = None,
     ):
         while not cancel.cancelled:
             try:

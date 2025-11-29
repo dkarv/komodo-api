@@ -12,7 +12,7 @@ use komodo_client::{
     deployment::{
       Deployment, DeploymentImage, extract_registry_domain,
     },
-    get_image_names, komodo_timestamp, optional_string,
+    komodo_timestamp, optional_string,
     permission::PermissionLevel,
     server::Server,
     update::{Log, Update},
@@ -115,7 +115,7 @@ impl Resolve<ExecuteArgs> for Deploy {
     let (version, registry_token) = match &deployment.config.image {
       DeploymentImage::Build { build_id, version } => {
         let build = resource::get::<Build>(build_id).await?;
-        let image_names = get_image_names(&build);
+        let image_names = build.get_image_names();
         let image_name = image_names
           .first()
           .context("No image name could be created")
@@ -249,7 +249,7 @@ pub async fn pull_deployment_inner(
   let (image, account, token) = match deployment.config.image {
     DeploymentImage::Build { build_id, version } => {
       let build = resource::get::<Build>(&build_id).await?;
-      let image_names = get_image_names(&build);
+      let image_names = build.get_image_names();
       let image_name = image_names
         .first()
         .context("No image name could be created")

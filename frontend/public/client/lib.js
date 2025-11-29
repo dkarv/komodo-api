@@ -88,6 +88,9 @@ export function KomodoClient(url, options) {
         else {
             // it is a single update
             const update = res;
+            if (update.status === UpdateStatus.Complete || !update._id?.$oid) {
+                return update;
+            }
             return await poll_update_until_complete(update._id?.$oid);
         }
     };

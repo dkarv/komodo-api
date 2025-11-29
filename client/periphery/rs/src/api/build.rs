@@ -18,6 +18,8 @@ pub struct Build {
   /// Propogate any secret replacers from core interpolation.
   #[serde(default)]
   pub replacers: Vec<(String, String)>,
+  /// Pass the commit hash to use with tagging
+  pub commit_hash: Option<String>,
   /// Add more tags for this build in addition to the version tags.
   #[serde(default)]
   pub additional_tags: Vec<String>,

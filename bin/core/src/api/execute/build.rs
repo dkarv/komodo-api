@@ -27,7 +27,7 @@ use komodo_client::{
     build::{Build, BuildConfig},
     builder::{Builder, BuilderConfig},
     deployment::DeploymentState,
-    komodo_timestamp,
+    komodo_timestamp, optional_string,
     permission::PermissionLevel,
     repo::Repo,
     update::{Log, Update},
@@ -290,12 +290,10 @@ impl Resolve<ExecuteArgs> for RunBuild {
             repo,
             registry_tokens,
             replacers: secret_replacers.into_iter().collect(),
-            // Push a commit hash tagged image
-            additional_tags: if update.commit_hash.is_empty() {
-              Default::default()
-            } else {
-              vec![update.commit_hash.clone()]
-            },
+            // To push a commit hash tagged image
+            commit_hash: optional_string(&update.commit_hash),
+            // Unused for now
+            additional_tags: Default::default(),
           }) => res.context("failed at call to periphery to build"),
         _ = cancel.cancelled() => {
           info!("build cancelled during build, cleaning up builder");

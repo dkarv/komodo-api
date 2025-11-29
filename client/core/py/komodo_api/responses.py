@@ -9,7 +9,7 @@ class AuthApi:
         self.request = request
 
     async def _auth(self, request: AuthRequest, clz: type[Res]) -> Res:
-        return await self.request("/auth", request, clz)
+        return await self.request("auth", request, clz)
 
     def getLoginOptions(self, params: GetLoginOptions) -> GetLoginOptionsResponse:
         return self._auth(
@@ -40,7 +40,7 @@ class UserApi:
         self.request = request
 
     async def _user(self, request: UserRequest, clz: type[Res]) -> Res:
-        return await self.request("/user", request, clz)
+        return await self.request("user", request, clz)
 
     def userPushRecentlyViewed(
         self, params: PushRecentlyViewed
@@ -68,7 +68,7 @@ class ReadApi:
         self.request = request
 
     async def _read(self, request: ReadRequest, clz: type[Res]) -> Res:
-        return await self.request("/read", request, clz)
+        return await self.request("read", request, clz)
 
     def getVersion(self, params: GetVersion) -> GetVersionResponse:
         return self._read(ReadRequestGetVersion(params=params), GetVersionResponse)
@@ -774,7 +774,7 @@ class WriteApi:
         self.request = request
 
     async def _write(self, request: WriteRequest, clz: type[Res]) -> Res:
-        return await self.request("/write", request, clz)
+        return await self.request("write", request, clz)
 
     # ==== USER ====
     def createLocalUser(self, params: CreateLocalUser) -> CreateLocalUserResponse:
@@ -1240,7 +1240,7 @@ class ExecuteApi:
         self.request = request
 
     async def _execute(self, request: ExecuteRequest, clz: type[Res]) -> Res:
-        return await self.request("/execute", request, clz)
+        return await self.request("execute", request, clz)
 
     # ==== SERVER ====
     def startContainer(self, params: StartContainer) -> Update:

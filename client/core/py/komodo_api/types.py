@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set
+from typing import Dict, Generic, List, Literal, Optional, TypeVar, Union, Mapping, Set, Any
 
 Config = TypeVar("Config")
 Info = TypeVar("Info")
@@ -835,6 +835,18 @@ class BuildConfig(BaseModel):
     Can be used in conjunction with `image_name` to direct multiple builds
     with different configs to push to the same image registry, under different,
     independantly versioned tags.
+    """
+    include_latest_tag: bool
+    """
+    Push `:latest` / `:latest-image_tag` tags.
+    """
+    include_version_tags: bool
+    """
+    Push build version semver `:1.19.5` + `1.19` / `:1.19.5-image_tag` tags.
+    """
+    include_commit_tag: bool
+    """
+    Push commit hash `:a6v8h83` / `:a6v8h83-image_tag` tags.
     """
     links: Optional[List[str]] = Field(default=None)
     """
@@ -5476,9 +5488,9 @@ InspectDockerVolumeResponse = Volume
 
 InspectStackContainerResponse = Container
 
-JsonObject = any
+JsonObject = Any
 
-JsonValue = any
+JsonValue = Any
 
 ListActionsResponse = List[ActionListItem]
 
@@ -6405,7 +6417,7 @@ LoginLocalUserResponse = JwtResponse
 """
 The response for [LoginLocalUser]
 """
-MongoDocument = any
+MongoDocument = Any
 
 class ProcedureQuerySpecifics(BaseModel):
     pass

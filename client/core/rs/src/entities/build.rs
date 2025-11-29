@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::{fmt::Write, sync::OnceLock};
 
 use bson::{Document, doc};
 use derive_builder::Builder;
@@ -25,6 +25,127 @@ use super::{
 
 #[typeshare]
 pub type Build = Resource<BuildConfig, BuildInfo>;
+
+impl Build {
+  pub fn get_image_names(&self) -> Vec<String> {
+    let Build {
+      name,
+      config:
+        BuildConfig {
+          image_name,
+          image_registry,
+          ..
+        },
+      ..
+    } = self;
+    let name = if image_name.is_empty() {
+      name
+    } else {
+      image_name
+    };
+    // Local only
+    if image_registry.is_empty() {
+      return vec![name.to_string()];
+    }
+    image_registry
+      .iter()
+      .map(
+        |ImageRegistryConfig {
+           domain,
+           account,
+           organization,
+         }| {
+          match (
+            !domain.is_empty(),
+            !organization.is_empty(),
+            !account.is_empty(),
+          ) {
+            // If organization and account provided, name under organization.
+            (true, true, true) => {
+              format!("{domain}/{organization}/{name}")
+            }
+            // Just domain / account provided
+            (true, false, true) => {
+              format!("{domain}/{account}/{name}")
+            }
+            // Otherwise, just use name (local only)
+            _ => name.to_string(),
+          }
+        },
+      )
+      .collect()
+  }
+
+  pub fn get_image_tags(
+    &self,
+    image_names: &[String],
+    commit_hash: Option<&str>,
+    additional: &[String],
+  ) -> Vec<String> {
+    let BuildConfig {
+      version,
+      image_tag,
+      include_latest_tag,
+      include_version_tags: include_version_tag,
+      include_commit_tag,
+      ..
+    } = &self.config;
+
+    let Version { major, minor, .. } = version;
+
+    let image_tag_postfix = if image_tag.is_empty() {
+      String::new()
+    } else {
+      format!("-{image_tag}")
+    };
+
+    let mut tags = Vec::new();
+
+    for image_name in image_names {
+      // Pure image tag passthrough when provided
+      if !image_tag.is_empty() {
+        tags.push(format!("{image_name}:{image_tag}"));
+      }
+      // `:latest` / `:latest-tag`
+      if *include_latest_tag {
+        tags.push(format!("{image_name}:latest{image_tag_postfix}"));
+      }
+      // `:1.19.5` + `:1.19` etc. / `1.19.5-tag`
+      if *include_version_tag {
+        tags
+          .push(format!("{image_name}:{version}{image_tag_postfix}"));
+        tags.push(format!(
+          "{image_name}:{major}.{minor}{image_tag_postfix}"
+        ));
+        tags.push(format!("{image_name}:{major}{image_tag_postfix}"));
+      }
+      if *include_commit_tag && let Some(hash) = commit_hash {
+        tags.push(format!("{image_name}:{hash}{image_tag_postfix}"));
+      }
+      for tag in additional {
+        tags.push(format!("{image_name}:{tag}"))
+      }
+    }
+
+    tags
+  }
+
+  pub fn get_image_tags_as_arg(
+    &self,
+    commit_hash: Option<&str>,
+    additional: &[String],
+  ) -> anyhow::Result<String> {
+    let mut res = String::new();
+    for image_tag in self.get_image_tags(
+      &self.get_image_names(),
+      commit_hash,
+      additional,
+    ) {
+      write!(&mut res, " -t {image_tag}")?;
+    }
+    Ok(res)
+  }
+}
 
 #[typeshare]
 pub type BuildListItem = ResourceListItem<BuildListItemInfo>;
@@ -168,6 +289,24 @@ pub struct BuildConfig {
   #[serde(default)]
   #[builder(default)]
   pub image_tag: String,
+
+  /// Push `:latest` / `:latest-image_tag` tags.
+  #[serde(default = "default_include_tag")]
+  #[builder(default = "default_include_tag()")]
+  #[partial_default(default_include_tag())]
+  pub include_latest_tag: bool,
+
+  /// Push build version semver `:1.19.5` + `1.19` / `:1.19.5-image_tag` tags.
+  #[serde(default = "default_include_tag")]
+  #[builder(default = "default_include_tag()")]
+  #[partial_default(default_include_tag())]
+  pub include_version_tags: bool,
+
+  /// Push commit hash `:a6v8h83` / `:a6v8h83-image_tag` tags.
+  #[serde(default = "default_include_tag")]
+  #[builder(default = "default_include_tag()")]
+  #[partial_default(default_include_tag())]
+  pub include_commit_tag: bool,
 
   /// Configure quick links that are displayed in the resource header
   #[serde(default, deserialize_with = "string_list_deserializer")]
@@ -344,6 +483,10 @@ fn default_auto_increment_version() -> bool {
   true
 }
 
+fn default_include_tag() -> bool {
+  true
+}
+
 fn default_git_provider() -> String {
   String::from("github.com")
 }
@@ -377,6 +520,9 @@ impl Default for BuildConfig {
       auto_increment_version: default_auto_increment_version(),
       image_name: Default::default(),
       image_tag: Default::default(),
+      include_latest_tag: default_include_tag(),
+      include_version_tags: default_include_tag(),
+      include_commit_tag: default_include_tag(),
       links: Default::default(),
       linked_repo: Default::default(),
       git_provider: default_git_provider(),

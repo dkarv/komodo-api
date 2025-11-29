@@ -12,7 +12,7 @@ use interpolate::Interpolator;
 use komodo_client::entities::{
   EnvironmentVar, all_logs_success,
   build::{Build, BuildConfig},
-  environment_vars_from_str, get_image_names, optional_string,
+  environment_vars_from_str, optional_string,
   to_path_compatible_name,
   update::Log,
 };
@@ -25,9 +25,7 @@ use resolver_api::Resolve;
 use tokio::fs;
 
 use crate::{
-  build::{
-    image_tags, parse_build_args, parse_secret_args, write_dockerfile,
-  },
+  build::{parse_build_args, parse_secret_args, write_dockerfile},
   config::periphery_config,
   docker::docker_login,
   helpers::{parse_extra_args, parse_labels},
@@ -126,8 +124,9 @@ impl Resolve<super::Args> for build::Build {
       mut build,
       repo: linked_repo,
       registry_tokens,
-      additional_tags,
       mut replacers,
+      commit_hash,
+      additional_tags,
     } = self;
 
     let mut logs = Vec::new();
@@ -145,8 +144,6 @@ impl Resolve<super::Args> for build::Build {
       name,
       config:
         BuildConfig {
-          version,
-          image_tag,
           build_path,
           dockerfile_path,
           build_args,
@@ -265,8 +262,6 @@ impl Resolve<super::Args> for build::Build {
 
     // Get command parts
 
-    let image_names = get_image_names(&build);
-
     // Add VERSION to build args (if not already there)
     let mut build_args = environment_vars_from_str(build_args)
       .context("Invalid build_args")?;
@@ -291,9 +286,9 @@ impl Resolve<super::Args> for build::Build {
 
     let buildx = if *use_buildx { " buildx" } else { "" };
 
-    let image_tags =
-      image_tags(&image_names, image_tag, version, &additional_tags)
-        .context("Failed to parse image tags into command")?;
+    let image_tags = build
+      .get_image_tags_as_arg(commit_hash.as_deref(), &additional_tags)
+      .context("Failed to parse image tags into command")?;
 
     let maybe_push = if should_push { " --push" } else { "" };
 

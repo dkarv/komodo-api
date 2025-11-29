@@ -598,6 +598,12 @@ export interface BuildConfig {
 	 * independantly versioned tags.
 	 */
 	image_tag?: string;
+	/** Push `:latest` / `:latest-image_tag` tags. */
+	include_latest_tag: boolean;
+	/** Push build version semver `:1.19.5` + `1.19` / `:1.19.5-image_tag` tags. */
+	include_version_tags: boolean;
+	/** Push commit hash `:a6v8h83` / `:a6v8h83-image_tag` tags. */
+	include_commit_tag: boolean;
 	/** Configure quick links that are displayed in the resource header */
 	links?: string[];
 	/** Choose a Komodo Repo (Resource) to source the build files. */
