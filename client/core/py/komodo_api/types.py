@@ -334,6 +334,7 @@ class AlerterEndpointPushover(BaseModel):
 AlerterEndpoint = Union[AlerterEndpointCustom, AlerterEndpointSlack, AlerterEndpointDiscord, AlerterEndpointNtfy, AlerterEndpointPushover]
 class ResourceTargetTypes(str, Enum):
     SYSTEM = "System"
+    SWARM = "Swarm"
     SERVER = "Server"
     STACK = "Stack"
     DEPLOYMENT = "Deployment"
@@ -347,6 +348,10 @@ class ResourceTargetTypes(str, Enum):
 
 class ResourceTargetSystem(BaseModel):
     type: Literal[ResourceTargetTypes.SYSTEM] = ResourceTargetTypes.SYSTEM
+    id: str
+
+class ResourceTargetSwarm(BaseModel):
+    type: Literal[ResourceTargetTypes.SWARM] = ResourceTargetTypes.SWARM
     id: str
 
 class ResourceTargetServer(BaseModel):
@@ -390,7 +395,7 @@ class ResourceTargetResourceSync(BaseModel):
     id: str
 
 # Used to reference a specific resource across all resource types
-ResourceTarget = Union[ResourceTargetSystem, ResourceTargetServer, ResourceTargetStack, ResourceTargetDeployment, ResourceTargetBuild, ResourceTargetRepo, ResourceTargetProcedure, ResourceTargetAction, ResourceTargetBuilder, ResourceTargetAlerter, ResourceTargetResourceSync]
+ResourceTarget = Union[ResourceTargetSystem, ResourceTargetSwarm, ResourceTargetServer, ResourceTargetStack, ResourceTargetDeployment, ResourceTargetBuild, ResourceTargetRepo, ResourceTargetProcedure, ResourceTargetAction, ResourceTargetBuilder, ResourceTargetAlerter, ResourceTargetResourceSync]
 class MaintenanceScheduleType(str, Enum):
     """
     Types of maintenance schedules
@@ -516,6 +521,41 @@ class AlerterQuerySpecifics(BaseModel):
 
 AlerterQuery = ResourceQuery[AlerterQuerySpecifics]
 
+class CheckDeploymentForUpdateResponse(BaseModel):
+    deployment: str
+    """
+    The deployment ID
+    """
+    update_available: bool
+    """
+    Whether update is available
+    """
+
+BatchCheckDeploymentForUpdateResponse = List[CheckDeploymentForUpdateResponse]
+
+class StackServiceWithUpdate(BaseModel):
+    service: str
+    image: str
+    """
+    The service's image
+    """
+    update_available: bool
+    """
+    Whether there is a newer image available for this service
+    """
+
+class CheckStackForUpdateResponse(BaseModel):
+    stack: str
+    """
+    The stack ID
+    """
+    services: List[StackServiceWithUpdate]
+    """
+    The stack services with update available status
+    """
+
+BatchCheckStackForUpdateResponse = List[CheckStackForUpdateResponse]
+
 class BatchExecutionResponseItemTypes(str, Enum):
     OK = "Ok"
     ERR = "Err"
@@ -533,8 +573,22 @@ BatchExecutionResponse = List[BatchExecutionResponseItem]
 
 class Operation(str, Enum):
     NONE = "None"
+    CREATESWARM = "CreateSwarm"
+    UPDATESWARM = "UpdateSwarm"
+    RENAMESWARM = "RenameSwarm"
+    DELETESWARM = "DeleteSwarm"
+    REMOVESWARMNODES = "RemoveSwarmNodes"
+    REMOVESWARMSTACKS = "RemoveSwarmStacks"
+    REMOVESWARMSERVICES = "RemoveSwarmServices"
+    CREATESWARMCONFIG = "CreateSwarmConfig"
+    ROTATESWARMCONFIG = "RotateSwarmConfig"
+    REMOVESWARMCONFIGS = "RemoveSwarmConfigs"
+    CREATESWARMSECRET = "CreateSwarmSecret"
+    ROTATESWARMSECRET = "RotateSwarmSecret"
+    REMOVESWARMSECRETS = "RemoveSwarmSecrets"
     CREATESERVER = "CreateServer"
     UPDATESERVER = "UpdateServer"
+    UPDATESERVERKEY = "UpdateServerKey"
     DELETESERVER = "DeleteServer"
     RENAMESERVER = "RenameServer"
     STARTCONTAINER = "StartContainer"
@@ -574,6 +628,7 @@ class Operation(str, Enum):
     STOPSTACK = "StopStack"
     DESTROYSTACK = "DestroyStack"
     RUNSTACKSERVICE = "RunStackService"
+    CHECKSTACKFORUPDATE = "CheckStackForUpdate"
     DEPLOYSTACKSERVICE = "DeployStackService"
     PULLSTACKSERVICE = "PullStackService"
     STARTSTACKSERVICE = "StartStackService"
@@ -594,6 +649,7 @@ class Operation(str, Enum):
     UNPAUSEDEPLOYMENT = "UnpauseDeployment"
     STOPDEPLOYMENT = "StopDeployment"
     DESTROYDEPLOYMENT = "DestroyDeployment"
+    CHECKDEPLOYMENTFORUPDATE = "CheckDeploymentForUpdate"
     CREATEBUILD = "CreateBuild"
     UPDATEBUILD = "UpdateBuild"
     RENAMEBUILD = "RenameBuild"
@@ -619,6 +675,13 @@ class Operation(str, Enum):
     RENAMEACTION = "RenameAction"
     DELETEACTION = "DeleteAction"
     RUNACTION = "RunAction"
+    CREATERESOURCESYNC = "CreateResourceSync"
+    UPDATERESOURCESYNC = "UpdateResourceSync"
+    RENAMERESOURCESYNC = "RenameResourceSync"
+    DELETERESOURCESYNC = "DeleteResourceSync"
+    WRITESYNCCONTENTS = "WriteSyncContents"
+    COMMITSYNC = "CommitSync"
+    RUNSYNC = "RunSync"
     CREATEBUILDER = "CreateBuilder"
     UPDATEBUILDER = "UpdateBuilder"
     RENAMEBUILDER = "RenameBuilder"
@@ -629,16 +692,11 @@ class Operation(str, Enum):
     DELETEALERTER = "DeleteAlerter"
     TESTALERTER = "TestAlerter"
     SENDALERT = "SendAlert"
-    CREATERESOURCESYNC = "CreateResourceSync"
-    UPDATERESOURCESYNC = "UpdateResourceSync"
-    RENAMERESOURCESYNC = "RenameResourceSync"
-    DELETERESOURCESYNC = "DeleteResourceSync"
-    WRITESYNCCONTENTS = "WriteSyncContents"
-    COMMITSYNC = "CommitSync"
-    RUNSYNC = "RunSync"
     CLEARREPOCACHE = "ClearRepoCache"
     BACKUPCOREDATABASE = "BackupCoreDatabase"
     GLOBALAUTOUPDATE = "GlobalAutoUpdate"
+    ROTATEALLSERVERKEYS = "RotateAllServerKeys"
+    ROTATECOREKEYS = "RotateCoreKeys"
     CREATEVARIABLE = "CreateVariable"
     UPDATEVARIABLEVALUE = "UpdateVariableValue"
     DELETEVARIABLE = "DeleteVariable"
@@ -1141,13 +1199,20 @@ BuilderQuery = ResourceQuery[BuilderQuerySpecifics]
 
 class ExecutionTypes(str, Enum):
     NONE = "None"
-    RUN_ACTION = "RunAction"
-    BATCH_RUN_ACTION = "BatchRunAction"
-    RUN_PROCEDURE = "RunProcedure"
-    BATCH_RUN_PROCEDURE = "BatchRunProcedure"
-    RUN_BUILD = "RunBuild"
-    BATCH_RUN_BUILD = "BatchRunBuild"
-    CANCEL_BUILD = "CancelBuild"
+    DEPLOY_STACK = "DeployStack"
+    BATCH_DEPLOY_STACK = "BatchDeployStack"
+    DEPLOY_STACK_IF_CHANGED = "DeployStackIfChanged"
+    BATCH_DEPLOY_STACK_IF_CHANGED = "BatchDeployStackIfChanged"
+    PULL_STACK = "PullStack"
+    BATCH_PULL_STACK = "BatchPullStack"
+    START_STACK = "StartStack"
+    RESTART_STACK = "RestartStack"
+    PAUSE_STACK = "PauseStack"
+    UNPAUSE_STACK = "UnpauseStack"
+    STOP_STACK = "StopStack"
+    DESTROY_STACK = "DestroyStack"
+    BATCH_DESTROY_STACK = "BatchDestroyStack"
+    RUN_STACK_SERVICE = "RunStackService"
     DEPLOY = "Deploy"
     BATCH_DEPLOY = "BatchDeploy"
     PULL_DEPLOYMENT = "PullDeployment"
@@ -1158,6 +1223,9 @@ class ExecutionTypes(str, Enum):
     STOP_DEPLOYMENT = "StopDeployment"
     DESTROY_DEPLOYMENT = "DestroyDeployment"
     BATCH_DESTROY_DEPLOYMENT = "BatchDestroyDeployment"
+    RUN_BUILD = "RunBuild"
+    BATCH_RUN_BUILD = "BatchRunBuild"
+    CANCEL_BUILD = "CancelBuild"
     CLONE_REPO = "CloneRepo"
     BATCH_CLONE_REPO = "BatchCloneRepo"
     PULL_REPO = "PullRepo"
@@ -1165,6 +1233,14 @@ class ExecutionTypes(str, Enum):
     BUILD_REPO = "BuildRepo"
     BATCH_BUILD_REPO = "BatchBuildRepo"
     CANCEL_REPO_BUILD = "CancelRepoBuild"
+    RUN_PROCEDURE = "RunProcedure"
+    BATCH_RUN_PROCEDURE = "BatchRunProcedure"
+    RUN_ACTION = "RunAction"
+    BATCH_RUN_ACTION = "BatchRunAction"
+    RUN_SYNC = "RunSync"
+    COMMIT_SYNC = "CommitSync"
+    TEST_ALERTER = "TestAlerter"
+    SEND_ALERT = "SendAlert"
     START_CONTAINER = "StartContainer"
     RESTART_CONTAINER = "RestartContainer"
     PAUSE_CONTAINER = "PauseContainer"
@@ -1186,27 +1262,20 @@ class ExecutionTypes(str, Enum):
     PRUNE_DOCKER_BUILDERS = "PruneDockerBuilders"
     PRUNE_BUILDX = "PruneBuildx"
     PRUNE_SYSTEM = "PruneSystem"
-    RUN_SYNC = "RunSync"
-    COMMIT_SYNC = "CommitSync"
-    DEPLOY_STACK = "DeployStack"
-    BATCH_DEPLOY_STACK = "BatchDeployStack"
-    DEPLOY_STACK_IF_CHANGED = "DeployStackIfChanged"
-    BATCH_DEPLOY_STACK_IF_CHANGED = "BatchDeployStackIfChanged"
-    PULL_STACK = "PullStack"
-    BATCH_PULL_STACK = "BatchPullStack"
-    START_STACK = "StartStack"
-    RESTART_STACK = "RestartStack"
-    PAUSE_STACK = "PauseStack"
-    UNPAUSE_STACK = "UnpauseStack"
-    STOP_STACK = "StopStack"
-    DESTROY_STACK = "DestroyStack"
-    BATCH_DESTROY_STACK = "BatchDestroyStack"
-    RUN_STACK_SERVICE = "RunStackService"
-    TEST_ALERTER = "TestAlerter"
-    SEND_ALERT = "SendAlert"
+    REMOVE_SWARM_NODES = "RemoveSwarmNodes"
+    REMOVE_SWARM_STACKS = "RemoveSwarmStacks"
+    REMOVE_SWARM_SERVICES = "RemoveSwarmServices"
+    CREATE_SWARM_CONFIG = "CreateSwarmConfig"
+    ROTATE_SWARM_CONFIG = "RotateSwarmConfig"
+    REMOVE_SWARM_CONFIGS = "RemoveSwarmConfigs"
+    CREATE_SWARM_SECRET = "CreateSwarmSecret"
+    ROTATE_SWARM_SECRET = "RotateSwarmSecret"
+    REMOVE_SWARM_SECRETS = "RemoveSwarmSecrets"
     CLEAR_REPO_CACHE = "ClearRepoCache"
     BACKUP_CORE_DATABASE = "BackupCoreDatabase"
     GLOBAL_AUTO_UPDATE = "GlobalAutoUpdate"
+    ROTATE_ALL_SERVER_KEYS = "RotateAllServerKeys"
+    ROTATE_CORE_KEYS = "RotateCoreKeys"
     SLEEP = "Sleep"
 
 class ExecutionNone(BaseModel):
@@ -1216,42 +1285,64 @@ class ExecutionNone(BaseModel):
     type: Literal[ExecutionTypes.NONE] = ExecutionTypes.NONE
     params: NoData
 
-class ExecutionRunAction(BaseModel):
+class ExecutionDeployStack(BaseModel):
     """
-    Run the target action. (alias: `action`, `ac`)
+    Deploy the target stack. (alias: `stack`, `st`)
     """
-    type: Literal[ExecutionTypes.RUN_ACTION] = ExecutionTypes.RUN_ACTION
-    params: RunAction
+    type: Literal[ExecutionTypes.DEPLOY_STACK] = ExecutionTypes.DEPLOY_STACK
+    params: DeployStack
 
-class ExecutionBatchRunAction(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_RUN_ACTION] = ExecutionTypes.BATCH_RUN_ACTION
-    params: BatchRunAction
+class ExecutionBatchDeployStack(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_DEPLOY_STACK] = ExecutionTypes.BATCH_DEPLOY_STACK
+    params: BatchDeployStack
 
-class ExecutionRunProcedure(BaseModel):
-    """
-    Run the target procedure. (alias: `procedure`, `pr`)
-    """
-    type: Literal[ExecutionTypes.RUN_PROCEDURE] = ExecutionTypes.RUN_PROCEDURE
-    params: RunProcedure
+class ExecutionDeployStackIfChanged(BaseModel):
+    type: Literal[ExecutionTypes.DEPLOY_STACK_IF_CHANGED] = ExecutionTypes.DEPLOY_STACK_IF_CHANGED
+    params: DeployStackIfChanged
 
-class ExecutionBatchRunProcedure(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_RUN_PROCEDURE] = ExecutionTypes.BATCH_RUN_PROCEDURE
-    params: BatchRunProcedure
+class ExecutionBatchDeployStackIfChanged(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_DEPLOY_STACK_IF_CHANGED] = ExecutionTypes.BATCH_DEPLOY_STACK_IF_CHANGED
+    params: BatchDeployStackIfChanged
 
-class ExecutionRunBuild(BaseModel):
-    """
-    Run the target build. (alias: `build`, `bd`)
-    """
-    type: Literal[ExecutionTypes.RUN_BUILD] = ExecutionTypes.RUN_BUILD
-    params: RunBuild
+class ExecutionPullStack(BaseModel):
+    type: Literal[ExecutionTypes.PULL_STACK] = ExecutionTypes.PULL_STACK
+    params: PullStack
 
-class ExecutionBatchRunBuild(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_RUN_BUILD] = ExecutionTypes.BATCH_RUN_BUILD
-    params: BatchRunBuild
+class ExecutionBatchPullStack(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_PULL_STACK] = ExecutionTypes.BATCH_PULL_STACK
+    params: BatchPullStack
 
-class ExecutionCancelBuild(BaseModel):
-    type: Literal[ExecutionTypes.CANCEL_BUILD] = ExecutionTypes.CANCEL_BUILD
-    params: CancelBuild
+class ExecutionStartStack(BaseModel):
+    type: Literal[ExecutionTypes.START_STACK] = ExecutionTypes.START_STACK
+    params: StartStack
+
+class ExecutionRestartStack(BaseModel):
+    type: Literal[ExecutionTypes.RESTART_STACK] = ExecutionTypes.RESTART_STACK
+    params: RestartStack
+
+class ExecutionPauseStack(BaseModel):
+    type: Literal[ExecutionTypes.PAUSE_STACK] = ExecutionTypes.PAUSE_STACK
+    params: PauseStack
+
+class ExecutionUnpauseStack(BaseModel):
+    type: Literal[ExecutionTypes.UNPAUSE_STACK] = ExecutionTypes.UNPAUSE_STACK
+    params: UnpauseStack
+
+class ExecutionStopStack(BaseModel):
+    type: Literal[ExecutionTypes.STOP_STACK] = ExecutionTypes.STOP_STACK
+    params: StopStack
+
+class ExecutionDestroyStack(BaseModel):
+    type: Literal[ExecutionTypes.DESTROY_STACK] = ExecutionTypes.DESTROY_STACK
+    params: DestroyStack
+
+class ExecutionBatchDestroyStack(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_DESTROY_STACK] = ExecutionTypes.BATCH_DESTROY_STACK
+    params: BatchDestroyStack
+
+class ExecutionRunStackService(BaseModel):
+    type: Literal[ExecutionTypes.RUN_STACK_SERVICE] = ExecutionTypes.RUN_STACK_SERVICE
+    params: RunStackService
 
 class ExecutionDeploy(BaseModel):
     """
@@ -1296,6 +1387,21 @@ class ExecutionBatchDestroyDeployment(BaseModel):
     type: Literal[ExecutionTypes.BATCH_DESTROY_DEPLOYMENT] = ExecutionTypes.BATCH_DESTROY_DEPLOYMENT
     params: BatchDestroyDeployment
 
+class ExecutionRunBuild(BaseModel):
+    """
+    Run the target build. (alias: `build`, `bd`)
+    """
+    type: Literal[ExecutionTypes.RUN_BUILD] = ExecutionTypes.RUN_BUILD
+    params: RunBuild
+
+class ExecutionBatchRunBuild(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_RUN_BUILD] = ExecutionTypes.BATCH_RUN_BUILD
+    params: BatchRunBuild
+
+class ExecutionCancelBuild(BaseModel):
+    type: Literal[ExecutionTypes.CANCEL_BUILD] = ExecutionTypes.CANCEL_BUILD
+    params: CancelBuild
+
 class ExecutionCloneRepo(BaseModel):
     """
     Clone the target repo
@@ -1326,6 +1432,50 @@ class ExecutionBatchBuildRepo(BaseModel):
 class ExecutionCancelRepoBuild(BaseModel):
     type: Literal[ExecutionTypes.CANCEL_REPO_BUILD] = ExecutionTypes.CANCEL_REPO_BUILD
     params: CancelRepoBuild
+
+class ExecutionRunProcedure(BaseModel):
+    """
+    Run the target procedure. (alias: `procedure`, `pr`)
+    """
+    type: Literal[ExecutionTypes.RUN_PROCEDURE] = ExecutionTypes.RUN_PROCEDURE
+    params: RunProcedure
+
+class ExecutionBatchRunProcedure(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_RUN_PROCEDURE] = ExecutionTypes.BATCH_RUN_PROCEDURE
+    params: BatchRunProcedure
+
+class ExecutionRunAction(BaseModel):
+    """
+    Run the target action. (alias: `action`, `ac`)
+    """
+    type: Literal[ExecutionTypes.RUN_ACTION] = ExecutionTypes.RUN_ACTION
+    params: RunAction
+
+class ExecutionBatchRunAction(BaseModel):
+    type: Literal[ExecutionTypes.BATCH_RUN_ACTION] = ExecutionTypes.BATCH_RUN_ACTION
+    params: BatchRunAction
+
+class ExecutionRunSync(BaseModel):
+    """
+    Execute a Resource Sync. (alias: `sync`)
+    """
+    type: Literal[ExecutionTypes.RUN_SYNC] = ExecutionTypes.RUN_SYNC
+    params: RunSync
+
+class ExecutionCommitSync(BaseModel):
+    """
+    Commit a Resource Sync. (alias: `commit`)
+    """
+    type: Literal[ExecutionTypes.COMMIT_SYNC] = ExecutionTypes.COMMIT_SYNC
+    params: CommitSync
+
+class ExecutionTestAlerter(BaseModel):
+    type: Literal[ExecutionTypes.TEST_ALERTER] = ExecutionTypes.TEST_ALERTER
+    params: TestAlerter
+
+class ExecutionSendAlert(BaseModel):
+    type: Literal[ExecutionTypes.SEND_ALERT] = ExecutionTypes.SEND_ALERT
+    params: SendAlert
 
 class ExecutionStartContainer(BaseModel):
     type: Literal[ExecutionTypes.START_CONTAINER] = ExecutionTypes.START_CONTAINER
@@ -1411,86 +1561,41 @@ class ExecutionPruneSystem(BaseModel):
     type: Literal[ExecutionTypes.PRUNE_SYSTEM] = ExecutionTypes.PRUNE_SYSTEM
     params: PruneSystem
 
-class ExecutionRunSync(BaseModel):
-    """
-    Execute a Resource Sync. (alias: `sync`)
-    """
-    type: Literal[ExecutionTypes.RUN_SYNC] = ExecutionTypes.RUN_SYNC
-    params: RunSync
+class ExecutionRemoveSwarmNodes(BaseModel):
+    type: Literal[ExecutionTypes.REMOVE_SWARM_NODES] = ExecutionTypes.REMOVE_SWARM_NODES
+    params: RemoveSwarmNodes
 
-class ExecutionCommitSync(BaseModel):
-    """
-    Commit a Resource Sync. (alias: `commit`)
-    """
-    type: Literal[ExecutionTypes.COMMIT_SYNC] = ExecutionTypes.COMMIT_SYNC
-    params: CommitSync
+class ExecutionRemoveSwarmStacks(BaseModel):
+    type: Literal[ExecutionTypes.REMOVE_SWARM_STACKS] = ExecutionTypes.REMOVE_SWARM_STACKS
+    params: RemoveSwarmStacks
 
-class ExecutionDeployStack(BaseModel):
-    """
-    Deploy the target stack. (alias: `stack`, `st`)
-    """
-    type: Literal[ExecutionTypes.DEPLOY_STACK] = ExecutionTypes.DEPLOY_STACK
-    params: DeployStack
+class ExecutionRemoveSwarmServices(BaseModel):
+    type: Literal[ExecutionTypes.REMOVE_SWARM_SERVICES] = ExecutionTypes.REMOVE_SWARM_SERVICES
+    params: RemoveSwarmServices
 
-class ExecutionBatchDeployStack(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_DEPLOY_STACK] = ExecutionTypes.BATCH_DEPLOY_STACK
-    params: BatchDeployStack
+class ExecutionCreateSwarmConfig(BaseModel):
+    type: Literal[ExecutionTypes.CREATE_SWARM_CONFIG] = ExecutionTypes.CREATE_SWARM_CONFIG
+    params: CreateSwarmConfig
 
-class ExecutionDeployStackIfChanged(BaseModel):
-    type: Literal[ExecutionTypes.DEPLOY_STACK_IF_CHANGED] = ExecutionTypes.DEPLOY_STACK_IF_CHANGED
-    params: DeployStackIfChanged
+class ExecutionRotateSwarmConfig(BaseModel):
+    type: Literal[ExecutionTypes.ROTATE_SWARM_CONFIG] = ExecutionTypes.ROTATE_SWARM_CONFIG
+    params: RotateSwarmConfig
 
-class ExecutionBatchDeployStackIfChanged(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_DEPLOY_STACK_IF_CHANGED] = ExecutionTypes.BATCH_DEPLOY_STACK_IF_CHANGED
-    params: BatchDeployStackIfChanged
+class ExecutionRemoveSwarmConfigs(BaseModel):
+    type: Literal[ExecutionTypes.REMOVE_SWARM_CONFIGS] = ExecutionTypes.REMOVE_SWARM_CONFIGS
+    params: RemoveSwarmConfigs
 
-class ExecutionPullStack(BaseModel):
-    type: Literal[ExecutionTypes.PULL_STACK] = ExecutionTypes.PULL_STACK
-    params: PullStack
+class ExecutionCreateSwarmSecret(BaseModel):
+    type: Literal[ExecutionTypes.CREATE_SWARM_SECRET] = ExecutionTypes.CREATE_SWARM_SECRET
+    params: CreateSwarmSecret
 
-class ExecutionBatchPullStack(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_PULL_STACK] = ExecutionTypes.BATCH_PULL_STACK
-    params: BatchPullStack
+class ExecutionRotateSwarmSecret(BaseModel):
+    type: Literal[ExecutionTypes.ROTATE_SWARM_SECRET] = ExecutionTypes.ROTATE_SWARM_SECRET
+    params: RotateSwarmSecret
 
-class ExecutionStartStack(BaseModel):
-    type: Literal[ExecutionTypes.START_STACK] = ExecutionTypes.START_STACK
-    params: StartStack
-
-class ExecutionRestartStack(BaseModel):
-    type: Literal[ExecutionTypes.RESTART_STACK] = ExecutionTypes.RESTART_STACK
-    params: RestartStack
-
-class ExecutionPauseStack(BaseModel):
-    type: Literal[ExecutionTypes.PAUSE_STACK] = ExecutionTypes.PAUSE_STACK
-    params: PauseStack
-
-class ExecutionUnpauseStack(BaseModel):
-    type: Literal[ExecutionTypes.UNPAUSE_STACK] = ExecutionTypes.UNPAUSE_STACK
-    params: UnpauseStack
-
-class ExecutionStopStack(BaseModel):
-    type: Literal[ExecutionTypes.STOP_STACK] = ExecutionTypes.STOP_STACK
-    params: StopStack
-
-class ExecutionDestroyStack(BaseModel):
-    type: Literal[ExecutionTypes.DESTROY_STACK] = ExecutionTypes.DESTROY_STACK
-    params: DestroyStack
-
-class ExecutionBatchDestroyStack(BaseModel):
-    type: Literal[ExecutionTypes.BATCH_DESTROY_STACK] = ExecutionTypes.BATCH_DESTROY_STACK
-    params: BatchDestroyStack
-
-class ExecutionRunStackService(BaseModel):
-    type: Literal[ExecutionTypes.RUN_STACK_SERVICE] = ExecutionTypes.RUN_STACK_SERVICE
-    params: RunStackService
-
-class ExecutionTestAlerter(BaseModel):
-    type: Literal[ExecutionTypes.TEST_ALERTER] = ExecutionTypes.TEST_ALERTER
-    params: TestAlerter
-
-class ExecutionSendAlert(BaseModel):
-    type: Literal[ExecutionTypes.SEND_ALERT] = ExecutionTypes.SEND_ALERT
-    params: SendAlert
+class ExecutionRemoveSwarmSecrets(BaseModel):
+    type: Literal[ExecutionTypes.REMOVE_SWARM_SECRETS] = ExecutionTypes.REMOVE_SWARM_SECRETS
+    params: RemoveSwarmSecrets
 
 class ExecutionClearRepoCache(BaseModel):
     type: Literal[ExecutionTypes.CLEAR_REPO_CACHE] = ExecutionTypes.CLEAR_REPO_CACHE
@@ -1504,12 +1609,20 @@ class ExecutionGlobalAutoUpdate(BaseModel):
     type: Literal[ExecutionTypes.GLOBAL_AUTO_UPDATE] = ExecutionTypes.GLOBAL_AUTO_UPDATE
     params: GlobalAutoUpdate
 
+class ExecutionRotateAllServerKeys(BaseModel):
+    type: Literal[ExecutionTypes.ROTATE_ALL_SERVER_KEYS] = ExecutionTypes.ROTATE_ALL_SERVER_KEYS
+    params: RotateAllServerKeys
+
+class ExecutionRotateCoreKeys(BaseModel):
+    type: Literal[ExecutionTypes.ROTATE_CORE_KEYS] = ExecutionTypes.ROTATE_CORE_KEYS
+    params: RotateCoreKeys
+
 class ExecutionSleep(BaseModel):
     type: Literal[ExecutionTypes.SLEEP] = ExecutionTypes.SLEEP
     params: Sleep
 
 # A wrapper for all Komodo exections.
-Execution = Union[ExecutionNone, ExecutionRunAction, ExecutionBatchRunAction, ExecutionRunProcedure, ExecutionBatchRunProcedure, ExecutionRunBuild, ExecutionBatchRunBuild, ExecutionCancelBuild, ExecutionDeploy, ExecutionBatchDeploy, ExecutionPullDeployment, ExecutionStartDeployment, ExecutionRestartDeployment, ExecutionPauseDeployment, ExecutionUnpauseDeployment, ExecutionStopDeployment, ExecutionDestroyDeployment, ExecutionBatchDestroyDeployment, ExecutionCloneRepo, ExecutionBatchCloneRepo, ExecutionPullRepo, ExecutionBatchPullRepo, ExecutionBuildRepo, ExecutionBatchBuildRepo, ExecutionCancelRepoBuild, ExecutionStartContainer, ExecutionRestartContainer, ExecutionPauseContainer, ExecutionUnpauseContainer, ExecutionStopContainer, ExecutionDestroyContainer, ExecutionStartAllContainers, ExecutionRestartAllContainers, ExecutionPauseAllContainers, ExecutionUnpauseAllContainers, ExecutionStopAllContainers, ExecutionPruneContainers, ExecutionDeleteNetwork, ExecutionPruneNetworks, ExecutionDeleteImage, ExecutionPruneImages, ExecutionDeleteVolume, ExecutionPruneVolumes, ExecutionPruneDockerBuilders, ExecutionPruneBuildx, ExecutionPruneSystem, ExecutionRunSync, ExecutionCommitSync, ExecutionDeployStack, ExecutionBatchDeployStack, ExecutionDeployStackIfChanged, ExecutionBatchDeployStackIfChanged, ExecutionPullStack, ExecutionBatchPullStack, ExecutionStartStack, ExecutionRestartStack, ExecutionPauseStack, ExecutionUnpauseStack, ExecutionStopStack, ExecutionDestroyStack, ExecutionBatchDestroyStack, ExecutionRunStackService, ExecutionTestAlerter, ExecutionSendAlert, ExecutionClearRepoCache, ExecutionBackupCoreDatabase, ExecutionGlobalAutoUpdate, ExecutionSleep]
+Execution = Union[ExecutionNone, ExecutionDeployStack, ExecutionBatchDeployStack, ExecutionDeployStackIfChanged, ExecutionBatchDeployStackIfChanged, ExecutionPullStack, ExecutionBatchPullStack, ExecutionStartStack, ExecutionRestartStack, ExecutionPauseStack, ExecutionUnpauseStack, ExecutionStopStack, ExecutionDestroyStack, ExecutionBatchDestroyStack, ExecutionRunStackService, ExecutionDeploy, ExecutionBatchDeploy, ExecutionPullDeployment, ExecutionStartDeployment, ExecutionRestartDeployment, ExecutionPauseDeployment, ExecutionUnpauseDeployment, ExecutionStopDeployment, ExecutionDestroyDeployment, ExecutionBatchDestroyDeployment, ExecutionRunBuild, ExecutionBatchRunBuild, ExecutionCancelBuild, ExecutionCloneRepo, ExecutionBatchCloneRepo, ExecutionPullRepo, ExecutionBatchPullRepo, ExecutionBuildRepo, ExecutionBatchBuildRepo, ExecutionCancelRepoBuild, ExecutionRunProcedure, ExecutionBatchRunProcedure, ExecutionRunAction, ExecutionBatchRunAction, ExecutionRunSync, ExecutionCommitSync, ExecutionTestAlerter, ExecutionSendAlert, ExecutionStartContainer, ExecutionRestartContainer, ExecutionPauseContainer, ExecutionUnpauseContainer, ExecutionStopContainer, ExecutionDestroyContainer, ExecutionStartAllContainers, ExecutionRestartAllContainers, ExecutionPauseAllContainers, ExecutionUnpauseAllContainers, ExecutionStopAllContainers, ExecutionPruneContainers, ExecutionDeleteNetwork, ExecutionPruneNetworks, ExecutionDeleteImage, ExecutionPruneImages, ExecutionDeleteVolume, ExecutionPruneVolumes, ExecutionPruneDockerBuilders, ExecutionPruneBuildx, ExecutionPruneSystem, ExecutionRemoveSwarmNodes, ExecutionRemoveSwarmStacks, ExecutionRemoveSwarmServices, ExecutionCreateSwarmConfig, ExecutionRotateSwarmConfig, ExecutionRemoveSwarmConfigs, ExecutionCreateSwarmSecret, ExecutionRotateSwarmSecret, ExecutionRemoveSwarmSecrets, ExecutionClearRepoCache, ExecutionBackupCoreDatabase, ExecutionGlobalAutoUpdate, ExecutionRotateAllServerKeys, ExecutionRotateCoreKeys, ExecutionSleep]
 class EnabledExecution(BaseModel):
     """
     Allows to enable / disabled procedures in the sequence / parallel vec on the fly
@@ -1607,27 +1720,16 @@ each stage runs executions in parallel.
 """
 CopyProcedureResponse = Procedure
 
-CreateActionWebhookResponse = NoData
-
 class CreateApiKeyResponse(BaseModel):
     """
-    Response for [CreateApiKey].
+    ⚠️ DO NOT USE DIRECTLY
+    This is a copy of [mogh_auth_client::api::manage::CreateApiKeyResponse] for local typeshare.
+    Use the one from mogh auth instead.
     """
     key: str
-    """
-    X-API-KEY
-    """
     secret: str
-    """
-    X-API-SECRET
-    
-    Note.
-    There is no way to get the secret again after it is distributed in this message
-    """
 
 CreateApiKeyForServiceUserResponse = CreateApiKeyResponse
-
-CreateBuildWebhookResponse = NoData
 
 class DockerRegistryAccount(BaseModel):
     """
@@ -1773,6 +1875,34 @@ class UserConfigService(BaseModel):
     data: UserConfigServiceInner
 
 UserConfig = Union[UserConfigLocal, UserConfigGoogle, UserConfigGithub, UserConfigOidc, UserConfigService]
+LinkedLoginsMap = Dict[UserConfigVariant, UserConfig]
+
+class UserTotpConfig(BaseModel):
+    secret: str
+    """
+    TOTP shared secret, encrypted
+    """
+    confirmed_at: I64
+    """
+    Unix timestamp in milliseconds when secret confirmed
+    """
+    recovery_codes: List[str]
+    """
+    Hashed recovery codes.
+    """
+
+JsonValue = Any
+
+class UserPasskeyConfig(BaseModel):
+    passkey: Optional[JsonValue] = Field(default=None)
+    """
+    Passkey config for 2fa. The exact schema is not public.
+    """
+    created_at: I64
+    """
+    Unix timestamp in milliseconds when key created
+    """
+
 class User(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1808,7 +1938,24 @@ class User(BaseModel):
     """
     config: UserConfig
     """
-    The user-type specific config.
+    The primary user login.
+    """
+    linked_logins: Optional[LinkedLoginsMap] = Field(default=None)
+    """
+    Additional linked login methods.
+    May not contain 'Service' type config.
+    """
+    totp: Optional[UserTotpConfig] = Field(default=None)
+    """
+    TOTP 2fa credentials
+    """
+    passkey: Optional[UserPasskeyConfig] = Field(default=None)
+    """
+    WebAuthn Passkey 2fa credentials
+    """
+    external_skip_2_fa: bool = Field(alias="external_skip_2fa")
+    """
+    Allow external / third party logins to skip 2fa.
     """
     last_update_view: Optional[I64] = Field(default=None)
     """
@@ -1828,13 +1975,7 @@ CreateLocalUserResponse = User
 
 CreateProcedureResponse = Procedure
 
-CreateRepoWebhookResponse = NoData
-
 CreateServiceUserResponse = User
-
-CreateStackWebhookResponse = NoData
-
-CreateSyncWebhookResponse = NoData
 
 class Variable(BaseModel):
     """
@@ -1866,25 +2007,70 @@ class Variable(BaseModel):
 
 CreateVariableResponse = Variable
 
-DeleteActionWebhookResponse = NoData
-
 DeleteApiKeyForServiceUserResponse = NoData
-
-DeleteApiKeyResponse = NoData
-
-DeleteBuildWebhookResponse = NoData
 
 DeleteDockerRegistryAccountResponse = DockerRegistryAccount
 
 DeleteGitProviderAccountResponse = GitProviderAccount
 
+class OnboardingKey(BaseModel):
+    """
+    An public key used to authenticate new Periphery -> Core connections
+    to join Komodo as a newly created Server.
+    
+    Server onboarding keys correspond to private / public key pairs.
+    While the public key is stored, the private key will only be returned to the user,
+    The private key will not be stored or available afterwards, just like the api key "secret".
+    """
+    public_key: str
+    """
+    Unique public key associated the creation private key.
+    """
+    enabled: Optional[bool] = Field(default=None)
+    """
+    Disable the onboarding key when not in use.
+    """
+    expires: Optional[I64] = Field(default=None)
+    """
+    Expiry of key, or 0 if never expires
+    """
+    name: Optional[str] = Field(default=None)
+    """
+    Name associated with the api key for management
+    """
+    onboarded: Optional[List[str]] = Field(default=None)
+    """
+    The [Server](crate::entities::server::Server) ids onboarded by this Creation Key
+    """
+    created_at: Optional[I64] = Field(default=None)
+    """
+    Timestamp of key creation
+    """
+    tags: Optional[List[str]] = Field(default=None)
+    """
+    Default tags to give to Servers created with this key.
+    """
+    privileged: Optional[bool] = Field(default=None)
+    """
+    Allows the Onboarding Key to be used to:
+    
+    1. Enable a disabled Server
+    2. Remove Server 'address' configuration, allowing Periphery -> Core connection.
+    3. Update existing Server's public keys.
+    """
+    copy_server: Optional[str] = Field(default=None)
+    """
+    Optional. If specified, copy this Server config when initializing
+    the Server.
+    """
+    create_builder: Optional[bool] = Field(default=None)
+    """
+    Also create a Builder for the Server.
+    """
+
+DeleteOnboardingKeyResponse = OnboardingKey
+
 DeleteProcedureResponse = Procedure
-
-DeleteRepoWebhookResponse = NoData
-
-DeleteStackWebhookResponse = NoData
-
-DeleteSyncWebhookResponse = NoData
 
 DeleteUserResponse = User
 
@@ -1943,9 +2129,19 @@ class TerminationSignal(str, Enum):
     SIGQUIT = "SIGQUIT"
     SIGTERM = "SIGTERM"
 class DeploymentConfig(BaseModel):
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The Swarm to deploy the Deployment on (as a Swarm Service), setting the Deployment into Swarm mode.
+    
+    Note. If both swarm_id and server_id are set,
+    swarm_id overrides server_id and the Deployment will be in Swarm mode.
+    """
     server_id: Optional[str] = Field(default=None)
     """
-    The id of server the deployment is deployed on.
+    The Server to deploy the Deployment on, setting the Deployment into Container mode.
+    
+    Note. If both swarm_id and server_id are set,
+    swarm_id overrides server_id and the Deployment will be in Swarm mode.
     """
     image: Optional[DeploymentImage] = Field(default=None)
     """
@@ -2004,6 +2200,12 @@ class DeploymentConfig(BaseModel):
     or replaces the container command, depending on use of ENTRYPOINT or CMD in dockerfile.
     Empty is no command.
     """
+    replicas: int
+    """
+    The number of replicas for the Service.
+    
+    Note. Only used in Swarm mode.
+    """
     termination_signal: Optional[TerminationSignal] = Field(default=None)
     """
     The default termination signal to use to stop the deployment. Defaults to SigTerm (default docker signal).
@@ -2014,13 +2216,18 @@ class DeploymentConfig(BaseModel):
     """
     extra_args: Optional[List[str]] = Field(default=None)
     """
-    Extra args which are interpolated into the `docker run` command,
+    Extra args which are interpolated into the
+    `docker run` / `docker service create` command,
     and affect the container configuration.
+    
+    - Container ref: https://docs.docker.com/reference/cli/docker/container/run/#options
+    - Swarm Service ref: https://docs.docker.com/reference/cli/docker/service/create/#options
     """
     term_signal_labels: Optional[str] = Field(default=None)
     """
     Labels attached to various termination signal options.
-    Used to specify different shutdown functionality depending on the termination signal.
+    Used to specify different shutdown functionality depending
+    on the termination signal.
     """
     ports: Optional[str] = Field(default=None)
     """
@@ -2035,14 +2242,27 @@ class DeploymentConfig(BaseModel):
     """
     environment: Optional[str] = Field(default=None)
     """
-    The environment variables passed to the container.
+    The environment variables passed to the container / service.
     """
     labels: Optional[str] = Field(default=None)
     """
     The docker labels given to the container.
     """
 
-Deployment = Resource[DeploymentConfig, None]
+ImageDigest = str
+
+"""
+Example:
+apache/tika@sha256:c0154cb95587cde64be74f35ada1a2bd7892219f3f0ac3c9dc6cab34046b3573
+"""
+class DeploymentInfo(BaseModel):
+    latest_image_digest: Optional[ImageDigest] = Field(default=None)
+    """
+    Store the latest associated image digest.
+    This includes both the image name / tag, and the specific digest hash.
+    """
+
+Deployment = Resource[DeploymentConfig, DeploymentInfo]
 
 class DeploymentState(str, Enum):
     """
@@ -2059,39 +2279,43 @@ class DeploymentState(str, Enum):
     """
     RUNNING = "running"
     """
-    Container is running
+    Container / Service is running
     """
     CREATED = "created"
     """
-    Container is created but not running
+    Server mode only. Container is created but not running.
     """
     RESTARTING = "restarting"
     """
-    Container is in restart loop
+    Server mode only. Container is in restart loop
     """
     REMOVING = "removing"
     """
-    Container is being removed
+    Server mode only. Container is being removed
     """
     PAUSED = "paused"
     """
-    Container is paused
+    Server mode only. Container is paused
     """
     EXITED = "exited"
     """
-    Container is exited
+    Server mode only. Container is exited
     """
     DEAD = "dead"
     """
-    Container is dead
+    Server mode only. Container is dead
+    """
+    UNHEALTHY = "unhealthy"
+    """
+    Swarm mode only. Some tasks don't match their desired state.
     """
     NOTDEPLOYED = "not_deployed"
     """
-    The deployment is not deployed (no matching container)
+    The deployment is not deployed (no matching Container / Service)
     """
     UNKNOWN = "unknown"
     """
-    Server not reachable for status
+    Server / Swarm not reachable for status
     """
 class DeploymentListItemInfo(BaseModel):
     state: DeploymentState
@@ -2110,9 +2334,13 @@ class DeploymentListItemInfo(BaseModel):
     """
     Whether there is a newer image available at the same tag.
     """
+    swarm_id: str
+    """
+    The swarm that deployment is deployed on, when in Swarm mode.
+    """
     server_id: str
     """
-    The server that deployment sits on.
+    The server that deployment is deployed on, when in Server mode.
     """
     build_id: Optional[str] = Field(default=None)
     """
@@ -2141,24 +2369,6 @@ class DeploymentQuerySpecifics(BaseModel):
 
 DeploymentQuery = ResourceQuery[DeploymentQuerySpecifics]
 
-class JwtResponse(BaseModel):
-    """
-    JSON containing an authentication token.
-    """
-    user_id: str
-    """
-    User ID for signed in user.
-    """
-    jwt: str
-    """
-    A token the user can use to authenticate their requests.
-    """
-
-ExchangeForJwtResponse = JwtResponse
-
-"""
-Response for [ExchangeForJwt].
-"""
 class TomlResponse(BaseModel):
     """
     Response containing pretty formatted toml contents.
@@ -2171,6 +2381,29 @@ ExportResourcesToTomlResponse = TomlResponse
 
 FindUserResponse = User
 
+class GenericResourcesInnerNamedResourceSpec(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    kind: Optional[str] = Field(alias="Kind", default=None)
+    value: Optional[str] = Field(alias="Value", default=None)
+
+class GenericResourcesInnerDiscreteResourceSpec(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    kind: Optional[str] = Field(alias="Kind", default=None)
+    value: Optional[I64] = Field(alias="Value", default=None)
+
+class GenericResourcesInner(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    named_resource_spec: Optional[GenericResourcesInnerNamedResourceSpec] = Field(alias="NamedResourceSpec", default=None)
+    discrete_resource_spec: Optional[GenericResourcesInnerDiscreteResourceSpec] = Field(alias="DiscreteResourceSpec", default=None)
+
+GenericResources = List[GenericResourcesInner]
+
+"""
+User-defined resources can be either Integer resources (e.g, `SSD=3`) or String resources (e.g, `GPU=UUID1`).
+"""
 class ActionActionState(BaseModel):
     running: int
     """
@@ -2219,6 +2452,23 @@ class AlertDataTestInner(BaseModel):
     name: str
     """
     The name of the alerter
+    """
+
+class AlertDataSwarmUnhealthyInner(BaseModel):
+    """
+    Generated type representing the anonymous struct variant `SwarmUnhealthy` of the `AlertData` Rust enum
+    """
+    id: str
+    """
+    The id of the swarm
+    """
+    name: str
+    """
+    The name of the swarm
+    """
+    err: Optional[str] = Field(default=None)
+    """
+    The error data
     """
 
 class AlertDataServerUnreachableInner(BaseModel):
@@ -2356,13 +2606,21 @@ class AlertDataContainerStateChangeInner(BaseModel):
     """
     The name of the deployment
     """
-    server_id: str
+    server_id: Optional[str] = Field(default=None)
     """
     The server id of server that the deployment is on
     """
-    server_name: str
+    server_name: Optional[str] = Field(default=None)
     """
     The server name
+    """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The swarm id of swarm that the deployment is on
+    """
+    swarm_name: Optional[str] = Field(default=None)
+    """
+    The swarm name
     """
     from_: DeploymentState = Field(alias="from")
     """
@@ -2385,13 +2643,21 @@ class AlertDataDeploymentImageUpdateAvailableInner(BaseModel):
     """
     The name of the deployment
     """
-    server_id: str
+    server_id: Optional[str] = Field(default=None)
     """
     The server id of server that the deployment is on
     """
-    server_name: str
+    server_name: Optional[str] = Field(default=None)
     """
     The server name
+    """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The swarm id of swarm that the deployment is on
+    """
+    swarm_name: Optional[str] = Field(default=None)
+    """
+    The swarm name
     """
     image: str
     """
@@ -2410,13 +2676,21 @@ class AlertDataDeploymentAutoUpdatedInner(BaseModel):
     """
     The name of the deployment
     """
-    server_id: str
+    server_id: Optional[str] = Field(default=None)
     """
     The server id of server that the deployment is on
     """
-    server_name: str
+    server_name: Optional[str] = Field(default=None)
     """
     The server name
+    """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The swarm id of swarm that the deployment is on
+    """
+    swarm_name: Optional[str] = Field(default=None)
+    """
+    The swarm name
     """
     image: str
     """
@@ -2437,13 +2711,21 @@ class AlertDataStackStateChangeInner(BaseModel):
     """
     The name of the stack
     """
-    server_id: str
+    server_id: Optional[str] = Field(default=None)
     """
     The server id of server that the stack is on
     """
-    server_name: str
+    server_name: Optional[str] = Field(default=None)
     """
     The server name
+    """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The swarm id of swarm that the stack is on
+    """
+    swarm_name: Optional[str] = Field(default=None)
+    """
+    The swarm name
     """
     from_: StackState = Field(alias="from")
     """
@@ -2466,13 +2748,21 @@ class AlertDataStackImageUpdateAvailableInner(BaseModel):
     """
     The name of the stack
     """
-    server_id: str
+    server_id: Optional[str] = Field(default=None)
     """
     The server id of server that the stack is on
     """
-    server_name: str
+    server_name: Optional[str] = Field(default=None)
     """
     The server name
+    """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The swarm id of swarm that the stack is on
+    """
+    swarm_name: Optional[str] = Field(default=None)
+    """
+    The swarm name
     """
     service: str
     """
@@ -2495,13 +2785,21 @@ class AlertDataStackAutoUpdatedInner(BaseModel):
     """
     The name of the stack
     """
-    server_id: str
+    server_id: Optional[str] = Field(default=None)
     """
     The server id of server that the stack is on
     """
-    server_name: str
+    server_name: Optional[str] = Field(default=None)
     """
     The server name
+    """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The swarm id of swarm that the stack is on
+    """
+    swarm_name: Optional[str] = Field(default=None)
+    """
+    The swarm name
     """
     images: List[str]
     """
@@ -2623,6 +2921,7 @@ class AlertDataCustomInner(BaseModel):
 class AlertDataTypes(str, Enum):
     NONE = "None"
     TEST = "Test"
+    SWARM_UNHEALTHY = "SwarmUnhealthy"
     SERVER_UNREACHABLE = "ServerUnreachable"
     SERVER_CPU = "ServerCpu"
     SERVER_MEM = "ServerMem"
@@ -2657,6 +2956,13 @@ class AlertDataTest(BaseModel):
     """
     type: Literal[AlertDataTypes.TEST] = AlertDataTypes.TEST
     data: AlertDataTestInner
+
+class AlertDataSwarmUnhealthy(BaseModel):
+    """
+    A server could not be reached.
+    """
+    type: Literal[AlertDataTypes.SWARM_UNHEALTHY] = AlertDataTypes.SWARM_UNHEALTHY
+    data: AlertDataSwarmUnhealthyInner
 
 class AlertDataServerUnreachable(BaseModel):
     """
@@ -2696,6 +3002,7 @@ class AlertDataServerVersionMismatch(BaseModel):
 class AlertDataContainerStateChange(BaseModel):
     """
     A container's state has changed unexpectedly.
+    For swarms, this refers to swarm service.
     """
     type: Literal[AlertDataTypes.CONTAINER_STATE_CHANGE] = AlertDataTypes.CONTAINER_STATE_CHANGE
     data: AlertDataContainerStateChangeInner
@@ -2793,7 +3100,7 @@ class AlertDataCustom(BaseModel):
     data: AlertDataCustomInner
 
 # The variants of data related to the alert.
-AlertData = Union[AlertDataNone, AlertDataTest, AlertDataServerUnreachable, AlertDataServerCpu, AlertDataServerMem, AlertDataServerDisk, AlertDataServerVersionMismatch, AlertDataContainerStateChange, AlertDataDeploymentImageUpdateAvailable, AlertDataDeploymentAutoUpdated, AlertDataStackStateChange, AlertDataStackImageUpdateAvailable, AlertDataStackAutoUpdated, AlertDataAwsBuilderTerminationFailed, AlertDataResourceSyncPendingUpdates, AlertDataBuildFailed, AlertDataRepoBuildFailed, AlertDataProcedureFailed, AlertDataActionFailed, AlertDataScheduleRun, AlertDataCustom]
+AlertData = Union[AlertDataNone, AlertDataTest, AlertDataSwarmUnhealthy, AlertDataServerUnreachable, AlertDataServerCpu, AlertDataServerMem, AlertDataServerDisk, AlertDataServerVersionMismatch, AlertDataContainerStateChange, AlertDataDeploymentImageUpdateAvailable, AlertDataDeploymentAutoUpdated, AlertDataStackStateChange, AlertDataStackImageUpdateAvailable, AlertDataStackAutoUpdated, AlertDataAwsBuilderTerminationFailed, AlertDataResourceSyncPendingUpdates, AlertDataBuildFailed, AlertDataRepoBuildFailed, AlertDataProcedureFailed, AlertDataActionFailed, AlertDataScheduleRun, AlertDataCustom]
 class Alert(BaseModel):
     """
     Representation of an alert in the system.
@@ -2849,6 +3156,7 @@ GetContainerLogResponse = Log
 class DeploymentActionState(BaseModel):
     pulling: bool
     deploying: bool
+    updating: bool
     starting: bool
     restarting: bool
     pausing: bool
@@ -2877,6 +3185,146 @@ GetDeploymentStatsResponse = ContainerStats
 GetDockerRegistryAccountResponse = DockerRegistryAccount
 
 GetGitProviderAccountResponse = GitProviderAccount
+
+class Timelength(str, Enum):
+    ONESECOND = "1-sec"
+    """
+    `1-sec`
+    """
+    TWOSECONDS = "2-sec"
+    """
+    `1-sec`
+    """
+    THREESECONDS = "3-sec"
+    """
+    `1-sec`
+    """
+    FIVESECONDS = "5-sec"
+    """
+    `5-sec`
+    """
+    TENSECONDS = "10-sec"
+    """
+    `10-sec`
+    """
+    FIFTEENSECONDS = "15-sec"
+    """
+    `15-sec`
+    """
+    THIRTYSECONDS = "30-sec"
+    """
+    `30-sec`
+    """
+    ONEMINUTE = "1-min"
+    """
+    `1-min`
+    """
+    TWOMINUTES = "2-min"
+    """
+    `2-min`
+    """
+    THREEMINUTES = "3-min"
+    """
+    `3-min`
+    """
+    FIVEMINUTES = "5-min"
+    """
+    `5-min`
+    """
+    TENMINUTES = "10-min"
+    """
+    `10-min`
+    """
+    FIFTEENMINUTES = "15-min"
+    """
+    `15-min`
+    """
+    THIRTYMINUTES = "30-min"
+    """
+    `30-min`
+    """
+    ONEHOUR = "1-hr"
+    """
+    `1-hr`
+    """
+    TWOHOURS = "2-hr"
+    """
+    `2-hr`
+    """
+    THREEHOURS = "3-hr"
+    """
+    `3-hr`
+    """
+    SIXHOURS = "6-hr"
+    """
+    `6-hr`
+    """
+    EIGHTHOURS = "8-hr"
+    """
+    `8-hr`
+    """
+    TWELVEHOURS = "12-hr"
+    """
+    `12-hr`
+    """
+    ONEDAY = "1-day"
+    """
+    `1-day`
+    """
+    TWODAYS = "2-day"
+    """
+    `2-day`
+    """
+    THREEDAYS = "3-day"
+    """
+    `3-day`
+    """
+    ONEWEEK = "1-wk"
+    """
+    `1-wk`
+    """
+    TWOWEEKS = "2-wk"
+    """
+    `2-wk`
+    """
+    THIRTYDAYS = "30-day"
+    """
+    `30-day`
+    """
+class PeripheryInformation(BaseModel):
+    """
+    Info about Periphery configuration
+    """
+    version: str
+    """
+    The Periphery version.
+    """
+    public_key: str
+    """
+    The public key of Periphery
+    """
+    terminals_disabled: bool
+    """
+    Whether terminals are disabled on this Periphery server
+    """
+    container_terminals_disabled: bool
+    """
+    Whether container exec is disabled on this Periphery server
+    """
+    stats_polling_rate: Timelength
+    """
+    The rate the system stats are being polled from the system
+    """
+    docker_connected: bool
+    """
+    Whether Periphery is successfully connected to docker daemon.
+    """
+    public_ip: Optional[str] = Field(default=None)
+    """
+    The host public ip, if it can be resolved.
+    """
+
+GetPeripheryInformationResponse = PeripheryInformation
 
 GetPermissionResponse = PermissionLevelAndSpecifics
 
@@ -3202,15 +3650,10 @@ class ResourceDiff(BaseModel):
     The data associated with the diff.
     """
 
-class SyncDeployUpdate(BaseModel):
-    to_deploy: int
-    """
-    Resources to deploy
-    """
-    log: str
-    """
-    A readable log of all the changes to be applied
-    """
+class SyncDeployTarget(BaseModel):
+    target: ResourceTarget
+    reason: str
+    after: List[ResourceTarget]
 
 class SyncFileContents(BaseModel):
     resource_path: Optional[str] = Field(default=None)
@@ -3251,13 +3694,17 @@ class ResourceSyncInfo(BaseModel):
     """
     The list of pending updates to user groups
     """
-    pending_deploy: Optional[SyncDeployUpdate] = Field(default=None)
+    pending_deploys: Optional[List[SyncDeployTarget]] = Field(default=None)
     """
     The list of pending deploys to resources.
     """
     pending_error: Optional[str] = Field(default=None)
     """
     If there is an error, it will be stored here
+    """
+    pending_deploy_error: Optional[str] = Field(default=None)
+    """
+    If there is an getting pending deploys, it will be stored here
     """
     pending_hash: Optional[str] = Field(default=None)
     """
@@ -3339,10 +3786,17 @@ class ServerConfig(BaseModel):
     """
     Server configuration.
     """
-    address: str
+    address: Optional[str] = Field(default=None)
     """
-    The http address of the periphery client.
-    Default: http://localhost:8120
+    The ws/s address of the periphery client.
+    If unset, Server expects Periphery -> Core connection.
+    """
+    insecure_tls: bool
+    """
+    Only relevant for Core -> Periphery connections.
+    Whether to skip Periphery tls certificate validation.
+    This defaults to true because Periphery generates self-signed certificates by default,
+    but if you use valid certs you can switch this to false.
     """
     external_address: Optional[str] = Field(default=None)
     """
@@ -3360,13 +3814,15 @@ class ServerConfig(BaseModel):
     you won't be able to perform any actions on it or see deployment's status.
     Default: false
     """
-    timeout_seconds: I64
+    auto_rotate_keys: bool
     """
-    The timeout used to reach the server in seconds.
-    default: 2
+    Whether to automatically rotate Server keys when
+    RotateAllServerKeys is called.
+    Default: true
     """
     passkey: Optional[str] = Field(default=None)
     """
+    Deprecated. Use private / public keys instead.
     An optional override passkey to use
     to authenticate with periphery agent.
     If this is empty, will use passkey in core config.
@@ -3376,11 +3832,6 @@ class ServerConfig(BaseModel):
     Sometimes the system stats reports a mount path that is not desired.
     Use this field to filter it out from the report.
     """
-    stats_monitoring: bool
-    """
-    Whether to monitor any server stats beyond passing health check.
-    default: true
-    """
     auto_prune: bool
     """
     Whether to trigger 'docker image prune -a -f' every 24 hours.
@@ -3389,6 +3840,11 @@ class ServerConfig(BaseModel):
     links: Optional[List[str]] = Field(default=None)
     """
     Configure quick links that are displayed in the resource header
+    """
+    stats_monitoring: bool
+    """
+    Whether to monitor any server stats beyond passing health check.
+    default: true
     """
     send_unreachable_alerts: bool
     """
@@ -3439,7 +3895,20 @@ class ServerConfig(BaseModel):
     Scheduled maintenance windows during which alerts will be suppressed.
     """
 
-Server = Resource[ServerConfig, None]
+class ServerInfo(BaseModel):
+    attempted_public_key: Optional[str] = Field(default=None)
+    """
+    If a Periphery fails to authenticate to Core
+    for a disconnected server with invalid Periphery public key,
+    it will be stored here to accept the connection later on.
+    """
+    public_key: Optional[str] = Field(default=None)
+    """
+    The expected public key associated with
+    private key of the periphery agent.
+    """
+
+Server = Resource[ServerConfig, ServerInfo]
 
 GetServerResponse = Server
 
@@ -3456,6 +3925,23 @@ class StackActionState(BaseModel):
 GetStackActionStateResponse = StackActionState
 
 GetStackLogResponse = Log
+
+class AdditionalEnvFile(BaseModel):
+    """
+    Additional env file configuration for Stack.
+    Supports backward compatibility with string-only format.
+    """
+    path: str
+    """
+    File path relative to run directory
+    """
+    track: bool
+    """
+    Whether Komodo should track this file's contents.
+    If true (default), Komodo will read, display, diff, and validate.
+    If false, only passed to docker compose via --env-file.
+    Useful for externally managed files (e.g., sops decrypted files).
+    """
 
 class StackFileRequires(str, Enum):
     REDEPLOY = "Redeploy"
@@ -3491,9 +3977,19 @@ class StackConfig(BaseModel):
     """
     The compose file configuration.
     """
+    swarm_id: Optional[str] = Field(default=None)
+    """
+    The Swarm to deploy the Stack on, setting the Stack into Swarm mode.
+    
+    Note. If both swarm_id and server_id are set,
+    swarm_id overrides server_id and the Stack will be in Swarm mode.
+    """
     server_id: Optional[str] = Field(default=None)
     """
-    The server to deploy the stack on.
+    The Server to deploy the Stack on, setting the Stack into Compose mode.
+    
+    Note. If both swarm_id and server_id are set,
+    swarm_id overrides server_id and the Stack will be in Swarm mode.
     """
     links: Optional[List[str]] = Field(default=None)
     """
@@ -3503,20 +3999,24 @@ class StackConfig(BaseModel):
     """
     Optionally specify a custom project name for the stack.
     If this is empty string, it will default to the stack name.
-    Used with `docker compose -p {project_name}`.
+    Used with `docker compose -p {project_name}` / `docker stack deploy {project_name}`.
     
-    Note. Can be used to import pre-existing stacks.
+    Note. Can be used to import pre-existing stacks with names that do not match Stack name.
     """
     auto_pull: bool
     """
     Whether to automatically `compose pull` before redeploying stack.
     Ensured latest images are deployed.
     Will fail if the compose file specifies a locally build image.
+    
+    Note. Not used in Swarm mode.
     """
     run_build: Optional[bool] = Field(default=None)
     """
     Whether to `docker compose build` before `compose down` / `compose up`.
     Combine with build_extra_args for custom behaviors.
+    
+    Note. Not used in Swarm mode.
     """
     poll_for_updates: Optional[bool] = Field(default=None)
     """
@@ -3623,8 +4123,10 @@ class StackConfig(BaseModel):
     The name of the written environment file before `docker compose up`.
     Relative to the run directory root.
     Default: .env
+    
+    Note. Not used in Swarm mode.
     """
-    additional_env_files: Optional[List[str]] = Field(default=None)
+    additional_env_files: Optional[List[AdditionalEnvFile]] = Field(default=None)
     """
     Add additional env files to attach with `--env-file`.
     Relative to the run directory root.
@@ -3664,7 +4166,11 @@ class StackConfig(BaseModel):
     """
     extra_args: Optional[List[str]] = Field(default=None)
     """
-    The extra arguments to pass after `docker compose up -d`.
+    The extra arguments to pass to the deploy command.
+    
+    - For Compose stack, uses `docker compose up -d [EXTRA_ARGS]`.
+    - For Swarm mode. `docker stack deploy [EXTRA_ARGS] STACK_NAME`
+    
     If empty, no extra arguments will be passed.
     """
     build_extra_args: Optional[List[str]] = Field(default=None)
@@ -3672,6 +4178,26 @@ class StackConfig(BaseModel):
     The extra arguments to pass after `docker compose build`.
     If empty, no extra build arguments will be passed.
     Only used if `run_build: true`
+    
+    Note. Not used in Swarm mode.
+    """
+    compose_cmd_wrapper: Optional[str] = Field(default=None)
+    """
+    Optional command wrapper for secrets management tools.
+    Wraps the docker compose up command with a prefix command.
+    Use [[COMPOSE_COMMAND]] as placeholder for the full compose command.
+    
+    Examples:
+    - "op run -- [[COMPOSE_COMMAND]]" (1password CLI)
+    - "sops exec-file --no-fifo /path/to/secret.env '[[COMPOSE_COMMAND]]'" (sops)
+    """
+    compose_cmd_wrapper_include: List[str]
+    """
+    Which compose subcommands should use the wrapper.
+    Valid values for Compose: "config", "build", "pull", "up", "run"
+    Valid values for Swarm: "config", "deploy"
+    Default: [] (empty). If empty and wrapper is set, defaults to ["up"] (Compose) or ["deploy"] (Swarm).
+    Set to ["config", "build", "pull", "up"] for sops exec-file with {} placeholder.
     """
     ignore_services: Optional[List[str]] = Field(default=None)
     """
@@ -3693,6 +4219,8 @@ class StackConfig(BaseModel):
     which is given relative to the run directory.
     
     If it is empty, no file will be written.
+    
+    Note. Not used in Swarm mode.
     """
 
 class FileContents(BaseModel):
@@ -3728,10 +4256,18 @@ class StackServiceNames(BaseModel):
     
     This stores only 1. and 2., ie stacko-mongo.
     Containers will be matched via regex like `^container_name-?[0-9]*$``
+    
+    Note. Setting container_name is not supported by Swarm,
+    so will always be 1. and 2. in Swarm mode.
     """
     image: Optional[str] = Field(default=None)
     """
     The services image.
+    """
+    image_digest: Optional[ImageDigest] = Field(default=None)
+    """
+    Store the associated image digest.
+    This includes both the image name / tag, and the specific digest hash.
     """
 
 class StackRemoteFileContents(BaseModel):
@@ -3821,6 +4357,38 @@ Stack = Resource[StackConfig, StackInfo]
 
 GetStackResponse = Stack
 
+class SwarmActionState(BaseModel):
+    pass
+GetSwarmActionStateResponse = SwarmActionState
+
+class SwarmConfig(BaseModel):
+    server_ids: Optional[List[str]] = Field(default=None)
+    """
+    The Servers which are swarm manager nodes.
+    If a Server is not reachable or gives error,
+    tries the next Server.
+    """
+    links: Optional[List[str]] = Field(default=None)
+    """
+    Configure quick links that are displayed in the resource header
+    """
+    send_unhealthy_alerts: bool
+    """
+    Whether to send alerts about the swarm health.
+    """
+    maintenance_windows: Optional[List[MaintenanceWindow]] = Field(default=None)
+    """
+    Scheduled maintenance windows during which alerts will be suppressed.
+    """
+
+class SwarmInfo(BaseModel):
+    pass
+Swarm = Resource[SwarmConfig, SwarmInfo]
+
+GetSwarmResponse = Swarm
+
+GetSwarmServiceLogResponse = Log
+
 class SystemInformation(BaseModel):
     """
     System information of a server
@@ -3848,14 +4416,6 @@ class SystemInformation(BaseModel):
     cpu_brand: str
     """
     The CPU's brand
-    """
-    terminals_disabled: bool
-    """
-    Whether terminals are disabled on this Periphery server
-    """
-    container_exec_disabled: bool
-    """
-    Whether container exec is disabled on this Periphery server
     """
 
 GetSystemInformationResponse = SystemInformation
@@ -3895,91 +4455,6 @@ class SingleDiskUsage(BaseModel):
     Total size of the disk in GB
     """
 
-class Timelength(str, Enum):
-    ONESECOND = "1-sec"
-    """
-    `1-sec`
-    """
-    FIVESECONDS = "5-sec"
-    """
-    `5-sec`
-    """
-    TENSECONDS = "10-sec"
-    """
-    `10-sec`
-    """
-    FIFTEENSECONDS = "15-sec"
-    """
-    `15-sec`
-    """
-    THIRTYSECONDS = "30-sec"
-    """
-    `30-sec`
-    """
-    ONEMINUTE = "1-min"
-    """
-    `1-min`
-    """
-    TWOMINUTES = "2-min"
-    """
-    `2-min`
-    """
-    FIVEMINUTES = "5-min"
-    """
-    `5-min`
-    """
-    TENMINUTES = "10-min"
-    """
-    `10-min`
-    """
-    FIFTEENMINUTES = "15-min"
-    """
-    `15-min`
-    """
-    THIRTYMINUTES = "30-min"
-    """
-    `30-min`
-    """
-    ONEHOUR = "1-hr"
-    """
-    `1-hr`
-    """
-    TWOHOURS = "2-hr"
-    """
-    `2-hr`
-    """
-    SIXHOURS = "6-hr"
-    """
-    `6-hr`
-    """
-    EIGHTHOURS = "8-hr"
-    """
-    `8-hr`
-    """
-    TWELVEHOURS = "12-hr"
-    """
-    `12-hr`
-    """
-    ONEDAY = "1-day"
-    """
-    `1-day`
-    """
-    THREEDAY = "3-day"
-    """
-    `3-day`
-    """
-    ONEWEEK = "1-wk"
-    """
-    `1-wk`
-    """
-    TWOWEEKS = "2-wk"
-    """
-    `2-wk`
-    """
-    THIRTYDAYS = "30-day"
-    """
-    `30-day`
-    """
 class SystemStats(BaseModel):
     """
     Realtime system stats data.
@@ -4148,8 +4623,6 @@ class UserGroup(BaseModel):
     """
 
 GetUserGroupResponse = UserGroup
-
-GetUserResponse = User
 
 GetVariableResponse = Variable
 
@@ -4458,7 +4931,7 @@ class MountTmpfsOptions(BaseModel):
     The permission mode for the tmpfs mount in an integer.
     """
 
-class ContainerMount(BaseModel):
+class Mount(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     target: Optional[str] = Field(alias="Target", default=None)
@@ -4471,7 +4944,11 @@ class ContainerMount(BaseModel):
     """
     typ: Optional[MountTypeEnum] = Field(alias="Type", default=None)
     """
-    The mount type. Available types:  - `bind` Mounts a file or directory from the host into the container. Must exist prior to creating the container. - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed. - `tmpfs` Create a tmpfs with the given options. The mount source cannot be specified for tmpfs. - `npipe` Mounts a named pipe from the host into the container. Must exist prior to creating the container. - `cluster` a Swarm cluster volume
+    The mount type. Available types:
+    - `bind` Mounts a file or directory from the host into the container. Must exist prior to creating the container.
+    - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed.
+    - `tmpfs` Create a tmpfs with the given options. The mount source cannot be specified for tmpfs. - `npipe` Mounts a named pipe from the host into the container. Must exist prior to creating the container.
+    - `cluster` a Swarm cluster volume
     """
     read_only: Optional[bool] = Field(alias="ReadOnly", default=None)
     """
@@ -4572,10 +5049,6 @@ class HostConfig(BaseModel):
     """
     A list of requests for devices to be sent to device drivers.
     """
-    kernel_memory_tcp: Optional[I64] = Field(alias="KernelMemoryTCP", default=None)
-    """
-    Hard limit for kernel TCP buffer memory (in bytes). Depending on the OCI runtime in use, this option may be ignored. It is no longer supported by the default (runc) runtime.  This field is omitted when empty.
-    """
     memory_reservation: Optional[I64] = Field(alias="MemoryReservation", default=None)
     """
     Memory soft limit in bytes.
@@ -4651,7 +5124,7 @@ class HostConfig(BaseModel):
     """
     A list of volumes to inherit from another container, specified in the form `<container name>[:<ro|rw>]`.
     """
-    mounts: Optional[List[ContainerMount]] = Field(alias="Mounts", default=None)
+    mounts: Optional[List[Mount]] = Field(alias="Mounts", default=None)
     """
     Specification for mounts to be added to the container.
     """
@@ -4887,7 +5360,7 @@ class ContainerConfig(BaseModel):
     """
     Whether to attach to `stderr`.
     """
-    exposed_ports: Optional[Dict[str, Dict[str, None]]] = Field(alias="ExposedPorts", default=None)
+    exposed_ports: Optional[List[str]] = Field(alias="ExposedPorts", default=None)
     """
     An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`
     """
@@ -4920,7 +5393,7 @@ class ContainerConfig(BaseModel):
     """
     The name (or reference) of the image to use when creating the container, or which was used when the container was created.
     """
-    volumes: Optional[Dict[str, Dict[str, None]]] = Field(alias="Volumes", default=None)
+    volumes: Optional[List[str]] = Field(alias="Volumes", default=None)
     """
     An object mapping mount point paths inside the container to empty objects.
     """
@@ -4935,10 +5408,6 @@ class ContainerConfig(BaseModel):
     network_disabled: Optional[bool] = Field(alias="NetworkDisabled", default=None)
     """
     Disable networking for the container.
-    """
-    mac_address: Optional[str] = Field(alias="MacAddress", default=None)
-    """
-    MAC address of the container.  Deprecated: this field is deprecated in API v1.44 and up. Use EndpointSettings.MacAddress instead.
     """
     on_build: Optional[List[str]] = Field(alias="OnBuild", default=None)
     """
@@ -5031,10 +5500,6 @@ class NetworkSettings(BaseModel):
     """
     model_config = ConfigDict(populate_by_name=True)
 
-    bridge: Optional[str] = Field(alias="Bridge", default=None)
-    """
-    Name of the default bridge interface when dockerd's --bridge flag is set.
-    """
     sandbox_id: Optional[str] = Field(alias="SandboxID", default=None)
     """
     SandboxID uniquely represents a container's network stack.
@@ -5104,7 +5569,1026 @@ class Container(BaseModel):
 
 InspectDeploymentContainerResponse = Container
 
+class SwarmServiceMode(str, Enum):
+    """
+    The service mode.
+    """
+    REPLICATED = "Replicated"
+    """
+    Replicated service
+    - Run desired number of replicas
+    """
+    GLOBAL = "Global"
+    """
+    Global service
+    - Run once per node
+    """
+    REPLICATEDJOB = "ReplicatedJob"
+    """
+    Replicated job
+    - Scheduled tasks which run to completion
+    - Run desired number of job replicas
+    """
+    GLOBALJOB = "GlobalJob"
+    """
+    Global job
+    - Scheduled tasks which run to completion
+    - Run one job per node
+    """
+class SwarmState(str, Enum):
+    HEALTHY = "Healthy"
+    """
+    All nodes /tasks OK
+    """
+    UNHEALTHY = "Unhealthy"
+    """
+    Some nodes / tasks don't match desired state
+    """
+    DOWN = "Down"
+    """
+    All nodes / tasks down.
+    """
+    UNKNOWN = "Unknown"
+    """
+    Unknown case
+    """
+U64 = int
+
+class ObjectVersion(BaseModel):
+    """
+    The version number of the object such as node, service, etc. This is needed to avoid conflicting writes. The client must send the version number along with the modified specification when updating these objects.  This approach ensures safe concurrency and determinism in that the change on the object may not be applied if the version number has changed from the last read. In other words, if two update requests specify the same base version, only one of the requests can succeed. As a result, two separate update requests that happen at the same time will not unintentionally overwrite each other.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    index: Optional[U64] = Field(alias="Index", default=None)
+
+class PluginPrivilege(BaseModel):
+    """
+    Describes a permission the user has to accept upon installing the plugin.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    description: Optional[str] = Field(alias="Description", default=None)
+    value: Optional[List[str]] = Field(alias="Value", default=None)
+
+class TaskSpecPluginSpec(BaseModel):
+    """
+    Plugin spec for the service.
+    *(Experimental release only.)*
+    <p><br /></p>  > **Note**: ContainerSpec, NetworkAttachmentSpec, and PluginSpec are > mutually exclusive. PluginSpec is only used when the Runtime field > is set to `plugin`. NetworkAttachmentSpec is used when the Runtime > field is set to `attachment`.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    The name or 'alias' to use for the plugin.
+    """
+    remote: Optional[str] = Field(alias="Remote", default=None)
+    """
+    The plugin image reference to use.
+    """
+    disabled: Optional[bool] = Field(alias="Disabled", default=None)
+    """
+    Disable the plugin once scheduled.
+    """
+    plugin_privilege: Optional[List[PluginPrivilege]] = Field(alias="PluginPrivilege", default=None)
+
+class TaskSpecContainerSpecPrivilegesCredentialSpec(BaseModel):
+    """
+    CredentialSpec for managed service account (Windows only)
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    config: Optional[str] = Field(alias="Config", default=None)
+    """
+    Load credential spec from a Swarm Config with the given ID. The specified config must also be present in the Configs field with the Runtime property set.  <p><br /></p>   > **Note**: `CredentialSpec.File`, `CredentialSpec.Registry`, > and `CredentialSpec.Config` are mutually exclusive.
+    """
+    file: Optional[str] = Field(alias="File", default=None)
+    """
+    Load credential spec from this file. The file is read by the daemon, and must be present in the `CredentialSpecs` subdirectory in the docker data directory, which defaults to `C:\\ProgramData\\Docker\\` on Windows.  For example, specifying `spec.json` loads `C:\\ProgramData\\Docker\\CredentialSpecs\\spec.json`.  <p><br /></p>  > **Note**: `CredentialSpec.File`, `CredentialSpec.Registry`, > and `CredentialSpec.Config` are mutually exclusive.
+    """
+    registry: Optional[str] = Field(alias="Registry", default=None)
+    """
+    Load credential spec from this value in the Windows registry. The specified registry value must be located in:  `HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Virtualization\\Containers\\CredentialSpecs`  <p><br /></p>   > **Note**: `CredentialSpec.File`, `CredentialSpec.Registry`, > and `CredentialSpec.Config` are mutually exclusive.
+    """
+
+class TaskSpecContainerSpecPrivilegesSeLinuxContext(BaseModel):
+    """
+    SELinux labels of the container
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    disable: Optional[bool] = Field(alias="Disable", default=None)
+    """
+    Disable SELinux
+    """
+    user: Optional[str] = Field(alias="User", default=None)
+    """
+    SELinux user label
+    """
+    role: Optional[str] = Field(alias="Role", default=None)
+    """
+    SELinux role label
+    """
+    typ: Optional[str] = Field(alias="Type", default=None)
+    """
+    SELinux type label
+    """
+    level: Optional[str] = Field(alias="Level", default=None)
+    """
+    SELinux level label
+    """
+
+class TaskSpecContainerSpecPrivilegesSeccompModeEnum(str, Enum):
+    EMPTY = ""
+    DEFAULT = "default"
+    UNCONFINED = "unconfined"
+    CUSTOM = "custom"
+class TaskSpecContainerSpecPrivilegesSeccomp(BaseModel):
+    """
+    Options for configuring seccomp on the container
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    mode: Optional[TaskSpecContainerSpecPrivilegesSeccompModeEnum] = Field(alias="Mode", default=None)
+    profile: Optional[str] = Field(alias="Profile", default=None)
+    """
+    The custom seccomp profile as a json object
+    """
+
+class TaskSpecContainerSpecPrivilegesAppArmorModeEnum(str, Enum):
+    EMPTY = ""
+    DEFAULT = "default"
+    DISABLED = "disabled"
+class TaskSpecContainerSpecPrivilegesAppArmor(BaseModel):
+    """
+    Options for configuring AppArmor on the container
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    mode: Optional[TaskSpecContainerSpecPrivilegesAppArmorModeEnum] = Field(alias="Mode", default=None)
+
+class TaskSpecContainerSpecPrivileges(BaseModel):
+    """
+    Security options for the container
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    credential_spec: Optional[TaskSpecContainerSpecPrivilegesCredentialSpec] = Field(alias="CredentialSpec", default=None)
+    se_linux_context: Optional[TaskSpecContainerSpecPrivilegesSeLinuxContext] = Field(alias="SELinuxContext", default=None)
+    seccomp: Optional[TaskSpecContainerSpecPrivilegesSeccomp] = Field(alias="Seccomp", default=None)
+    app_armor: Optional[TaskSpecContainerSpecPrivilegesAppArmor] = Field(alias="AppArmor", default=None)
+    no_new_privileges: Optional[bool] = Field(alias="NoNewPrivileges", default=None)
+    """
+    Configuration of the no_new_privs bit in the container
+    """
+
+class TaskSpecContainerSpecDnsConfig(BaseModel):
+    """
+    Specification for DNS related configurations in resolver configuration file (`resolv.conf`).
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    nameservers: Optional[List[str]] = Field(alias="Nameservers", default=None)
+    """
+    The IP addresses of the name servers.
+    """
+    search: Optional[List[str]] = Field(alias="Search", default=None)
+    """
+    A search list for host-name lookup.
+    """
+    options: Optional[List[str]] = Field(alias="Options", default=None)
+    """
+    A list of internal resolver variables to be modified (e.g., `debug`, `ndots:3`, etc.).
+    """
+
+class TaskSpecContainerSpecFile(BaseModel):
+    """
+    File represents a specific target that is backed by a file.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name represents the final filename in the filesystem.
+    """
+    uid: Optional[str] = Field(alias="UID", default=None)
+    """
+    UID represents the file UID.
+    """
+    gid: Optional[str] = Field(alias="GID", default=None)
+    """
+    GID represents the file GID.
+    """
+    mode: Optional[int] = Field(alias="Mode", default=None)
+    """
+    Mode represents the FileMode of the file.
+    """
+
+class TaskSpecContainerSpecSecrets(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    file: Optional[TaskSpecContainerSpecFile] = Field(alias="File", default=None)
+    secret_id: Optional[str] = Field(alias="SecretID", default=None)
+    """
+    SecretID represents the ID of the specific secret that we're referencing.
+    """
+    secret_name: Optional[str] = Field(alias="SecretName", default=None)
+    """
+    SecretName is the name of the secret that this references, but this is just provided for lookup/display purposes. The secret in the reference will be identified by its ID.
+    """
+
+class TaskSpecContainerSpecConfigs(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    file: Optional[TaskSpecContainerSpecFile] = Field(alias="File", default=None)
+    config_id: Optional[str] = Field(alias="ConfigID", default=None)
+    """
+    ConfigID represents the ID of the specific config that we're referencing.
+    """
+    config_name: Optional[str] = Field(alias="ConfigName", default=None)
+    """
+    ConfigName is the name of the config that this references, but this is just provided for lookup/display purposes. The config in the reference will be identified by its ID.
+    """
+
+class TaskSpecContainerSpecIsolationEnum(str, Enum):
+    DEFAULT = "default"
+    PROCESS = "process"
+    HYPERV = "hyperv"
+    EMPTY = ""
+class TaskSpecContainerSpec(BaseModel):
+    """
+    Container spec for the service.
+    **Note**: ContainerSpec, NetworkAttachmentSpec, and PluginSpec are > mutually exclusive.
+    PluginSpec is only used when the Runtime field > is set to `plugin`.
+    NetworkAttachmentSpec is used when the Runtime > field is set to `attachment`.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    image: Optional[str] = Field(alias="Image", default=None)
+    """
+    The image name to use for the container
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value data.
+    """
+    command: Optional[List[str]] = Field(alias="Command", default=None)
+    """
+    The command to be run in the image.
+    """
+    args: Optional[List[str]] = Field(alias="Args", default=None)
+    """
+    Arguments to the command.
+    """
+    hostname: Optional[str] = Field(alias="Hostname", default=None)
+    """
+    The hostname to use for the container, as a valid [RFC 1123](https://tools.ietf.org/html/rfc1123) hostname.
+    """
+    env: Optional[List[str]] = Field(alias="Env", default=None)
+    """
+    A list of environment variables in the form `VAR=value`.
+    """
+    dir: Optional[str] = Field(alias="Dir", default=None)
+    """
+    The working directory for commands to run in.
+    """
+    user: Optional[str] = Field(alias="User", default=None)
+    """
+    The user inside the container.
+    """
+    groups: Optional[List[str]] = Field(alias="Groups", default=None)
+    """
+    A list of additional groups that the container process will run as.
+    """
+    privileges: Optional[TaskSpecContainerSpecPrivileges] = Field(alias="Privileges", default=None)
+    tty: Optional[bool] = Field(alias="TTY", default=None)
+    """
+    Whether a pseudo-TTY should be allocated.
+    """
+    open_stdin: Optional[bool] = Field(alias="OpenStdin", default=None)
+    """
+    Open `stdin`
+    """
+    read_only: Optional[bool] = Field(alias="ReadOnly", default=None)
+    """
+    Mount the container's root filesystem as read only.
+    """
+    mounts: Optional[List[Mount]] = Field(alias="Mounts", default=None)
+    """
+    Specification for mounts to be added to containers created as part of the service.
+    """
+    stop_signal: Optional[str] = Field(alias="StopSignal", default=None)
+    """
+    Signal to stop the container.
+    """
+    stop_grace_period: Optional[I64] = Field(alias="StopGracePeriod", default=None)
+    """
+    Amount of time to wait for the container to terminate before forcefully killing it.
+    """
+    health_check: Optional[HealthConfig] = Field(alias="HealthCheck", default=None)
+    hosts: Optional[List[str]] = Field(alias="Hosts", default=None)
+    """
+    A list of hostname/IP mappings to add to the container's `hosts` file. The format of extra hosts is specified in the [hosts(5)](http://man7.org/linux/man-pages/man5/hosts.5.html) man page:      IP_address canonical_hostname [aliases...]
+    """
+    dns_config: Optional[TaskSpecContainerSpecDnsConfig] = Field(alias="DNSConfig", default=None)
+    secrets: Optional[List[TaskSpecContainerSpecSecrets]] = Field(alias="Secrets", default=None)
+    """
+    Secrets contains references to zero or more secrets that will be exposed to the service.
+    """
+    oom_score_adj: Optional[I64] = Field(alias="OomScoreAdj", default=None)
+    """
+    An integer value containing the score given to the container in order to tune OOM killer preferences.
+    """
+    configs: Optional[List[TaskSpecContainerSpecConfigs]] = Field(alias="Configs", default=None)
+    """
+    Configs contains references to zero or more configs that will be exposed to the service.
+    """
+    isolation: Optional[TaskSpecContainerSpecIsolationEnum] = Field(alias="Isolation", default=None)
+    """
+    Isolation technology of the containers running the service. (Windows only)
+    """
+    init: Optional[bool] = Field(alias="Init", default=None)
+    """
+    Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used.
+    """
+    sysctls: Optional[Dict[str, str]] = Field(alias="Sysctls", default=None)
+    """
+    Set kernel namedspaced parameters (sysctls) in the container. The Sysctls option on services accepts the same sysctls as the are supported on containers. Note that while the same sysctls are supported, no guarantees or checks are made about their suitability for a clustered environment, and it's up to the user to determine whether a given sysctl will work properly in a Service.
+    """
+    capability_add: Optional[List[str]] = Field(alias="CapabilityAdd", default=None)
+    """
+    A list of kernel capabilities to add to the default set for the container.
+    """
+    capability_drop: Optional[List[str]] = Field(alias="CapabilityDrop", default=None)
+    """
+    A list of kernel capabilities to drop from the default set for the container.
+    """
+    ulimits: Optional[List[ResourcesUlimits]] = Field(alias="Ulimits", default=None)
+    """
+    A list of resource limits to set in the container. For example: `{\"Name\": \"nofile\", \"Soft\": 1024, \"Hard\": 2048}`\"
+    """
+
+class TaskSpecNetworkAttachmentSpec(BaseModel):
+    """
+    Read-only spec type for non-swarm containers attached to swarm overlay networks.  <p><br /></p>  > **Note**: ContainerSpec, NetworkAttachmentSpec, and PluginSpec are > mutually exclusive. PluginSpec is only used when the Runtime field > is set to `plugin`. NetworkAttachmentSpec is used when the Runtime > field is set to `attachment`.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    container_id: Optional[str] = Field(alias="ContainerID", default=None)
+    """
+    ID of the container represented by this task
+    """
+
+class Limit(BaseModel):
+    """
+    An object describing a limit on resources which can be requested by a task.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    nano_cpus: Optional[I64] = Field(alias="NanoCPUs", default=None)
+    memory_bytes: Optional[I64] = Field(alias="MemoryBytes", default=None)
+    pids: Optional[I64] = Field(alias="Pids", default=None)
+    """
+    Limits the maximum number of PIDs in the container. Set `0` for unlimited.
+    """
+
+class ResourceObject(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    nano_cpus: Optional[I64] = Field(alias="NanoCPUs", default=None)
+    memory_bytes: Optional[I64] = Field(alias="MemoryBytes", default=None)
+    generic_resources: Optional[GenericResources] = Field(alias="GenericResources", default=None)
+
+class TaskSpecResources(BaseModel):
+    """
+    Resource requirements which apply to each individual container created as part of the service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    limits: Optional[Limit] = Field(alias="Limits", default=None)
+    """
+    Define resources limits.
+    """
+    reservations: Optional[ResourceObject] = Field(alias="Reservations", default=None)
+    """
+    Define resources reservation.
+    """
+
+class TaskSpecRestartPolicyConditionEnum(str, Enum):
+    EMPTY = ""
+    NONE = "none"
+    ON_FAILURE = "on-failure"
+    ANY = "any"
+class TaskSpecRestartPolicy(BaseModel):
+    """
+    Specification for the restart policy which applies to containers created as part of this service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    condition: Optional[TaskSpecRestartPolicyConditionEnum] = Field(alias="Condition", default=None)
+    """
+    Condition for restart.
+    """
+    delay: Optional[I64] = Field(alias="Delay", default=None)
+    """
+    Delay between restart attempts.
+    """
+    max_attempts: Optional[I64] = Field(alias="MaxAttempts", default=None)
+    """
+    Maximum attempts to restart a given container before giving up (default value is 0, which is ignored).
+    """
+    window: Optional[I64] = Field(alias="Window", default=None)
+    """
+    Windows is the time window used to evaluate the restart policy (default value is 0, which is unbounded).
+    """
+
+class TaskSpecPlacementSpread(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    spread_descriptor: Optional[str] = Field(alias="SpreadDescriptor", default=None)
+    """
+    label descriptor, such as `engine.labels.az`.
+    """
+
+class TaskSpecPlacementPreferences(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    spread: Optional[TaskSpecPlacementSpread] = Field(alias="Spread", default=None)
+
+class Platform(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    architecture: Optional[str] = Field(alias="Architecture", default=None)
+    """
+    Architecture represents the hardware architecture (for example, `x86_64`).
+    """
+    os: Optional[str] = Field(alias="OS", default=None)
+    """
+    OS represents the Operating System (for example, `linux` or `windows`).
+    """
+
+class TaskSpecPlacement(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    constraints: Optional[List[str]] = Field(alias="Constraints", default=None)
+    """
+    An array of constraint expressions to limit the set of nodes where a task can be scheduled. Constraint expressions can either use a _match_ (`==`) or _exclude_ (`!=`) rule. Multiple constraints find nodes that satisfy every expression (AND match). Constraints can match node or Docker Engine labels as follows:  node attribute       | matches                        | example ---------------------|--------------------------------|----------------------------------------------- `node.id`            | Node ID                        | `node.id==2ivku8v2gvtg4` `node.hostname`      | Node hostname                  | `node.hostname!=node-2` `node.role`          | Node role (`manager`/`worker`) | `node.role==manager` `node.platform.os`   | Node operating system          | `node.platform.os==windows` `node.platform.arch` | Node architecture              | `node.platform.arch==x86_64` `node.labels`        | User-defined node labels       | `node.labels.security==high` `engine.labels`      | Docker Engine's labels         | `engine.labels.operatingsystem==ubuntu-24.04`  `engine.labels` apply to Docker Engine labels like operating system, drivers, etc. Swarm administrators add `node.labels` for operational purposes by using the [`node update endpoint`](#operation/NodeUpdate).
+    """
+    preferences: Optional[List[TaskSpecPlacementPreferences]] = Field(alias="Preferences", default=None)
+    """
+    Preferences provide a way to make the scheduler aware of factors such as topology. They are provided in order from highest to lowest precedence.
+    """
+    max_replicas: Optional[I64] = Field(alias="MaxReplicas", default=None)
+    """
+    Maximum number of replicas for per node (default value is 0, which is unlimited)
+    """
+    platforms: Optional[List[Platform]] = Field(alias="Platforms", default=None)
+    """
+    Platforms stores all the platforms that the service's image can run on. This field is used in the platform filter for scheduling. If empty, then the platform filter is off, meaning there are no scheduling restrictions.
+    """
+
+class NetworkAttachmentConfig(BaseModel):
+    """
+    Specifies how a service should be attached to a particular network.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    target: Optional[str] = Field(alias="Target", default=None)
+    """
+    The target network for attachment. Must be a network name or ID.
+    """
+    aliases: Optional[List[str]] = Field(alias="Aliases", default=None)
+    """
+    Discoverable alternate names for the service on this network.
+    """
+    driver_opts: Optional[Dict[str, str]] = Field(alias="DriverOpts", default=None)
+    """
+    Driver attachment options for the network target.
+    """
+
+class TaskSpecLogDriver(BaseModel):
+    """
+    Specifies the log driver to use for tasks created from this spec.
+    If not present, the default one for the swarm will be used,
+    finally falling back to the engine default if not specified.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    options: Optional[Dict[str, str]] = Field(alias="Options", default=None)
+
+class TaskSpec(BaseModel):
+    """
+    User modifiable task configuration.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    plugin_spec: Optional[TaskSpecPluginSpec] = Field(alias="PluginSpec", default=None)
+    container_spec: Optional[TaskSpecContainerSpec] = Field(alias="ContainerSpec", default=None)
+    network_attachment_spec: Optional[TaskSpecNetworkAttachmentSpec] = Field(alias="NetworkAttachmentSpec", default=None)
+    resources: Optional[TaskSpecResources] = Field(alias="Resources", default=None)
+    restart_policy: Optional[TaskSpecRestartPolicy] = Field(alias="RestartPolicy", default=None)
+    placement: Optional[TaskSpecPlacement] = Field(alias="Placement", default=None)
+    force_update: Optional[U64] = Field(alias="ForceUpdate", default=None)
+    """
+    A counter that triggers an update even if no relevant parameters have been changed.
+    """
+    runtime: Optional[str] = Field(alias="Runtime", default=None)
+    """
+    Runtime is the type of runtime specified for the task executor.
+    """
+    networks: Optional[List[NetworkAttachmentConfig]] = Field(alias="Networks", default=None)
+    """
+    Specifies which networks the service should attach to.
+    """
+    log_driver: Optional[TaskSpecLogDriver] = Field(alias="LogDriver", default=None)
+
+class ServiceSpecModeReplicated(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    replicas: Optional[I64] = Field(alias="Replicas", default=None)
+
+class ServiceSpecModeReplicatedJob(BaseModel):
+    """
+    The mode used for services with a finite number of tasks that run to a completed state.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    max_concurrent: Optional[I64] = Field(alias="MaxConcurrent", default=None)
+    """
+    The maximum number of replicas to run simultaneously.
+    """
+    total_completions: Optional[I64] = Field(alias="TotalCompletions", default=None)
+    """
+    The total number of replicas desired to reach the Completed state. If unset, will default to the value of `MaxConcurrent`
+    """
+
+class ServiceSpecMode(BaseModel):
+    """
+    Scheduling mode for the service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    replicated: Optional[ServiceSpecModeReplicated] = Field(alias="Replicated", default=None)
+    global_: Optional[NoData] = Field(alias="Global", default=None)
+    replicated_job: Optional[ServiceSpecModeReplicatedJob] = Field(alias="ReplicatedJob", default=None)
+    global_job: Optional[NoData] = Field(alias="GlobalJob", default=None)
+    """
+    The mode used for services which run a task to the completed state on each valid node.
+    """
+
+class ServiceSpecUpdateConfigFailureActionEnum(str, Enum):
+    EMPTY = ""
+    CONTINUE = "continue"
+    PAUSE = "pause"
+    ROLLBACK = "rollback"
+class ServiceSpecUpdateConfigOrderEnum(str, Enum):
+    EMPTY = ""
+    STOP_FIRST = "stop-first"
+    START_FIRST = "start-first"
+class ServiceSpecUpdateConfig(BaseModel):
+    """
+    Specification for the update strategy of the service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    parallelism: Optional[I64] = Field(alias="Parallelism", default=None)
+    """
+    Maximum number of tasks to be updated in one iteration (0 means unlimited parallelism).
+    """
+    delay: Optional[I64] = Field(alias="Delay", default=None)
+    """
+    Amount of time between updates, in nanoseconds.
+    """
+    failure_action: Optional[ServiceSpecUpdateConfigFailureActionEnum] = Field(alias="FailureAction", default=None)
+    """
+    Action to take if an updated task fails to run, or stops running during the update.
+    """
+    monitor: Optional[I64] = Field(alias="Monitor", default=None)
+    """
+    Amount of time to monitor each updated task for failures, in nanoseconds.
+    """
+    max_failure_ratio: Optional[float] = Field(alias="MaxFailureRatio", default=None)
+    """
+    The fraction of tasks that may fail during an update before the failure action is invoked, specified as a floating point number between 0 and 1.
+    """
+    order: Optional[ServiceSpecUpdateConfigOrderEnum] = Field(alias="Order", default=None)
+    """
+    The order of operations when rolling out an updated task. Either the old task is shut down before the new task is started, or the new task is started before the old task is shut down.
+    """
+
+class ServiceSpecRollbackConfigFailureActionEnum(str, Enum):
+    EMPTY = ""
+    CONTINUE = "continue"
+    PAUSE = "pause"
+class ServiceSpecRollbackConfigOrderEnum(str, Enum):
+    EMPTY = ""
+    STOP_FIRST = "stop-first"
+    START_FIRST = "start-first"
+class ServiceSpecRollbackConfig(BaseModel):
+    """
+    Specification for the rollback strategy of the service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    parallelism: Optional[I64] = Field(alias="Parallelism", default=None)
+    """
+    Maximum number of tasks to be rolled back in one iteration (0 means unlimited parallelism).
+    """
+    delay: Optional[I64] = Field(alias="Delay", default=None)
+    """
+    Amount of time between rollback iterations, in nanoseconds.
+    """
+    failure_action: Optional[ServiceSpecRollbackConfigFailureActionEnum] = Field(alias="FailureAction", default=None)
+    """
+    Action to take if an rolled back task fails to run, or stops running during the rollback.
+    """
+    monitor: Optional[I64] = Field(alias="Monitor", default=None)
+    """
+    Amount of time to monitor each rolled back task for failures, in nanoseconds.
+    """
+    max_failure_ratio: Optional[float] = Field(alias="MaxFailureRatio", default=None)
+    """
+    The fraction of tasks that may fail during a rollback before the failure action is invoked, specified as a floating point number between 0 and 1.
+    """
+    order: Optional[ServiceSpecRollbackConfigOrderEnum] = Field(alias="Order", default=None)
+    """
+    The order of operations when rolling back a task. Either the old task is shut down before the new task is started, or the new task is started before the old task is shut down.
+    """
+
+class EndpointSpecModeEnum(str, Enum):
+    EMPTY = ""
+    VIP = "vip"
+    DNSRR = "dnsrr"
+class EndpointPortConfigProtocolEnum(str, Enum):
+    EMPTY = ""
+    TCP = "tcp"
+    UDP = "udp"
+    SCTP = "sctp"
+class EndpointPortConfigPublishModeEnum(str, Enum):
+    EMPTY = ""
+    INGRESS = "ingress"
+    HOST = "host"
+class EndpointPortConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    protocol: Optional[EndpointPortConfigProtocolEnum] = Field(alias="Protocol", default=None)
+    target_port: Optional[I64] = Field(alias="TargetPort", default=None)
+    """
+    The port inside the container.
+    """
+    published_port: Optional[I64] = Field(alias="PublishedPort", default=None)
+    """
+    The port on the swarm hosts.
+    """
+    publish_mode: Optional[EndpointPortConfigPublishModeEnum] = Field(alias="PublishMode", default=None)
+    """
+    The mode in which port is published.  <p><br /></p>  - \"ingress\" makes the target port accessible on every node,   regardless of whether there is a task for the service running on   that node or not. - \"host\" bypasses the routing mesh and publish the port directly on   the swarm node where that service is running.
+    """
+
+class EndpointSpec(BaseModel):
+    """
+    Properties that can be configured to access and load balance a service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    mode: Optional[EndpointSpecModeEnum] = Field(alias="Mode", default=None)
+    """
+    The mode of resolution to use for internal load balancing between tasks.
+    """
+    ports: Optional[List[EndpointPortConfig]] = Field(alias="Ports", default=None)
+    """
+    List of exposed ports that this service is accessible on from the outside. Ports can only be provided if `vip` resolution mode is used.
+    """
+
+class ServiceSpec(BaseModel):
+    """
+    User modifiable configuration for a service.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name of the service.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    task_template: Optional[TaskSpec] = Field(alias="TaskTemplate", default=None)
+    mode: Optional[ServiceSpecMode] = Field(alias="Mode", default=None)
+    update_config: Optional[ServiceSpecUpdateConfig] = Field(alias="UpdateConfig", default=None)
+    rollback_config: Optional[ServiceSpecRollbackConfig] = Field(alias="RollbackConfig", default=None)
+    networks: Optional[List[NetworkAttachmentConfig]] = Field(alias="Networks", default=None)
+    """
+    Specifies which networks the service should attach to.  Deprecated: This field is deprecated since v1.44. The Networks field in TaskSpec should be used instead.
+    """
+    endpoint_spec: Optional[EndpointSpec] = Field(alias="EndpointSpec", default=None)
+
+class ServiceEndpointVirtualIps(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    network_id: Optional[str] = Field(alias="NetworkID", default=None)
+    addr: Optional[str] = Field(alias="Addr", default=None)
+
+class ServiceEndpoint(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    spec: Optional[EndpointSpec] = Field(alias="Spec", default=None)
+    ports: Optional[List[EndpointPortConfig]] = Field(alias="Ports", default=None)
+    virtual_ips: Optional[List[ServiceEndpointVirtualIps]] = Field(alias="VirtualIPs", default=None)
+
+class ServiceUpdateStatusStateEnum(str, Enum):
+    EMPTY = ""
+    UPDATING = "updating"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    ROLLBACK_STARTED = "rollback_started"
+    ROLLBACK_PAUSED = "rollback_paused"
+    ROLLBACK_COMPLETED = "rollback_completed"
+class ServiceUpdateStatus(BaseModel):
+    """
+    The status of a service update.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    state: Optional[ServiceUpdateStatusStateEnum] = Field(alias="State", default=None)
+    started_at: Optional[str] = Field(alias="StartedAt", default=None)
+    completed_at: Optional[str] = Field(alias="CompletedAt", default=None)
+    message: Optional[str] = Field(alias="Message", default=None)
+
+class ServiceServiceStatus(BaseModel):
+    """
+    The status of the service's tasks. Provided only when requested as part of a ServiceList operation.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    running_tasks: Optional[U64] = Field(alias="RunningTasks", default=None)
+    """
+    The number of tasks for the service currently in the Running state.
+    """
+    desired_tasks: Optional[U64] = Field(alias="DesiredTasks", default=None)
+    """
+    The number of tasks for the service desired to be running.
+    For replicated services, this is the replica count from the service spec.
+    For global services, this is computed by taking count of all tasks for the service with a Desired State other than Shutdown.
+    """
+    completed_tasks: Optional[U64] = Field(alias="CompletedTasks", default=None)
+    """
+    The number of tasks for a job that are in the Completed state.
+    This field must be cross-referenced with the service type, as the value of 0 may mean the service is not in a job mode,
+    or it may mean the job-mode service has no tasks yet Completed.
+    """
+
+class ServiceJobStatus(BaseModel):
+    """
+    The status of the service when it is in one of ReplicatedJob or GlobalJob modes. Absent on Replicated and Global mode services. The JobIteration is an ObjectVersion, but unlike the Service's version, does not need to be sent with an update request.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    job_iteration: Optional[ObjectVersion] = Field(alias="JobIteration", default=None)
+    """
+    JobIteration is a value increased each time a Job is executed, successfully or otherwise. \"Executed\", in this case, means the job as a whole has been started, not that an individual Task has been launched. A job is \"Executed\" when its ServiceSpec is updated. JobIteration can be used to disambiguate Tasks belonging to different executions of a job.  Though JobIteration will increase with each subsequent execution, it may not necessarily increase by 1, and so JobIteration should not be used to
+    """
+    last_execution: Optional[str] = Field(alias="LastExecution", default=None)
+    """
+    The last time, as observed by the server, that this job was started.
+    """
+
+class SwarmService(BaseModel):
+    """
+    Swarm service details.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    mode: Optional[SwarmServiceMode] = Field(alias="Mode", default=None)
+    """
+    The service mode.
+    """
+    replicas: Optional[I64] = Field(alias="Replicas", default=None)
+    """
+    Number of replicas (in a replicated mode)
+    """
+    max_concurrent: Optional[I64] = Field(alias="MaxConcurrent", default=None)
+    """
+    Max concurrent tasks (in a replicated job mode)
+    """
+    state: SwarmState = Field(alias="State")
+    """
+    Swarm service state.
+    - Healthy if all associated tasks match their desired state (or report no desired state)
+    - Unhealthy otherwise
+    
+    Not included in docker cli return, computed by Komodo
+    """
+    version: Optional[ObjectVersion] = Field(alias="Version", default=None)
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    spec: Optional[ServiceSpec] = Field(alias="Spec", default=None)
+    endpoint: Optional[ServiceEndpoint] = Field(alias="Endpoint", default=None)
+    update_status: Optional[ServiceUpdateStatus] = Field(alias="UpdateStatus", default=None)
+    service_status: Optional[ServiceServiceStatus] = Field(alias="ServiceStatus", default=None)
+    job_status: Optional[ServiceJobStatus] = Field(alias="JobStatus", default=None)
+
+InspectDeploymentSwarmServiceResponse = SwarmService
+
 InspectDockerContainerResponse = Container
+
+class OciPlatform(BaseModel):
+    """
+    Describes the platform which the image in the manifest runs on, as defined in the [OCI Image Index Specification](https://github.com/opencontainers/image-spec/blob/v1.0.1/image-index.md).
+    """
+    architecture: Optional[str] = Field(default=None)
+    """
+    The CPU architecture, for example `amd64` or `ppc64`.
+    """
+    os: Optional[str] = Field(default=None)
+    """
+    The operating system, for example `linux` or `windows`.
+    """
+    os_version: Optional[str] = Field(default=None)
+    """
+    Optional field specifying the operating system version, for example on Windows `10.0.19041.1165`.
+    """
+    os_features: Optional[List[str]] = Field(default=None)
+    """
+    Optional field specifying an array of strings, each listing a required OS feature (for example on Windows `win32k`).
+    """
+    variant: Optional[str] = Field(default=None)
+    """
+    Optional field specifying a variant of the CPU, for example `v7` to specify ARMv7 when architecture is `arm`.
+    """
+
+class OciDescriptor(BaseModel):
+    """
+    A descriptor struct containing digest, media type, and size, as defined in the [OCI Content Descriptors Specification](https://github.com/opencontainers/image-spec/blob/v1.0.1/descriptor.md).
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    media_type: Optional[str] = Field(alias="mediaType", default=None)
+    """
+    The media type of the object this schema refers to.
+    """
+    digest: Optional[str] = Field(default=None)
+    """
+    The digest of the targeted content.
+    """
+    size: Optional[I64] = Field(default=None)
+    """
+    The size in bytes of the blob.
+    """
+    urls: Optional[List[str]] = Field(default=None)
+    """
+    List of URLs from which this object MAY be downloaded.
+    """
+    annotations: Optional[Dict[str, str]] = Field(default=None)
+    """
+    Arbitrary metadata relating to the targeted content.
+    """
+    data: Optional[str] = Field(default=None)
+    """
+    Data is an embedding of the targeted content. This is encoded as a base64 string when marshalled to JSON (automatically, by encoding/json). If present, Data can be used directly to avoid fetching the targeted content.
+    """
+    platform: Optional[OciPlatform] = Field(default=None)
+    artifact_type: Optional[str] = Field(alias="artifactType", default=None)
+    """
+    ArtifactType is the IANA media type of this artifact.
+    """
+
+class ImageManifestSummarySize(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    total: I64 = Field(alias="Total")
+    """
+    Total is the total size (in bytes) of all the locally present data (both distributable and non-distributable) that's related to this manifest and its children. This equal to the sum of [Content] size AND all the sizes in the [Size] struct present in the Kind-specific data struct. For example, for an image kind (Kind == \"image\") this would include the size of the image content and unpacked image snapshots ([Size.Content] + [ImageData.Size.Unpacked]).
+    """
+    content: I64 = Field(alias="Content")
+    """
+    Content is the size (in bytes) of all the locally present content in the content store (e.g. image config, layers) referenced by this manifest and its children. This only includes blobs in the content store.
+    """
+
+class ImageManifestSummaryKindEnum(str, Enum):
+    EMPTY = ""
+    IMAGE = "image"
+    ATTESTATION = "attestation"
+    UNKNOWN = "unknown"
+class ImageManifestSummaryImageDataSize(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    unpacked: I64 = Field(alias="Unpacked")
+    """
+    Unpacked is the size (in bytes) of the locally unpacked (uncompressed) image content that's directly usable by the containers running this image. It's independent of the distributable content - e.g. the image might still have an unpacked data that's still used by some container even when the distributable/compressed content is already gone.
+    """
+
+class ImageManifestSummaryImageData(BaseModel):
+    """
+    The image data for the image manifest. This field is only populated when Kind is \"image\".
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    platform: OciPlatform = Field(alias="Platform")
+    """
+    OCI platform of the image. This will be the platform specified in the manifest descriptor from the index/manifest list. If it's not available, it will be obtained from the image config.
+    """
+    containers: List[str] = Field(alias="Containers")
+    """
+    The IDs of the containers that are using this image.
+    """
+    size: ImageManifestSummaryImageDataSize = Field(alias="Size")
+
+class ImageManifestSummaryAttestationData(BaseModel):
+    """
+    The image data for the attestation manifest. This field is only populated when Kind is \"attestation\".
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    _for_: str = Field(alias="For")
+    """
+    The digest of the image manifest that this attestation is for.
+    """
+
+class ImageManifestSummary(BaseModel):
+    """
+    ImageManifestSummary represents a summary of an image manifest.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(alias="ID")
+    """
+    ID is the content-addressable ID of an image and is the same as the digest of the image manifest.
+    """
+    descriptor: OciDescriptor = Field(alias="Descriptor")
+    available: bool = Field(alias="Available")
+    """
+    Indicates whether all the child content (image config, layers) is fully available locally.
+    """
+    size: ImageManifestSummarySize = Field(alias="Size")
+    kind: Optional[ImageManifestSummaryKindEnum] = Field(alias="Kind", default=None)
+    """
+    The kind of the manifest.  kind         | description -------------|----------------------------------------------------------- image        | Image manifest that can be used to start a container. attestation  | Attestation manifest produced by the Buildkit builder for a specific image manifest.
+    """
+    image_data: Optional[ImageManifestSummaryImageData] = Field(alias="ImageData", default=None)
+    attestation_data: Optional[ImageManifestSummaryAttestationData] = Field(alias="AttestationData", default=None)
+
+class ImageConfig(BaseModel):
+    """
+    Configuration of the image. These fields are used as defaults when starting a container from the image.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    user: Optional[str] = Field(alias="User", default=None)
+    """
+    The user that commands are run as inside the container.
+    """
+    exposed_ports: Optional[List[str]] = Field(alias="ExposedPorts", default=None)
+    """
+    An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`
+    """
+    env: Optional[List[str]] = Field(alias="Env", default=None)
+    """
+    A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`. A variable without `=` is removed from the environment, rather than to have an empty value.
+    """
+    cmd: Optional[List[str]] = Field(alias="Cmd", default=None)
+    """
+    Command to run specified as a string or an array of strings.
+    """
+    healthcheck: Optional[HealthConfig] = Field(alias="Healthcheck", default=None)
+    args_escaped: Optional[bool] = Field(alias="ArgsEscaped", default=None)
+    """
+    Command is already escaped (Windows only)
+    """
+    volumes: Optional[List[str]] = Field(alias="Volumes", default=None)
+    """
+    An object mapping mount point paths inside the container to empty objects.
+    """
+    working_dir: Optional[str] = Field(alias="WorkingDir", default=None)
+    """
+    The working directory for commands to run in.
+    """
+    entrypoint: Optional[List[str]] = Field(alias="Entrypoint", default=None)
+    """
+    The entry point for the container as a string or an array of strings.  If the array consists of exactly one empty string (`[\"\"]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
+    """
+    on_build: Optional[List[str]] = Field(alias="OnBuild", default=None)
+    """
+    `ONBUILD` metadata that were defined in the image's `Dockerfile`.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    stop_signal: Optional[str] = Field(alias="StopSignal", default=None)
+    """
+    Signal to stop a container as a string or unsigned integer.
+    """
+    shell: Optional[List[str]] = Field(alias="Shell", default=None)
+    """
+    Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
+    """
 
 class ImageInspectRootFs(BaseModel):
     """
@@ -5136,6 +6620,14 @@ class Image(BaseModel):
     """
     ID is the content-addressable ID of an image.  This identifier is a content-addressable digest calculated from the image's configuration (which includes the digests of layers used by the image).  Note that this digest differs from the `RepoDigests` below, which holds digests of image manifests that reference the image.
     """
+    descriptor: Optional[OciDescriptor] = Field(alias="Descriptor", default=None)
+    """
+    Descriptor is an OCI descriptor of the image target. In case of a multi-platform image, this descriptor points to the OCI index or a manifest list.  This field is only present if the daemon provides a multi-platform image store.  WARNING: This is experimental and may change at any time without any backward compatibility.
+    """
+    manifests: Optional[List[ImageManifestSummary]] = Field(alias="Manifests", default=None)
+    """
+    Manifests is a list of image manifests available in this image. It provides a more detailed view of the platform-specific image manifests or other image-attached data like build attestations.  Only available if the daemon provides a multi-platform image store and the `manifests` option is set in the inspect request.  WARNING: This is experimental and may change at any time without any backward compatibility.
+    """
     repo_tags: Optional[List[str]] = Field(alias="RepoTags", default=None)
     """
     List of image names/tags in the local image cache that reference this image.  Multiple image tags can refer to the same image, and this list may be empty if no tags reference the image, in which case the image is \"untagged\", in which case it can still be referenced by its ID.
@@ -5143,10 +6635,6 @@ class Image(BaseModel):
     repo_digests: Optional[List[str]] = Field(alias="RepoDigests", default=None)
     """
     List of content-addressable digests of locally available image manifests that the image is referenced from. Multiple manifests can refer to the same image.  These digests are usually only available if the image was either pulled from a registry, or if the image was pushed to a registry, which is when the manifest is generated and its digest calculated.
-    """
-    parent: Optional[str] = Field(alias="Parent", default=None)
-    """
-    ID of the parent image.  Depending on how the image was created, this field may be empty and is only set for images that were built/created locally. This field is empty if the image was pulled from an image registry.
     """
     comment: Optional[str] = Field(alias="Comment", default=None)
     """
@@ -5156,18 +6644,11 @@ class Image(BaseModel):
     """
     Date and time at which the image was created, formatted in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.  This information is only available if present in the image, and omitted otherwise.
     """
-    docker_version: Optional[str] = Field(alias="DockerVersion", default=None)
-    """
-    The version of Docker that was used to build the image.  Depending on how the image was created, this field may be empty.
-    """
     author: Optional[str] = Field(alias="Author", default=None)
     """
     Name of the author that was specified when committing the image, or as specified through MAINTAINER (deprecated) in the Dockerfile.
     """
-    config: Optional[ContainerConfig] = Field(alias="Config", default=None)
-    """
-    Configuration for a container that is portable between hosts.
-    """
+    config: Optional[ImageConfig] = Field(alias="Config", default=None)
     architecture: Optional[str] = Field(alias="Architecture", default=None)
     """
     Hardware CPU architecture that the image runs on.
@@ -5257,16 +6738,6 @@ class VolumeScopeEnum(str, Enum):
     EMPTY = ""
     LOCAL = "local"
     GLOBAL = "global"
-U64 = int
-
-class ObjectVersion(BaseModel):
-    """
-    The version number of the object such as node, service, etc. This is needed to avoid conflicting writes. The client must send the version number along with the modified specification when updating these objects.  This approach ensures safe concurrency and determinism in that the change on the object may not be applied if the version number has changed from the last read. In other words, if two update requests specify the same base version, only one of the requests can succeed. As a result, two separate update requests that happen at the same time will not unintentionally overwrite each other.
-    """
-    model_config = ConfigDict(populate_by_name=True)
-
-    index: Optional[U64] = Field(alias="Index", default=None)
-
 class ClusterVolumeSpecAccessModeScopeEnum(str, Enum):
     EMPTY = ""
     SINGLE = "single"
@@ -5465,7 +6936,7 @@ class Volume(BaseModel):
     """
     Date/Time the volume was created.
     """
-    status: Optional[Dict[str, Dict[str, None]]] = Field(alias="Status", default=None)
+    status: Optional[List[str]] = Field(alias="Status", default=None)
     """
     Low-level details about the volume, provided by the volume driver. Details are returned as a map with key/value pairs: `{\"key\":\"value\",\"key2\":\"value2\"}`.  The `Status` field is optional, and is omitted if the volume driver does not support this feature.
     """
@@ -5488,9 +6959,693 @@ InspectDockerVolumeResponse = Volume
 
 InspectStackContainerResponse = Container
 
-JsonObject = Any
+class SwarmServiceListItem(BaseModel):
+    """
+    Swarm service list item.
+    """
+    model_config = ConfigDict(populate_by_name=True)
 
-JsonValue = Any
+    id: Optional[str] = Field(alias="ID", default=None)
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name of the service.
+    """
+    image: Optional[str] = Field(alias="Image", default=None)
+    """
+    The image associated with service
+    """
+    runtime: Optional[str] = Field(alias="Runtime", default=None)
+    """
+    Runtime is the type of runtime specified for the task executor.
+    """
+    restart: Optional[TaskSpecRestartPolicyConditionEnum] = Field(alias="Restart", default=None)
+    """
+    Condition for restart.
+    """
+    mode: Optional[SwarmServiceMode] = Field(alias="Mode", default=None)
+    """
+    The service mode.
+    """
+    replicas: Optional[I64] = Field(alias="Replicas", default=None)
+    """
+    Number of replicas (in a replicated mode)
+    """
+    max_concurrent: Optional[I64] = Field(alias="MaxConcurrent", default=None)
+    """
+    Max concurrent tasks (in a replicated job mode)
+    """
+    configs: List[str] = Field(alias="Configs")
+    """
+    Attached config names
+    """
+    secrets: List[str] = Field(alias="Secrets")
+    """
+    Attached secret names
+    """
+    running_tasks: Optional[U64] = Field(alias="RunningTasks", default=None)
+    """
+    The number of tasks for the service currently in the Running state.
+    """
+    desired_tasks: Optional[U64] = Field(alias="DesiredTasks", default=None)
+    """
+    The number of tasks for the service desired to be running.
+    - For replicated services, this is the replica count from the service spec.
+    - For global services, this is computed by taking count of all tasks for the
+    service with a Desired State other than Shutdown.
+    """
+    completed_tasks: Optional[U64] = Field(alias="CompletedTasks", default=None)
+    """
+    The number of tasks for a job that are in the Completed state.
+    This field must be cross-referenced with the service type,
+    as the value of 0 may mean the service is not in a job mode,
+    or it may mean the job-mode service has no tasks yet Completed.
+    """
+    state: SwarmState = Field(alias="State")
+    """
+    Swarm service state.
+    - Healthy if all associated tasks match their desired state (or report no desired state)
+    - Unhealthy otherwise
+    
+    Not included in docker cli return, computed by Komodo
+    """
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+
+class TaskState(str, Enum):
+    NEW = "new"
+    ALLOCATED = "allocated"
+    PENDING = "pending"
+    ASSIGNED = "assigned"
+    ACCEPTED = "accepted"
+    PREPARING = "preparing"
+    READY = "ready"
+    STARTING = "starting"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    SHUTDOWN = "shutdown"
+    FAILED = "failed"
+    REJECTED = "rejected"
+    REMOVE = "remove"
+    ORPHANED = "orphaned"
+class SwarmTaskListItem(BaseModel):
+    """
+    Swarm task list item.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    """
+    The ID of the task.
+    """
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name of the task.
+    """
+    node_id: Optional[str] = Field(alias="NodeID", default=None)
+    """
+    The ID of the node that this task is on.
+    """
+    service_id: Optional[str] = Field(alias="ServiceID", default=None)
+    """
+    The ID of the service this task is part of.
+    """
+    container_id: Optional[str] = Field(alias="ContainerID", default=None)
+    """
+    The ID of container associated with this task.
+    """
+    state: Optional[TaskState] = Field(alias="State", default=None)
+    desired_state: Optional[TaskState] = Field(alias="DesiredState", default=None)
+    configs: List[str] = Field(alias="Configs")
+    """
+    Attached config names
+    """
+    secrets: List[str] = Field(alias="Secrets")
+    """
+    Attached secret names
+    """
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+
+class SwarmStack(BaseModel):
+    """
+    All entities related to docker stack available over CLI.
+    Returned by:
+    ```shell
+    docker stack services --format json <STACK>
+    docker stack ps --format json <STACK>
+    ```
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(alias="Name")
+    """
+    Swarm stack name.
+    """
+    state: SwarmState = Field(alias="State")
+    """
+    Swarm stack state.
+    - Healthy if all associated tasks match their desired state (or report no desired state)
+    - Unhealthy otherwise
+    
+    Not included in docker cli return, computed by Komodo
+    """
+    services: List[SwarmServiceListItem] = Field(alias="Services")
+    """
+    Services part of the stack
+    """
+    tasks: List[SwarmTaskListItem] = Field(alias="Tasks")
+    """
+    Tasks part of the stack
+    """
+
+InspectStackSwarmInfoResponse = SwarmStack
+
+InspectStackSwarmServiceResponse = SwarmService
+
+class Driver(BaseModel):
+    """
+    Driver represents a driver (network, logging, secrets).
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(alias="Name")
+    """
+    Name of the driver.
+    """
+    options: Optional[Dict[str, str]] = Field(alias="Options", default=None)
+    """
+    Key/value map of driver-specific options.
+    """
+
+class ConfigSpec(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    User-defined name of the config.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    data: Optional[str] = Field(alias="Data", default=None)
+    """
+    Data is the data to store as a config, formatted as a Base64-url-safe-encoded ([RFC 4648](https://tools.ietf.org/html/rfc4648#section-5)) string.
+    It must be empty if the Driver field is set, in which case the data is loaded from an external secret store.
+    The maximum allowed size is 500KB, as defined in [MaxSecretSize](https://pkg.go.dev/github.com/moby/swarmkit/v2@v2.0.0-20250103191802-8c1959736554/api/validation#MaxSecretSize).
+    """
+    templating: Optional[Driver] = Field(alias="Templating", default=None)
+    """
+    Templating driver, if applicable  Templating controls whether and how to evaluate the config payload as a template. If no driver is set, no templating is used.
+    """
+
+class SwarmConfigDetails(BaseModel):
+    """
+    Swarm config details.
+    
+    This would be just "SwarmConfig", but that would
+    conflict with the Swarm (Komodo resource) Config type,
+    which is also SwarmConfig.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    version: Optional[ObjectVersion] = Field(alias="Version", default=None)
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    spec: Optional[ConfigSpec] = Field(alias="Spec", default=None)
+
+InspectSwarmConfigResponse = SwarmConfigDetails
+
+class NodeSpecRoleEnum(str, Enum):
+    EMPTY = ""
+    WORKER = "worker"
+    MANAGER = "manager"
+class NodeSpecAvailabilityEnum(str, Enum):
+    EMPTY = ""
+    ACTIVE = "active"
+    PAUSE = "pause"
+    DRAIN = "drain"
+class NodeSpec(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name for the node.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    role: Optional[NodeSpecRoleEnum] = Field(alias="Role", default=None)
+    """
+    Role of the node.
+    """
+    availability: Optional[NodeSpecAvailabilityEnum] = Field(alias="Availability", default=None)
+    """
+    Availability of the node.
+    """
+
+class EngineDescriptionPlugins(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    typ: Optional[str] = Field(alias="Type", default=None)
+    name: Optional[str] = Field(alias="Name", default=None)
+
+class EngineDescription(BaseModel):
+    """
+    EngineDescription provides information about an engine.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    engine_version: Optional[str] = Field(alias="EngineVersion", default=None)
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    plugins: Optional[List[EngineDescriptionPlugins]] = Field(alias="Plugins", default=None)
+
+class TlsInfo(BaseModel):
+    """
+    Information about the issuer of leaf TLS certificates and the trusted root CA certificate.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    trust_root: Optional[str] = Field(alias="TrustRoot", default=None)
+    """
+    The root CA certificate(s) that are used to validate leaf TLS certificates.
+    """
+    cert_issuer_subject: Optional[str] = Field(alias="CertIssuerSubject", default=None)
+    """
+    The base64-url-safe-encoded raw subject bytes of the issuer.
+    """
+    cert_issuer_public_key: Optional[str] = Field(alias="CertIssuerPublicKey", default=None)
+    """
+    The base64-url-safe-encoded raw public key bytes of the issuer.
+    """
+
+class NodeDescription(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    hostname: Optional[str] = Field(alias="Hostname", default=None)
+    platform: Optional[Platform] = Field(alias="Platform", default=None)
+    resources: Optional[ResourceObject] = Field(alias="Resources", default=None)
+    engine: Optional[EngineDescription] = Field(alias="Engine", default=None)
+    tls_info: Optional[TlsInfo] = Field(alias="TLSInfo", default=None)
+
+class NodeState(str, Enum):
+    """
+    NodeState represents the state of a node.
+    """
+    UNKNOWN = "unknown"
+    DOWN = "down"
+    READY = "ready"
+    DISCONNECTED = "disconnected"
+class NodeStatus(BaseModel):
+    """
+    NodeStatus represents the status of a node.  It provides the current status of the node, as seen by the manager.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    state: Optional[NodeState] = Field(alias="State", default=None)
+    message: Optional[str] = Field(alias="Message", default=None)
+    addr: Optional[str] = Field(alias="Addr", default=None)
+    """
+    IP address of the node.
+    """
+
+class NodeReachability(str, Enum):
+    """
+    Reachability represents the reachability of a node.
+    """
+    UNKNOWN = "unknown"
+    UNREACHABLE = "unreachable"
+    REACHABLE = "reachable"
+class ManagerStatus(BaseModel):
+    """
+    ManagerStatus represents the status of a manager.  It provides the current status of a node's manager component, if the node is a manager.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    leader: Optional[bool] = Field(alias="Leader", default=None)
+    reachability: Optional[NodeReachability] = Field(alias="Reachability", default=None)
+    addr: Optional[str] = Field(alias="Addr", default=None)
+    """
+    The IP address and port at which the manager is reachable.
+    """
+
+class SwarmNode(BaseModel):
+    """
+    Swarm node details.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    version: Optional[ObjectVersion] = Field(alias="Version", default=None)
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    """
+    Date and time at which the node was added to the swarm in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+    """
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    """
+    Date and time at which the node was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+    """
+    spec: Optional[NodeSpec] = Field(alias="Spec", default=None)
+    description: Optional[NodeDescription] = Field(alias="Description", default=None)
+    status: Optional[NodeStatus] = Field(alias="Status", default=None)
+    manager_status: Optional[ManagerStatus] = Field(alias="ManagerStatus", default=None)
+
+InspectSwarmNodeResponse = SwarmNode
+
+class SwarmSpecOrchestration(BaseModel):
+    """
+    Orchestration configuration.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    task_history_retention_limit: Optional[I64] = Field(alias="TaskHistoryRetentionLimit", default=None)
+    """
+    The number of historic tasks to keep per instance or node.
+    If negative, never remove completed or failed tasks.
+    """
+
+class SwarmSpecRaft(BaseModel):
+    """
+    Raft configuration.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    snapshot_interval: Optional[U64] = Field(alias="SnapshotInterval", default=None)
+    """
+    The number of log entries between snapshots.
+    """
+    keep_old_snapshots: Optional[U64] = Field(alias="KeepOldSnapshots", default=None)
+    """
+    The number of snapshots to keep beyond the current snapshot.
+    """
+    log_entries_for_slow_followers: Optional[U64] = Field(alias="LogEntriesForSlowFollowers", default=None)
+    """
+    The number of log entries to keep around to sync up slow followers after a snapshot is created.
+    """
+    election_tick: Optional[I64] = Field(alias="ElectionTick", default=None)
+    """
+    The number of ticks that a follower will wait for a message from the leader before becoming a candidate and starting an election. `ElectionTick` must be greater than `HeartbeatTick`.  A tick currently defaults to one second, so these translate directly to seconds currently, but this is NOT guaranteed.
+    """
+    heartbeat_tick: Optional[I64] = Field(alias="HeartbeatTick", default=None)
+    """
+    The number of ticks between heartbeats.
+    Every HeartbeatTick ticks, the leader will send a heartbeat to the followers.
+    A tick currently defaults to one second, so these translate directly to seconds currently, but this is NOT guaranteed.
+    """
+
+class SwarmSpecDispatcher(BaseModel):
+    """
+    Dispatcher configuration.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    heartbeat_period: Optional[I64] = Field(alias="HeartbeatPeriod", default=None)
+    """
+    The delay for an agent to send a heartbeat to the dispatcher.
+    """
+
+class SwarmSpecCaConfigExternalCasProtocolEnum(str, Enum):
+    EMPTY = ""
+    CFSSL = "cfssl"
+class SwarmSpecCaConfigExternalCas(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    protocol: Optional[SwarmSpecCaConfigExternalCasProtocolEnum] = Field(alias="Protocol", default=None)
+    """
+    Protocol for communication with the external CA (currently only `cfssl` is supported).
+    """
+    url: Optional[str] = Field(alias="URL", default=None)
+    """
+    URL where certificate signing requests should be sent.
+    """
+    options: Optional[Dict[str, str]] = Field(alias="Options", default=None)
+    """
+    An object with key/value pairs that are interpreted as protocol-specific options for the external CA driver.
+    """
+    ca_cert: Optional[str] = Field(alias="CACert", default=None)
+    """
+    The root CA certificate (in PEM format) this external CA uses to issue TLS certificates (assumed to be to the current swarm root CA certificate if not provided).
+    """
+
+class SwarmSpecCaConfig(BaseModel):
+    """
+    CA configuration.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    node_cert_expiry: Optional[I64] = Field(alias="NodeCertExpiry", default=None)
+    """
+    The duration node certificates are issued for.
+    """
+    external_cas: Optional[List[SwarmSpecCaConfigExternalCas]] = Field(alias="ExternalCAs", default=None)
+    """
+    Configuration for forwarding signing requests to an external certificate authority.
+    """
+    signing_ca_cert: Optional[str] = Field(alias="SigningCACert", default=None)
+    """
+    The desired signing CA certificate for all swarm node TLS leaf certificates, in PEM format.
+    """
+    signing_ca_key: Optional[str] = Field(alias="SigningCAKey", default=None)
+    """
+    The desired signing CA key for all swarm node TLS leaf certificates, in PEM format.
+    """
+    force_rotate: Optional[U64] = Field(alias="ForceRotate", default=None)
+    """
+    An integer whose purpose is to force swarm to generate a new signing CA certificate and key, if none have been specified in `SigningCACert` and `SigningCAKey`
+    """
+
+class SwarmSpecEncryptionConfig(BaseModel):
+    """
+    Parameters related to encryption-at-rest.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    auto_lock_managers: Optional[bool] = Field(alias="AutoLockManagers", default=None)
+    """
+    If set, generate a key and use it to lock data stored on the managers.
+    """
+
+class SwarmSpecTaskDefaultsLogDriver(BaseModel):
+    """
+    The log driver to use for tasks created in the orchestrator if unspecified by a service.  Updating this value only affects new tasks. Existing tasks continue to use their previously configured log driver until recreated.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    The log driver to use as a default for new tasks.
+    """
+    options: Optional[Dict[str, str]] = Field(alias="Options", default=None)
+    """
+    Driver-specific options for the selected log driver, specified as key/value pairs.
+    """
+
+class SwarmSpecTaskDefaults(BaseModel):
+    """
+    Defaults for creating tasks in this cluster.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    log_driver: Optional[SwarmSpecTaskDefaultsLogDriver] = Field(alias="LogDriver", default=None)
+
+class SwarmSpec(BaseModel):
+    """
+    User modifiable swarm configuration.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name of the swarm.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    orchestration: Optional[SwarmSpecOrchestration] = Field(alias="Orchestration", default=None)
+    raft: Optional[SwarmSpecRaft] = Field(alias="Raft", default=None)
+    dispatcher: Optional[SwarmSpecDispatcher] = Field(alias="Dispatcher", default=None)
+    ca_config: Optional[SwarmSpecCaConfig] = Field(alias="CAConfig", default=None)
+    encryption_config: Optional[SwarmSpecEncryptionConfig] = Field(alias="EncryptionConfig", default=None)
+    task_defaults: Optional[SwarmSpecTaskDefaults] = Field(alias="TaskDefaults", default=None)
+
+class JoinTokens(BaseModel):
+    """
+    JoinTokens contains the tokens workers and managers need to join the swarm.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    worker: Optional[str] = Field(alias="Worker", default=None)
+    """
+    The token workers can use to join the swarm.
+    """
+    manager: Optional[str] = Field(alias="Manager", default=None)
+    """
+    The token managers can use to join the swarm.
+    """
+
+class SwarmInspectInfo(BaseModel):
+    """
+    Docker-level information about the Swarm.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    """
+    The (Docker) ID of the swarm.
+    """
+    version: Optional[ObjectVersion] = Field(alias="Version", default=None)
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    """
+    Date and time at which the swarm was initialised in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+    """
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    """
+    Date and time at which the swarm was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+    """
+    spec: Optional[SwarmSpec] = Field(alias="Spec", default=None)
+    tls_info: Optional[TlsInfo] = Field(alias="TLSInfo", default=None)
+    root_rotation_in_progress: Optional[bool] = Field(alias="RootRotationInProgress", default=None)
+    """
+    Whether there is currently a root CA rotation in progress for the swarm
+    """
+    data_path_port: Optional[int] = Field(alias="DataPathPort", default=None)
+    """
+    DataPathPort specifies the data path port number for data traffic. Acceptable port range is 1024 to 49151. If no port is set or is set to 0, the default port (4789) is used.
+    """
+    default_addr_pool: Optional[List[str]] = Field(alias="DefaultAddrPool", default=None)
+    """
+    Default Address Pool specifies default subnet pools for global scope networks.
+    """
+    subnet_size: Optional[int] = Field(alias="SubnetSize", default=None)
+    """
+    SubnetSize specifies the subnet size of the networks created from the default subnet pool.
+    """
+    join_tokens: Optional[JoinTokens] = Field(alias="JoinTokens", default=None)
+
+InspectSwarmResponse = SwarmInspectInfo
+
+class SecretSpec(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    User-defined name of the secret.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    data: Optional[str] = Field(alias="Data", default=None)
+    """
+    Data is the data to store as a secret, formatted as a Base64-url-safe-encoded ([RFC 4648](https://tools.ietf.org/html/rfc4648#section-5)) string.
+    It must be empty if the Driver field is set, in which case the data is loaded from an external secret store.
+    The maximum allowed size is 500KB, as defined in [MaxSecretSize](https://pkg.go.dev/github.com/moby/swarmkit/v2@v2.0.0-20250103191802-8c1959736554/api/validation#MaxSecretSize).
+    This field is only used to _create_ a secret, and is not returned by other endpoints.
+    """
+    driver: Optional[Driver] = Field(alias="Driver", default=None)
+    """
+    Name of the secrets driver used to fetch the secret's value from an external secret store.
+    """
+    templating: Optional[Driver] = Field(alias="Templating", default=None)
+    """
+    Templating driver, if applicable  Templating controls whether and how to evaluate the config payload as a template.
+    If no driver is set, no templating is used.
+    """
+
+class SwarmSecret(BaseModel):
+    """
+    Swarm secret details.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    version: Optional[ObjectVersion] = Field(alias="Version", default=None)
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    spec: Optional[SecretSpec] = Field(alias="Spec", default=None)
+
+InspectSwarmSecretResponse = SwarmSecret
+
+InspectSwarmServiceResponse = SwarmService
+
+InspectSwarmStackResponse = SwarmStack
+
+class ContainerStatus(BaseModel):
+    """
+    represents the status of a container.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    container_id: Optional[str] = Field(alias="ContainerID", default=None)
+    pid: Optional[I64] = Field(alias="PID", default=None)
+    exit_code: Optional[I64] = Field(alias="ExitCode", default=None)
+
+class PortStatus(BaseModel):
+    """
+    represents the port status of a task's host ports whose service has published host ports
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    ports: Optional[List[EndpointPortConfig]] = Field(alias="Ports", default=None)
+
+class TaskStatus(BaseModel):
+    """
+    represents the status of a task.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    timestamp: Optional[str] = Field(alias="Timestamp", default=None)
+    state: Optional[TaskState] = Field(alias="State", default=None)
+    message: Optional[str] = Field(alias="Message", default=None)
+    err: Optional[str] = Field(alias="Err", default=None)
+    container_status: Optional[ContainerStatus] = Field(alias="ContainerStatus", default=None)
+    port_status: Optional[PortStatus] = Field(alias="PortStatus", default=None)
+
+class SwarmTask(BaseModel):
+    """
+    Swarm task details.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    """
+    The ID of the task.
+    """
+    version: Optional[ObjectVersion] = Field(alias="Version", default=None)
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name of the task.
+    """
+    labels: Optional[Dict[str, str]] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata.
+    """
+    spec: Optional[TaskSpec] = Field(alias="Spec", default=None)
+    service_id: Optional[str] = Field(alias="ServiceID", default=None)
+    """
+    The ID of the service this task is part of.
+    """
+    slot: Optional[I64] = Field(alias="Slot", default=None)
+    node_id: Optional[str] = Field(alias="NodeID", default=None)
+    """
+    The ID of the node that this task is on.
+    """
+    assigned_generic_resources: Optional[GenericResources] = Field(alias="AssignedGenericResources", default=None)
+    status: Optional[TaskStatus] = Field(alias="Status", default=None)
+    desired_state: Optional[TaskState] = Field(alias="DesiredState", default=None)
+    job_iteration: Optional[ObjectVersion] = Field(alias="JobIteration", default=None)
+    """
+    If the Service this Task belongs to is a job-mode service, contains the JobIteration of the Service this Task was created for. Absent if the Task was created for a Replicated or Global Service.
+    """
+
+InspectSwarmTaskResponse = SwarmTask
+
+JsonObject = Any
 
 ListActionsResponse = List[ActionListItem]
 
@@ -5527,7 +7682,7 @@ class ContainerListItem(BaseModel):
     """
     server_id: Optional[str] = Field(default=None)
     """
-    The Server which holds the container.
+    The Server which hosts the container.
     """
     name: str
     """
@@ -5681,17 +7836,29 @@ class ImageHistoryResponseItem(BaseModel):
 ListDockerImageHistoryResponse = List[ImageHistoryResponseItem]
 
 class ImageListItem(BaseModel):
+    id: str
+    """
+    ID is the content-addressable ID of an image.
+    This identifier is a content-addressable digest calculated from the image's configuration (which includes the digests of layers used by the image).
+    Note that this digest differs from the `digests` below, which holds digests of image manifests that reference the image.
+    """
+    parent_id: str
+    """
+    ID of the parent image.
+    Depending on how the image was created, this field may be empty and is only set for images that were built/created locally.
+    This field is empty if the image was pulled from an image registry.
+    """
     name: str
     """
     The first tag in `repo_tags`, or Id if no tags.
     """
-    id: str
+    tags: Optional[List[str]] = Field(default=None)
     """
-    ID is the content-addressable ID of an image.  This identifier is a content-addressable digest calculated from the image's configuration (which includes the digests of layers used by the image).  Note that this digest differs from the `RepoDigests` below, which holds digests of image manifests that reference the image.
+    The unchanged `RepoTags`.
     """
-    parent_id: str
+    digests: Optional[List[str]] = Field(default=None)
     """
-    ID of the parent image.  Depending on how the image was created, this field may be empty and is only set for images that were built/created locally. This field is empty if the image was pulled from an image registry.
+    The unchanged `RepoDigests`.
     """
     created: I64
     """
@@ -5799,6 +7966,8 @@ ListFullServersResponse = List[Server]
 
 ListFullStacksResponse = List[Stack]
 
+ListFullSwarmsResponse = List[Swarm]
+
 ListGitProviderAccountsResponse = List[GitProviderAccount]
 
 class GitProvider(BaseModel):
@@ -5816,6 +7985,8 @@ class GitProvider(BaseModel):
     """
 
 ListGitProvidersFromConfigResponse = List[GitProvider]
+
+ListOnboardingKeysResponse = List[OnboardingKey]
 
 class UserTargetTypes(str, Enum):
     USER = "User"
@@ -6144,22 +8315,22 @@ class ServerListItemInfo(BaseModel):
     """
     Region of the server.
     """
-    address: str
+    address: Optional[str] = Field(default=None)
     """
-    Address of the server.
+    Address of the server, or null if empty.
     """
     external_address: Optional[str] = Field(default=None)
     """
     External address of the server (reachable by users).
     Used with links.
     """
-    version: str
+    public_ip: Optional[str] = Field(default=None)
     """
-    The Komodo Periphery version of the server.
+    Host public ip, if it could be resolved.
     """
     send_unreachable_alerts: bool
     """
-    Whether server is configured to send unreachable alerts.
+    Whether server is configured to send disconnected alerts.
     """
     send_cpu_alerts: bool
     """
@@ -6177,13 +8348,27 @@ class ServerListItemInfo(BaseModel):
     """
     Whether server is configured to send version mismatch alerts.
     """
+    version: Optional[str] = Field(default=None)
+    """
+    The Komodo Periphery version.
+    """
+    public_key: Optional[str] = Field(default=None)
+    """
+    The public key of Periphery
+    """
+    attempted_public_key: Optional[str] = Field(default=None)
+    """
+    If a Periphery fails to authenticate to Core with invalid Periphery public key,
+    it will be stored here to accept the connection later on.
+    """
     terminals_disabled: bool
     """
+    Whether server is configured to send unreachable alerts.
     Whether terminals are disabled for this Server.
     """
-    container_exec_disabled: bool
+    container_terminals_disabled: bool
     """
-    Whether container exec is disabled for this Server.
+    Whether container terminals are disabled for this Server.
     """
 
 ServerListItem = ResourceListItem[ServerListItemInfo]
@@ -6201,11 +8386,15 @@ class StackService(BaseModel):
     """
     container: Optional[ContainerListItem] = Field(default=None)
     """
-    The container
+    The container (Server mode)
     """
-    update_available: bool
+    swarm_service: Optional[SwarmServiceListItem] = Field(default=None)
     """
-    Whether there is an update available for this services image.
+    The service (Swarm mode)
+    """
+    image_digests: Optional[List[ImageDigest]] = Field(default=None)
+    """
+    The service image digests
     """
 
 ListStackServicesResponse = List[StackService]
@@ -6255,21 +8444,14 @@ class StackState(str, Enum):
     """
     Server not reachable for status
     """
-class StackServiceWithUpdate(BaseModel):
-    service: str
-    image: str
-    """
-    The service's image
-    """
-    update_available: bool
-    """
-    Whether there is a newer image available for this service
-    """
-
 class StackListItemInfo(BaseModel):
+    swarm_id: str
+    """
+    The swarm that stack is deployed on, when in Swarm mode.
+    """
     server_id: str
     """
-    The server that stack is deployed on.
+    The server that stack is deployed on, when in Server mode.
     """
     files_on_host: bool
     """
@@ -6337,6 +8519,161 @@ StackListItem = ResourceListItem[StackListItemInfo]
 
 ListStacksResponse = List[StackListItem]
 
+class SwarmConfigListItem(BaseModel):
+    """
+    Swarm config list item.
+    Returned by `docker config ls --format json`
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    User-defined name of the config.
+    """
+    id: Optional[str] = Field(alias="ID", default=None)
+    in_use: Optional[bool] = Field(alias="InUse", default=None)
+    """
+    Whether the config is in use by any service
+    """
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    labels: Optional[str] = Field(alias="Labels", default=None)
+    """
+    User-defined key/value metadata, formatted as a string:
+    `"lab1=val1,lab2=val2"`.
+    """
+
+ListSwarmConfigsResponse = List[SwarmConfigListItem]
+
+ListSwarmNetworksResponse = List[NetworkListItem]
+
+class SwarmNodeListItem(BaseModel):
+    """
+    Swarm node list item.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Name for the node.
+    """
+    hostname: Optional[str] = Field(alias="Hostname", default=None)
+    role: Optional[NodeSpecRoleEnum] = Field(alias="Role", default=None)
+    """
+    Role of the node.
+    """
+    availability: Optional[NodeSpecAvailabilityEnum] = Field(alias="Availability", default=None)
+    """
+    Availability of the node.
+    """
+    state: Optional[NodeState] = Field(alias="State", default=None)
+    """
+    State of the node
+    """
+    manager_addr: Optional[str] = Field(alias="ManagerAddr", default=None)
+    """
+    For manager nodes, include the manager addr.
+    """
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    """
+    Date and time at which the node was added to the swarm in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+    """
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+    """
+    Date and time at which the node was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+    """
+
+ListSwarmNodesResponse = List[SwarmNodeListItem]
+
+class SwarmSecretListItem(BaseModel):
+    """
+    Swarm secret list item.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    User-defined name of the secret.
+    """
+    driver: Optional[str] = Field(alias="Driver", default=None)
+    """
+    Name of the secrets driver used to fetch the secret's value from an external secret store.
+    """
+    templating: Optional[str] = Field(alias="Templating", default=None)
+    """
+    Templating driver, if applicable  Templating controls whether and how to evaluate the config payload as a template.
+    If no driver is set, no templating is used.
+    """
+    in_use: bool = Field(alias="InUse")
+    """
+    Whether the secret is in use by any service
+    """
+    created_at: Optional[str] = Field(alias="CreatedAt", default=None)
+    updated_at: Optional[str] = Field(alias="UpdatedAt", default=None)
+
+ListSwarmSecretsResponse = List[SwarmSecretListItem]
+
+ListSwarmServicesResponse = List[SwarmServiceListItem]
+
+class SwarmStackListItem(BaseModel):
+    """
+    Swarm stack list item.
+    Returned by `docker stack ls --format json`
+    
+    https://docs.docker.com/reference/cli/docker/stack/ls/#format
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(alias="Name", default=None)
+    """
+    Swarm stack name.
+    """
+    state: Optional[SwarmState] = Field(alias="State", default=None)
+    """
+    Swarm stack state.
+    - Healthy if all associated tasks match their desired state
+    - Unhealthy otherwise
+    
+    Not included in docker cli return, computed by Komodo
+    """
+    services: Optional[str] = Field(alias="Services", default=None)
+    """
+    Number of services which are part of the stack
+    """
+    orchestrator: Optional[str] = Field(alias="Orchestrator", default=None)
+    """
+    The stack orchestrator
+    """
+    namespace: Optional[str] = Field(alias="Namespace", default=None)
+    """
+    The stack namespace
+    """
+
+ListSwarmStacksResponse = List[SwarmStackListItem]
+
+ListSwarmTasksResponse = List[SwarmTaskListItem]
+
+class SwarmListItemInfo(BaseModel):
+    server_ids: List[str]
+    """
+    Servers part of the swarm
+    """
+    state: SwarmState
+    """
+    The Swarm state
+    """
+    err: Optional[str] = Field(default=None)
+    """
+    If there is an error reaching
+    Swarm, message will be given here.
+    """
+
+SwarmListItem = ResourceListItem[SwarmListItemInfo]
+
+ListSwarmsResponse = List[SwarmListItem]
+
 class SystemProcess(BaseModel):
     """
     Information about a process on the system.
@@ -6384,25 +8721,83 @@ ListSystemProcessesResponse = List[SystemProcess]
 
 ListTagsResponse = List[Tag]
 
-class TerminalInfo(BaseModel):
+class TerminalTargetServerInner(BaseModel):
     """
-    Info about an active terminal on a server.
+    Generated type representing the anonymous struct variant `Server` of the `TerminalTarget` Rust enum
+    """
+    server: Optional[str] = Field(default=None)
+
+class TerminalTargetContainerInner(BaseModel):
+    """
+    Generated type representing the anonymous struct variant `Container` of the `TerminalTarget` Rust enum
+    """
+    server: str
+    container: str
+
+class TerminalTargetStackInner(BaseModel):
+    """
+    Generated type representing the anonymous struct variant `Stack` of the `TerminalTarget` Rust enum
+    """
+    stack: str
+    service: Optional[str] = Field(default=None)
+
+class TerminalTargetDeploymentInner(BaseModel):
+    """
+    Generated type representing the anonymous struct variant `Deployment` of the `TerminalTarget` Rust enum
+    """
+    deployment: str
+
+class TerminalTargetTypes(str, Enum):
+    SERVER = "Server"
+    CONTAINER = "Container"
+    STACK = "Stack"
+    DEPLOYMENT = "Deployment"
+
+class TerminalTargetServer(BaseModel):
+    type: Literal[TerminalTargetTypes.SERVER] = TerminalTargetTypes.SERVER
+    params: TerminalTargetServerInner
+
+class TerminalTargetContainer(BaseModel):
+    type: Literal[TerminalTargetTypes.CONTAINER] = TerminalTargetTypes.CONTAINER
+    params: TerminalTargetContainerInner
+
+class TerminalTargetStack(BaseModel):
+    type: Literal[TerminalTargetTypes.STACK] = TerminalTargetTypes.STACK
+    params: TerminalTargetStackInner
+
+class TerminalTargetDeployment(BaseModel):
+    type: Literal[TerminalTargetTypes.DEPLOYMENT] = TerminalTargetTypes.DEPLOYMENT
+    params: TerminalTargetDeploymentInner
+
+TerminalTarget = Union[TerminalTargetServer, TerminalTargetContainer, TerminalTargetStack, TerminalTargetDeployment]
+class Terminal(BaseModel):
+    """
+    Represents an active terminal on a server.
     Retrieve with [ListTerminals][crate::api::read::server::ListTerminals].
     """
     name: str
     """
     The name of the terminal.
     """
+    target: TerminalTarget
+    """
+    The target resource of the Terminal.
+    """
     command: str
     """
-    The root program / args of the pty
+    The command used to init the shell.
     """
     stored_size_kb: float
     """
     The size of the terminal history in memory.
     """
+    created_at: I64
+    """
+    When the Terminal was created.
+    Unix timestamp milliseconds.
+    """
 
-ListTerminalsResponse = List[TerminalInfo]
+ListTerminalsResponse = List[Terminal]
 
 ListUserGroupsResponse = List[UserGroup]
 
@@ -6412,11 +8807,6 @@ ListUsersResponse = List[User]
 
 ListVariablesResponse = List[Variable]
 
-LoginLocalUserResponse = JwtResponse
-
-"""
-The response for [LoginLocalUser]
-"""
 MongoDocument = Any
 
 class ProcedureQuerySpecifics(BaseModel):
@@ -6447,6 +8837,8 @@ SearchDeploymentLogResponse = Log
 
 SearchStackLogResponse = Log
 
+SearchSwarmServiceLogResponse = Log
+
 class ServerQuerySpecifics(BaseModel):
     pass
 ServerQuery = ResourceQuery[ServerQuerySpecifics]
@@ -6456,11 +8848,6 @@ Server-specific query
 """
 SetLastSeenUpdateResponse = NoData
 
-SignUpLocalUserResponse = JwtResponse
-
-"""
-Response for [SignUpLocalUser].
-"""
 class StackQuerySpecifics(BaseModel):
     server_ids: Optional[List[str]] = Field(default=None)
     """
@@ -6484,9 +8871,19 @@ class StackQuerySpecifics(BaseModel):
 
 StackQuery = ResourceQuery[StackQuerySpecifics]
 
+class SwarmQuerySpecifics(BaseModel):
+    servers: List[str]
+    """
+    Filter swarms by server ids.
+    """
+
+SwarmQuery = ResourceQuery[SwarmQuerySpecifics]
+
 UpdateDockerRegistryAccountResponse = DockerRegistryAccount
 
 UpdateGitProviderAccountResponse = GitProviderAccount
+
+UpdateOnboardingKeyResponse = OnboardingKey
 
 UpdatePermissionOnResourceTypeResponse = NoData
 
@@ -6501,10 +8898,6 @@ UpdateServiceUserDescriptionResponse = User
 UpdateUserAdminResponse = NoData
 
 UpdateUserBasePermissionsResponse = NoData
-
-UpdateUserPasswordResponse = NoData
-
-UpdateUserUsernameResponse = NoData
 
 UpdateVariableDescriptionResponse = Variable
 
@@ -6537,6 +8930,8 @@ _PartialResourceSyncConfig = ResourceSyncConfig
 _PartialServerConfig = ServerConfig
 
 _PartialStackConfig = StackConfig
+
+_PartialSwarmConfig = SwarmConfig
 
 _PartialTag = Tag
 
@@ -6576,12 +8971,6 @@ class AwsBuilderConfig(BaseModel):
     """
     The size of the builder volume in gb
     """
-    port: int
-    """
-    The port periphery will be running on.
-    Default: `8120`
-    """
-    use_https: bool
     ami_id: Optional[str] = Field(default=None)
     """
     The EC2 ami id to create.
@@ -6615,6 +9004,21 @@ class AwsBuilderConfig(BaseModel):
     """
     The user data to deploy the instance with.
     """
+    port: int
+    """
+    The port periphery will be running on.
+    Default: `8120`
+    """
+    use_https: bool
+    periphery_public_key: Optional[str] = Field(default=None)
+    """
+    An expected public key associated with Periphery private key.
+    If empty, doesn't validate Periphery public key.
+    """
+    insecure_tls: bool
+    """
+    Whether to validate the Periphery tls certificates.
+    """
     git_providers: Optional[List[GitProvider]] = Field(default=None)
     """
     Which git providers are available on the AMI
@@ -6630,8 +9034,8 @@ class AwsBuilderConfig(BaseModel):
 
 class BackupCoreDatabase(BaseModel):
     """
-    Backs up the Komodo Core database to compressed jsonl files.
-    Admin only. Response: [Update]
+    **Admin only.** Backs up the Komodo Core database to compressed jsonl files.
+    Response: [Update]. Aliases: `backup-database`, `backup-db`, `backup`.
     
     Mount a folder to `/backups`, and Core will use it to create
     timestamped database dumps, which can be restored using
@@ -6658,6 +9062,71 @@ class BatchBuildRepo(BaseModel):
     ```
     """
 
+class BatchCheckDeploymentForUpdate(BaseModel):
+    """
+    Checks for newer image than what is deployed. Response: [BatchCheckDeploymentForUpdateResponse]
+    """
+    pattern: str
+    """
+    Id or name or wildcard pattern or regex.
+    Supports multiline and comma delineated combinations of the above.
+    
+    Example:
+    ```text
+    # match all foo-* deployments
+    foo-*
+    # add some more
+    extra-deployment-1, extra-deployment-2
+    ```
+    """
+    skip_auto_update: Optional[bool] = Field(default=None)
+    """
+    Normally resources with 'auto_update' will be
+    redeployed immediately if updates are found.
+    With this enabled, convert this into an UpdateAvailable alert.
+    """
+    wait_for_auto_update: Optional[bool] = Field(default=None)
+    """
+    If check triggers auto deploy,
+    whether this call should wait on the auto deploy,
+    or run it in the background.
+    """
+
+class BatchCheckStackForUpdate(BaseModel):
+    """
+    Checks for new images. Response: [BatchCheckStackForUpdateResponse]
+    """
+    pattern: str
+    """
+    Id or name or wildcard pattern or regex.
+    Supports multiline and comma delineated combinations of the above.
+    
+    Example:
+    ```text
+    # match all foo-* stacks
+    foo-*
+    # add some more
+    extra-stack-1, extra-stack-2
+    ```
+    """
+    skip_auto_update: Optional[bool] = Field(default=None)
+    """
+    Normally resources with 'auto_update' will be
+    redeployed immediately if updates are found.
+    With this enabled, convert this into an UpdateAvailable alert.
+    """
+    wait_for_auto_update: Optional[bool] = Field(default=None)
+    """
+    If check triggers auto deploy,
+    whether this call should wait on the auto deploy,
+    or run it in the background.
+    """
+    skip_cache_refresh: Optional[bool] = Field(default=None)
+    """
+    Usually will refresh the stack cache before checking for updates.
+    Skip with this option.
+    """
+
 class BatchCloneRepo(BaseModel):
     """
     Clones multiple Repos in parallel that match pattern. Response: [BatchExecutionResponse].
@@ -6674,6 +9143,16 @@ class BatchCloneRepo(BaseModel):
     # add some more
     extra-repo-1, extra-repo-2
     ```
+    """
+
+class BatchDeleteAllTerminals(BaseModel):
+    """
+    Delete all terminals on many or all Servers.
+    Response: [NoData]
+    """
+    query: Optional[ServerQuery] = Field(default=None)
+    """
+    Optional structured query to filter servers.
     """
 
 class BatchDeploy(BaseModel):
@@ -6756,7 +9235,7 @@ class BatchDestroyStack(BaseModel):
     """
     Id or name or wildcard pattern or regex.
     Supports multiline and comma delineated combinations of the above.
-    d
+    
     Example:
     ```text
     # match all foo-* stacks
@@ -6908,9 +9387,56 @@ class CancelRepoBuild(BaseModel):
     Can be id or name
     """
 
+class CheckDeploymentForUpdate(BaseModel):
+    """
+    Checks for newer image than what is deployed. Response: [CheckDeploymentForUpdateResponse]
+    """
+    deployment: str
+    """
+    Name or id
+    """
+    skip_auto_update: Optional[bool] = Field(default=None)
+    """
+    Normally resources with 'auto_update' will be
+    redeployed immediately if updates are found.
+    With this enabled, convert this into an UpdateAvailable alert.
+    """
+    wait_for_auto_update: Optional[bool] = Field(default=None)
+    """
+    If check triggers auto deploy,
+    whether this call should wait on the auto deploy,
+    or run it in the background.
+    """
+
+class CheckStackForUpdate(BaseModel):
+    """
+    Checks for new images. Response: [CheckStackForUpdateResponse]
+    """
+    stack: str
+    """
+    Name or id
+    """
+    skip_auto_update: Optional[bool] = Field(default=None)
+    """
+    Normally resources with 'auto_update' will be
+    redeployed immediately if updates are found.
+    With this enabled, convert this into an UpdateAvailable alert.
+    """
+    wait_for_auto_update: Optional[bool] = Field(default=None)
+    """
+    If check triggers auto deploy,
+    whether this call should wait on the auto deploy,
+    or run it in the background.
+    """
+    skip_cache_refresh: Optional[bool] = Field(default=None)
+    """
+    Usually will refresh the stack cache before checking for updates.
+    Skip with this option.
+    """
+
 class ClearRepoCache(BaseModel):
     """
-    Clears all repos from the Core repo cache. Admin only.
+    **Admin only.** Clears all repos from the Core repo cache.
     Response: [Update]
     """
     pass
@@ -6931,6 +9457,16 @@ class CloneRepo(BaseModel):
     Id or name
     """
 
+class CloseAlert(BaseModel):
+    """
+    **Admin only.** Close the Alert at the given id.
+    Response: [NoData]
+    """
+    id: str
+    """
+    The id of the Alert to close.
+    """
+
 class CommitSync(BaseModel):
     """
     Exports matching resources, and writes to the target sync's resource file. Response: [Update]
@@ -6942,73 +9478,74 @@ class CommitSync(BaseModel):
     Id or name
     """
 
-class ConnectContainerExecQuery(BaseModel):
+class TerminalRecreateMode(str, Enum):
     """
-    Query to connect to a container exec session (interactive shell over websocket) on the given server.
-    TODO: Document calling.
+    Configures the behavior of [CreateTerminal] if the
+    specified terminal name already exists.
     """
-    server: str
+    NEVER = "Never"
     """
-    Server Id or name
+    Never kill the old terminal if it already exists.
+    If the init command is different, returns error.
     """
-    container: str
+    ALWAYS = "Always"
     """
-    The container name
+    Always kill the old terminal and create new one
     """
-    shell: str
+    DIFFERENTCOMMAND = "DifferentCommand"
     """
-    The shell to use (eg. `sh` or `bash`)
+    Only kill and recreate if the command is different.
     """
-
-class ConnectDeploymentExecQuery(BaseModel):
+class ContainerTerminalMode(str, Enum):
     """
-    Query to connect to a container exec session (interactive shell over websocket) on the given Deployment.
-    This call will use access to the Deployment Terminal to permission the call.
-    TODO: Document calling.
+    Specify the container terminal mode (exec or attach)
     """
-    deployment: str
+    EXEC = "exec"
+    ATTACH = "attach"
+class InitTerminal(BaseModel):
     """
-    Deployment Id or name
+    Args to init the Terminal if needed.
     """
-    shell: str
+    command: Optional[str] = Field(default=None)
     """
-    The shell to use (eg. `sh` or `bash`)
+    The shell command (eg `bash`) to init the shell.
+    
+    Default:
+    - Server: Configured on each Periphery
+    - Container: `sh`
     """
-
-class ConnectStackExecQuery(BaseModel):
+    recreate: Optional[TerminalRecreateMode] = Field(default=None)
     """
-    Query to connect to a container exec session (interactive shell over websocket) on the given Stack / service.
-    This call will use access to the Stack Terminal to permission the call.
-    TODO: Document calling.
+    Default: `Never`
     """
-    stack: str
+    mode: Optional[ContainerTerminalMode] = Field(default=None)
     """
-    Stack Id or name
-    """
-    service: str
-    """
-    The service name to connect to
-    """
-    shell: str
-    """
-    The shell to use (eg. `sh` or `bash`)
+    Only relevant for container-type terminals.
+    Specify the container terminal mode (`exec` or `attach`).
+    Default: `exec`
     """
 
 class ConnectTerminalQuery(BaseModel):
     """
-    Query to connect to a terminal (interactive shell over websocket) on the given server.
-    TODO: Document calling.
+    Connect to a Terminal.
     """
-    server: str
+    target: TerminalTarget
     """
-    Server Id or name
+    The target to create terminal for.
     """
-    terminal: str
+    terminal: Optional[str] = Field(default=None)
     """
-    Each periphery can keep multiple terminals open.
-    If a terminals with the specified name does not exist,
-    the call will fail.
-    Create a terminal using [CreateTerminal][super::write::server::CreateTerminal]
+    Terminal name to connect to.
+    If it may not exist yet, also pass 'init' params
+    to include initialization.
+    Default: Depends on target.
+    """
+    init: Optional[InitTerminal] = Field(default=None)
+    """
+    Pass to init the terminal session
+    for when the terminal doesn't already exist.
+    
+    Example: ?...(query)&init[command]=bash&init[recreate]=DifferentCommand
     """
 
 class ContainerBlkioStatEntry(BaseModel):
@@ -7385,6 +9922,10 @@ class CopyServer(BaseModel):
     """
     The id of the server to copy.
     """
+    public_key: Optional[str] = Field(default=None)
+    """
+    Initial public key to assign to Server.
+    """
 
 class CopyStack(BaseModel):
     """
@@ -7400,9 +9941,23 @@ class CopyStack(BaseModel):
     The id of the stack to copy.
     """
 
+class CopySwarm(BaseModel):
+    """
+    Creates a new Swarm with given `name` and the configuration
+    of the Swarm at the given `id`. Response: [Swarm].
+    """
+    name: str
+    """
+    The name of the new swarm.
+    """
+    id: str
+    """
+    The id of the swarm to copy.
+    """
+
 class CreateAction(BaseModel):
     """
-    Create a action. Response: [Action].
+    Create an action. Response: [Action].
     """
     name: str
     """
@@ -7411,16 +9966,6 @@ class CreateAction(BaseModel):
     config: Optional[_PartialActionConfig] = Field(default=None)
     """
     Optional partial config to initialize the action with.
-    """
-
-class CreateActionWebhook(BaseModel):
-    """
-    Create a webhook on the github action attached to the Action resource.
-    passed in request. Response: [CreateActionWebhookResponse]
-    """
-    action: str
-    """
-    Id or name
     """
 
 class CreateAlerter(BaseModel):
@@ -7436,27 +9981,9 @@ class CreateAlerter(BaseModel):
     Optional partial config to initialize the alerter with.
     """
 
-class CreateApiKey(BaseModel):
-    """
-    Create an api key for the calling user.
-    Response: [CreateApiKeyResponse].
-    
-    Note. After the response is served, there will be no way
-    to get the secret later.
-    """
-    name: str
-    """
-    The name for the api key.
-    """
-    expires: Optional[I64] = Field(default=None)
-    """
-    A unix timestamp in millseconds specifying api key expire time.
-    Default is 0, which means no expiry.
-    """
-
 class CreateApiKeyForServiceUser(BaseModel):
     """
-    Admin only method to create an api key for a service user.
+    **Admin only**. Create an api key for a service user.
     Response: [CreateApiKeyResponse].
     """
     user_id: str
@@ -7484,16 +10011,6 @@ class CreateBuild(BaseModel):
     config: Optional[_PartialBuildConfig] = Field(default=None)
     """
     Optional partial config to initialize the build with.
-    """
-
-class CreateBuildWebhook(BaseModel):
-    """
-    Create a webhook on the github repo attached to the build
-    passed in request. Response: [CreateBuildWebhookResponse]
-    """
-    build: str
-    """
-    Id or name
     """
 
 class PartialBuilderConfigTypes(str, Enum):
@@ -7606,6 +10123,63 @@ class CreateNetwork(BaseModel):
     The name of the network to create.
     """
 
+class CreateOnboardingKey(BaseModel):
+    """
+    **Admin only.** Create a Server onboarding key.
+    Response: [CreateOnboardingKeyResponse].
+    
+    Note. The 'periphery_public_key' on default Server config will
+    be overridden with the actual public key once its generated by Periphery
+    as part of the onboarding flow.
+    """
+    name: str
+    """
+    The name for the creation key
+    """
+    expires: Optional[I64] = Field(default=None)
+    """
+    A unix timestamp in millseconds specifying api key expire time.
+    Default is 0, which means no expiry.
+    """
+    private_key: Optional[str] = Field(default=None)
+    """
+    Optionally specify an existing private key, otherwise
+    generate fresh key.
+    """
+    tags: Optional[List[str]] = Field(default=None)
+    """
+    Default tags to apply to Servers created using this key.
+    """
+    privileged: Optional[bool] = Field(default=None)
+    """
+    Allows the Onboarding Key to be used to:
+    
+    1. Enable a disabled Server
+    2. Remove Server 'address' configuration, allowing Periphery -> Core connection.
+    3. Update existing Server's public keys.
+    """
+    copy_server: Optional[str] = Field(default=None)
+    """
+    Optional. New Servers copy this Server's config.
+    """
+    create_builder: Optional[bool] = Field(default=None)
+    """
+    Optional. Whether to also create a Builder for the Server.
+    """
+
+class CreateOnboardingKeyResponse(BaseModel):
+    """
+    The response for [CreateOnboardingKey]
+    """
+    private_key: str
+    """
+    pkcs8 encoded private key
+    """
+    created: OnboardingKey
+    """
+    The created ServerOnboardingKey
+    """
+
 class CreateProcedure(BaseModel):
     """
     Create a procedure. Response: [Procedure].
@@ -7632,24 +10206,6 @@ class CreateRepo(BaseModel):
     Optional partial config to initialize the repo with.
     """
 
-class RepoWebhookAction(str, Enum):
-    CLONE = "Clone"
-    PULL = "Pull"
-    BUILD = "Build"
-class CreateRepoWebhook(BaseModel):
-    """
-    Create a webhook on the github repo attached to the (Komodo) Repo resource.
-    passed in request. Response: [CreateRepoWebhookResponse]
-    """
-    repo: str
-    """
-    Id or name
-    """
-    action: RepoWebhookAction
-    """
-    "Clone" or "Pull" or "Build"
-    """
-
 class CreateResourceSync(BaseModel):
     """
     Create a sync. Response: [ResourceSync].
@@ -7674,6 +10230,10 @@ class CreateServer(BaseModel):
     config: Optional[_PartialServerConfig] = Field(default=None)
     """
     Optional partial config to initialize the server with.
+    """
+    public_key: Optional[str] = Field(default=None)
+    """
+    Initial public key to assign to Server.
     """
 
 class CreateServiceUser(BaseModel):
@@ -7703,38 +10263,75 @@ class CreateStack(BaseModel):
     Optional partial config to initialize the stack with.
     """
 
-class StackWebhookAction(str, Enum):
-    REFRESH = "Refresh"
-    DEPLOY = "Deploy"
-class CreateStackWebhook(BaseModel):
+class CreateSwarm(BaseModel):
     """
-    Create a webhook on the github repo attached to the stack
-    passed in request. Response: [CreateStackWebhookResponse]
+    Create a Swarm. Response: [Swarm].
     """
-    stack: str
+    name: str
     """
-    Id or name
+    The name given to newly created swarm.
     """
-    action: StackWebhookAction
+    config: Optional[_PartialSwarmConfig] = Field(default=None)
     """
-    "Refresh" or "Deploy"
+    Optional partial config to initialize the swarm with.
     """
 
-class SyncWebhookAction(str, Enum):
-    REFRESH = "Refresh"
-    SYNC = "Sync"
-class CreateSyncWebhook(BaseModel):
+class CreateSwarmConfig(BaseModel):
     """
-    Create a webhook on the github repo attached to the sync
-    passed in request. Response: [CreateSyncWebhookResponse]
+    `docker config create [OPTIONS] CONFIG file|-`
+    
+    https://docs.docker.com/reference/cli/docker/config/create/
     """
-    sync: str
+    swarm: str
     """
-    Id or name
+    Name or id
     """
-    action: SyncWebhookAction
+    name: str
     """
-    "Refresh" or "Sync"
+    The name of the config to create
+    """
+    data: str
+    """
+    The data to store in the config
+    """
+    labels: Optional[List[str]] = Field(default=None)
+    """
+    Docker labels to give the config
+    """
+    template_driver: Optional[str] = Field(default=None)
+    """
+    Optional custom template driver
+    """
+
+class CreateSwarmSecret(BaseModel):
+    """
+    `docker config create [OPTIONS] CONFIG file|-`
+    
+    https://docs.docker.com/reference/cli/docker/config/create/
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    name: str
+    """
+    The name of the secret to create
+    """
+    data: str
+    """
+    The data to store in the secret
+    """
+    driver: Optional[str] = Field(default=None)
+    """
+    Optional custom secret driver
+    """
+    labels: Optional[List[str]] = Field(default=None)
+    """
+    Docker labels to give the secret
+    """
+    template_driver: Optional[str] = Field(default=None)
+    """
+    Optional custom template driver
     """
 
 class CreateTag(BaseModel):
@@ -7750,45 +10347,37 @@ class CreateTag(BaseModel):
     Tag color. Default: Slate.
     """
 
-class TerminalRecreateMode(str, Enum):
-    """
-    Configures the behavior of [CreateTerminal] if the
-    specified terminal name already exists.
-    """
-    NEVER = "Never"
-    """
-    Never kill the old terminal if it already exists.
-    If the command is different, returns error.
-    """
-    ALWAYS = "Always"
-    """
-    Always kill the old terminal and create new one
-    """
-    DIFFERENTCOMMAND = "DifferentCommand"
-    """
-    Only kill and recreate if the command is different.
-    """
 class CreateTerminal(BaseModel):
     """
-    Create a terminal on the server.
-    Response: [NoData]
+    Create a Terminal.
+    Requires minimum Read + Terminal permission on the target Resource.
+    Response: [Terminal]
     """
-    server: str
+    name: Optional[str] = Field(default=None)
     """
-    Server Id or name
+    A name for the Terminal session.
+    If not specified, a default will be given.
     """
-    name: str
+    target: TerminalTarget
     """
-    The name of the terminal on the server to create.
+    The target to create terminal for
     """
-    command: str
+    command: Optional[str] = Field(default=None)
     """
     The shell command (eg `bash`) to init the shell.
     
-    This can also include args:
-    `docker exec -it container sh`
+    Default:
+    - Server: Configured on each Periphery
+    - ContainerExec: `sh`
+    - Attach: unused
+    """
+    mode: Optional[ContainerTerminalMode] = Field(default=None)
+    """
+    For container terminals, choose 'exec' or 'attach'.
     
-    Default: `bash`
+    Default
+    - Server: ignored
+    - Container / Stack / Deployment: `exec`
     """
     recreate: Optional[TerminalRecreateMode] = Field(default=None)
     """
@@ -7844,16 +10433,6 @@ class DeleteAction(BaseModel):
     The id or name of the action to delete.
     """
 
-class DeleteActionWebhook(BaseModel):
-    """
-    Delete the webhook on the github action attached to the Action resource.
-    passed in request. Response: [DeleteActionWebhookResponse]
-    """
-    action: str
-    """
-    Id or name
-    """
-
 class DeleteAlerter(BaseModel):
     """
     Deletes the alerter at the given id, and returns the deleted alerter.
@@ -7866,7 +10445,7 @@ class DeleteAlerter(BaseModel):
 
 class DeleteAllTerminals(BaseModel):
     """
-    Delete all terminals on the server.
+    Delete all Terminals on the Server.
     Response: [NoData]
     """
     server: str
@@ -7874,19 +10453,9 @@ class DeleteAllTerminals(BaseModel):
     Server Id or name
     """
 
-class DeleteApiKey(BaseModel):
-    """
-    Delete an api key for the calling user.
-    Response: [NoData]
-    """
-    key: str
-    """
-    The key which the user intends to delete.
-    """
-
 class DeleteApiKeyForServiceUser(BaseModel):
     """
-    Admin only method to delete an api key for a service user.
+    **Admin only.** Delete an api key for a service user.
     Response: [NoData].
     """
     key: str
@@ -7899,16 +10468,6 @@ class DeleteBuild(BaseModel):
     id: str
     """
     The id or name of the build to delete.
-    """
-
-class DeleteBuildWebhook(BaseModel):
-    """
-    Delete a webhook on the github repo attached to the build
-    passed in request. Response: [CreateBuildWebhookResponse]
-    """
-    build: str
-    """
-    Id or name
     """
 
 class DeleteBuilder(BaseModel):
@@ -7982,6 +10541,13 @@ class DeleteNetwork(BaseModel):
     The name of the network to delete.
     """
 
+class DeleteOnboardingKey(BaseModel):
+    """
+    **Admin only.** Delete an onboarding key.
+    Response: The deleted [OnboardingKey].
+    """
+    public_key: str
+
 class DeleteProcedure(BaseModel):
     """
     Deletes the procedure at the given id, and returns the deleted procedure.
@@ -8000,20 +10566,6 @@ class DeleteRepo(BaseModel):
     id: str
     """
     The id or name of the repo to delete.
-    """
-
-class DeleteRepoWebhook(BaseModel):
-    """
-    Delete the webhook on the github repo attached to the (Komodo) Repo resource.
-    passed in request. Response: [DeleteRepoWebhookResponse]
-    """
-    repo: str
-    """
-    Id or name
-    """
-    action: RepoWebhookAction
-    """
-    "Clone" or "Pull" or "Build"
     """
 
 class DeleteResourceSync(BaseModel):
@@ -8046,32 +10598,14 @@ class DeleteStack(BaseModel):
     The id or name of the stack to delete.
     """
 
-class DeleteStackWebhook(BaseModel):
+class DeleteSwarm(BaseModel):
     """
-    Delete the webhook on the github repo attached to the stack
-    passed in request. Response: [DeleteStackWebhookResponse]
+    Deletes the Swarm at the given id, and returns the deleted Swarm.
+    Response: [Swarm]
     """
-    stack: str
+    id: str
     """
-    Id or name
-    """
-    action: StackWebhookAction
-    """
-    "Refresh" or "Deploy"
-    """
-
-class DeleteSyncWebhook(BaseModel):
-    """
-    Delete the webhook on the github repo attached to the sync
-    passed in request. Response: [DeleteSyncWebhookResponse]
-    """
-    sync: str
-    """
-    Id or name
-    """
-    action: SyncWebhookAction
-    """
-    "Refresh" or "Sync"
+    The id or name of the swarm to delete.
     """
 
 class DeleteTag(BaseModel):
@@ -8087,16 +10621,16 @@ class DeleteTag(BaseModel):
 
 class DeleteTerminal(BaseModel):
     """
-    Delete a terminal on the server.
+    Delete a terminal.
     Response: [NoData]
     """
-    server: str
+    target: TerminalTarget
     """
-    Server Id or name
+    Server / Container / Stack / Deployment
     """
     terminal: str
     """
-    The name of the terminal on the server to delete.
+    The name of the Terminal to delete.
     """
 
 class DeleteUser(BaseModel):
@@ -8144,8 +10678,9 @@ class DeleteVolume(BaseModel):
 
 class Deploy(BaseModel):
     """
-    Deploys the container for the target deployment. Response: [Update].
+    Deploys the container / swarm service for the target Deployment. Response: [Update].
     
+    For Server based Deployments (just a container):
     1. Pulls the image onto the target server.
     2. If the container is already running,
     it will be stopped and removed using `docker container rm ${container_name}`.
@@ -8179,6 +10714,8 @@ class DeployStack(BaseModel):
     """
     Filter to only deploy specific services.
     If empty, will deploy all services.
+    
+    Note. For Swarm mode Stacks, this field is not supported and will be ignored.
     """
     stop_time: Optional[int] = Field(default=None)
     """
@@ -8277,108 +10814,145 @@ class DiscordAlerterEndpoint(BaseModel):
     The Discord webhook url
     """
 
+class DockerLists(BaseModel):
+    """
+    Standard docker lists available from a Server.
+    """
+    containers: List[ContainerListItem]
+    networks: List[NetworkListItem]
+    images: List[ImageListItem]
+    volumes: List[VolumeListItem]
+    projects: List[ComposeProject]
+
 class EnvironmentVar(BaseModel):
     variable: str
     value: str
 
-class ExchangeForJwt(BaseModel):
-    """
-    Exchange a single use exchange token (safe for transport in url query)
-    for a jwt.
-    Response: [ExchangeForJwtResponse].
-    """
-    token: str
-    """
-    The 'exchange token'
-    """
-
-class ExecuteContainerExecBody(BaseModel):
-    """
-    Execute a command in the given containers shell.
-    TODO: Document calling.
-    """
-    server: str
-    """
-    Server Id or name
-    """
-    container: str
-    """
-    The container name
-    """
-    shell: str
-    """
-    The shell to use (eg. `sh` or `bash`)
-    """
-    command: str
-    """
-    The command to execute.
-    """
-
-class ExecuteDeploymentExecBody(BaseModel):
-    """
-    Execute a command in the given containers shell.
-    TODO: Document calling.
-    """
-    deployment: str
-    """
-    Deployment Id or name
-    """
-    shell: str
-    """
-    The shell to use (eg. `sh` or `bash`)
-    """
-    command: str
-    """
-    The command to execute.
-    """
-
-class ExecuteStackExecBody(BaseModel):
-    """
-    Execute a command in the given containers shell.
-    TODO: Document calling.
-    """
-    stack: str
-    """
-    Stack Id or name
-    """
-    service: str
-    """
-    The service name to connect to
-    """
-    shell: str
-    """
-    The shell to use (eg. `sh` or `bash`)
-    """
-    command: str
-    """
-    The command to execute.
-    """
-
 class ExecuteTerminalBody(BaseModel):
     """
     Execute a terminal command on the given server.
-    TODO: Document calling.
     """
-    server: str
+    target: TerminalTarget
     """
-    Server Id or name
+    The target to create terminal for.
     """
-    terminal: str
+    terminal: Optional[str] = Field(default=None)
     """
-    The name of the terminal on the server to use to execute.
-    If the terminal at name exists, it will be used to execute the command.
-    Otherwise, a new terminal will be created for this command, which will
-    persist until it exits or is deleted.
+    Terminal name to connect to.
+    If it may not exist yet, also pass 'init' params
+    to include initialization.
+    Default: Depends on target.
     """
     command: str
     """
     The command to execute.
     """
+    init: Optional[InitTerminal] = Field(default=None)
+    """
+    Pass to init the terminal session
+    for when the terminal doesn't already exist.
+    """
+
+class ResourceToml(BaseModel, Generic[PartialConfig]):
+    name: str
+    """
+    The resource name. Required
+    """
+    description: Optional[str] = Field(default=None)
+    """
+    The resource description. Optional.
+    """
+    template: Optional[bool] = Field(default=None)
+    """
+    Mark resource as a template
+    """
+    tags: Optional[List[str]] = Field(default=None)
+    """
+    Tag ids or names. Optional
+    """
+    deploy: Optional[bool] = Field(default=None)
+    """
+    Optional. Only relevant for deployments / stacks.
+    
+    Will ensure deployment / stack is running with the latest configuration.
+    Deploy actions to achieve this will be included in the sync.
+    Default is false.
+    """
+    after: Optional[List[str]] = Field(default=None)
+    """
+    Optional. Only relevant for deployments / stacks using the 'deploy' sync feature.
+    
+    Specify other deployments / stacks by name as dependencies.
+    The sync will ensure the deployment / stack will only be deployed 'after' its dependencies.
+    """
+    config: Optional[PartialConfig] = Field(default=None)
+    """
+    Resource specific configuration.
+    """
+
+class PermissionToml(BaseModel):
+    target: ResourceTarget
+    """
+    Id can be:
+    - resource name. `id = "abcd-build"`
+    - regex matching resource names. `id = "\\^(.+)-build-([0-9]+)$\"`
+    """
+    level: Optional[PermissionLevel] = Field(default=None)
+    """
+    The permission level:
+    - None
+    - Read
+    - Execute
+    - Write
+    """
+    specific: Optional[Set[SpecificPermission]] = Field(default=None)
+    """
+    Any [SpecificPermissions](SpecificPermission) on the resource
+    """
+
+class UserGroupToml(BaseModel):
+    name: str
+    """
+    User group name
+    """
+    everyone: Optional[bool] = Field(default=None)
+    """
+    Whether all users will implicitly have the permissions in this group.
+    """
+    users: Optional[List[str]] = Field(default=None)
+    """
+    Users in the group
+    """
+    all: Optional[Mapping[ResourceTargetTypes, PermissionLevelAndSpecifics]] = Field(default=None)
+    """
+    Give the user group elevated permissions on all resources of a certain type
+    """
+    permissions: Optional[List[PermissionToml]] = Field(default=None)
+    """
+    Permissions given to the group
+    """
+
+class ResourcesToml(BaseModel):
+    """
+    Specifies resources to sync on Komodo
+    """
+    swarms: Optional[List[ResourceToml[_PartialSwarmConfig]]] = Field(default=None)
+    servers: Optional[List[ResourceToml[_PartialServerConfig]]] = Field(default=None)
+    deployments: Optional[List[ResourceToml[_PartialDeploymentConfig]]] = Field(default=None)
+    stacks: Optional[List[ResourceToml[_PartialStackConfig]]] = Field(default=None)
+    builds: Optional[List[ResourceToml[_PartialBuildConfig]]] = Field(default=None)
+    repos: Optional[List[ResourceToml[_PartialRepoConfig]]] = Field(default=None)
+    procedures: Optional[List[ResourceToml[_PartialProcedureConfig]]] = Field(default=None)
+    actions: Optional[List[ResourceToml[_PartialActionConfig]]] = Field(default=None)
+    alerters: Optional[List[ResourceToml[_PartialAlerterConfig]]] = Field(default=None)
+    builders: Optional[List[ResourceToml[_PartialBuilderConfig]]] = Field(default=None)
+    resource_syncs: Optional[List[ResourceToml[_PartialResourceSyncConfig]]] = Field(default=None)
+    user_groups: Optional[List[UserGroupToml]] = Field(default=None)
+    variables: Optional[List[Variable]] = Field(default=None)
 
 class ExportAllResourcesToToml(BaseModel):
     """
-    Get pretty formatted monrun sync toml for all resources
-    which the user has permissions to view.
+    Get sync toml for all resources which the user has permissions to view.
     Response: [TomlResponse].
     """
     include_resources: bool
@@ -8402,10 +10976,15 @@ class ExportAllResourcesToToml(BaseModel):
     Whether to include user groups in the exported contents.
     Default: false
     """
+    existing: Optional[ResourcesToml] = Field(default=None)
+    """
+    Pass an existing [ResourcesToml] to preserve
+    the meta configuration.
+    """
 
 class ExportResourcesToToml(BaseModel):
     """
-    Get pretty formatted monrun sync toml for specific resources and user groups.
+    Get sync toml for specific resources, variables, and user groups.
     Response: [TomlResponse].
     """
     targets: Optional[List[ResourceTarget]] = Field(default=None)
@@ -8419,6 +10998,11 @@ class ExportResourcesToToml(BaseModel):
     include_variables: Optional[bool] = Field(default=None)
     """
     Whether to include variables
+    """
+    existing: Optional[ResourcesToml] = Field(default=None)
+    """
+    Pass an existing [ResourcesToml] to preserve
+    the meta configuration.
     """
 
 class FindUser(BaseModel):
@@ -8599,29 +11183,6 @@ class GetBuildMonthlyStatsResponse(BaseModel):
     total_count: float
     days: List[BuildStatsDay]
 
-class GetBuildWebhookEnabled(BaseModel):
-    """
-    Get whether a Build's target repo has a webhook for the build configured. Response: [GetBuildWebhookEnabledResponse].
-    """
-    build: str
-    """
-    Id or name
-    """
-
-class GetBuildWebhookEnabledResponse(BaseModel):
-    """
-    Response for [GetBuildWebhookEnabled]
-    """
-    managed: bool
-    """
-    Whether the repo webhooks can even be managed.
-    The repo owner must be in `github_webhook_app.owners` list to be managed.
-    """
-    enabled: bool
-    """
-    Whether pushes to branch trigger build. Will always be false if managed is false.
-    """
-
 class GetBuilder(BaseModel):
     """
     Get a specific builder by id or name. Response: [Builder].
@@ -8705,7 +11266,7 @@ class GetContainerLog(BaseModel):
 
 class GetCoreInfo(BaseModel):
     """
-    Get info about the core api configuration.
+    Get information about the Komodo Core API configuration.
     Response: [GetCoreInfoResponse].
     """
     pass
@@ -8741,10 +11302,6 @@ class GetCoreInfoResponse(BaseModel):
     """
     Whether confirm dialog should be disabled
     """
-    github_webhook_owners: List[str]
-    """
-    The repo owners for which github webhook management api is available
-    """
     disable_websocket_reconnect: bool
     """
     Whether to disable websocket automatic reconnect.
@@ -8756,6 +11313,10 @@ class GetCoreInfoResponse(BaseModel):
     timezone: str
     """
     TZ identifier Core is using, if manually set.
+    """
+    public_key: str
+    """
+    Default public key allowing this Core to authenticate to Periphery agents.
     """
 
 class GetDeployment(BaseModel):
@@ -8993,55 +11554,15 @@ class GetHistoricalServerStatsResponse(BaseModel):
     If there is a next page of data, pass this to `page` to get it.
     """
 
-class GetLoginOptions(BaseModel):
+class GetPeripheryInformation(BaseModel):
     """
-    Non authenticated route to see the available options
-    users have to login to Komodo, eg. local auth, github, google.
-    Response: [GetLoginOptionsResponse].
-    """
-    pass
-class GetLoginOptionsResponse(BaseModel):
-    """
-    The response for [GetLoginOptions].
-    """
-    local: bool
-    """
-    Whether local auth is enabled.
-    """
-    github: bool
-    """
-    Whether github login is enabled.
-    """
-    google: bool
-    """
-    Whether google login is enabled.
-    """
-    oidc: bool
-    """
-    Whether OIDC login is enabled.
-    """
-    registration_disabled: bool
-    """
-    Whether user registration (Sign Up) has been disabled
-    """
-
-class GetPeripheryVersion(BaseModel):
-    """
-    Get the version of the Komodo Periphery agent on the target server.
-    Response: [GetPeripheryVersionResponse].
+    Get the Periphery information of the target server,
+    including the Periphery version and public key.
+    Response: [PeripheryInformation].
     """
     server: str
     """
     Id or name
-    """
-
-class GetPeripheryVersionResponse(BaseModel):
-    """
-    Response for [GetPeripheryVersion].
-    """
-    version: str
-    """
-    The version of periphery.
     """
 
 class GetPermission(BaseModel):
@@ -9120,37 +11641,6 @@ class GetRepoActionState(BaseModel):
     repo: str
     """
     Id or name
-    """
-
-class GetRepoWebhooksEnabled(BaseModel):
-    """
-    Get a target Repo's configured webhooks. Response: [GetRepoWebhooksEnabledResponse].
-    """
-    repo: str
-    """
-    Id or name
-    """
-
-class GetRepoWebhooksEnabledResponse(BaseModel):
-    """
-    Response for [GetRepoWebhooksEnabled]
-    """
-    managed: bool
-    """
-    Whether the repo webhooks can even be managed.
-    The repo owner must be in `github_webhook_app.owners` list to be managed.
-    """
-    clone_enabled: bool
-    """
-    Whether pushes to branch trigger clone. Will always be false if managed is false.
-    """
-    pull_enabled: bool
-    """
-    Whether pushes to branch trigger pull. Will always be false if managed is false.
-    """
-    build_enabled: bool
-    """
-    Whether pushes to branch trigger build. Will always be false if managed is false.
     """
 
 class GetReposSummary(BaseModel):
@@ -9375,33 +11865,6 @@ class GetStackLog(BaseModel):
     Enable `--timestamps`
     """
 
-class GetStackWebhooksEnabled(BaseModel):
-    """
-    Get a target stack's configured webhooks. Response: [GetStackWebhooksEnabledResponse].
-    """
-    stack: str
-    """
-    Id or name
-    """
-
-class GetStackWebhooksEnabledResponse(BaseModel):
-    """
-    Response for [GetStackWebhooksEnabled]
-    """
-    managed: bool
-    """
-    Whether the repo webhooks can even be managed.
-    The repo owner must be in `github_webhook_app.owners` list to be managed.
-    """
-    refresh_enabled: bool
-    """
-    Whether pushes to branch trigger refresh. Will always be false if managed is false.
-    """
-    deploy_enabled: bool
-    """
-    Whether pushes to branch trigger stack execution. Will always be false if managed is false.
-    """
-
 class GetStacksSummary(BaseModel):
     """
     Gets a summary of data relating to all syncs.
@@ -9437,31 +11900,90 @@ class GetStacksSummaryResponse(BaseModel):
     The number of stacks with Unknown state.
     """
 
-class GetSyncWebhooksEnabled(BaseModel):
+class GetSwarm(BaseModel):
     """
-    Get a target Sync's configured webhooks. Response: [GetSyncWebhooksEnabledResponse].
+    Get a specific swarm. Response: [Swarm].
     """
-    sync: str
+    swarm: str
     """
     Id or name
     """
 
-class GetSyncWebhooksEnabledResponse(BaseModel):
+class GetSwarmActionState(BaseModel):
     """
-    Response for [GetSyncWebhooksEnabled]
+    Get current action state for the swarm. Response: [SwarmActionState].
     """
-    managed: bool
+    swarm: str
     """
-    Whether the repo webhooks can even be managed.
-    The repo owner must be in `github_webhook_app.owners` list to be managed.
+    Id or name
     """
-    refresh_enabled: bool
+
+class GetSwarmServiceLog(BaseModel):
     """
-    Whether pushes to branch trigger refresh. Will always be false if managed is false.
+    Get a swarm service's logs. Response: [GetSwarmServiceLogResponse].
+    
+    Note. This call will hit the underlying server directly for most up to date log.
     """
-    sync_enabled: bool
+    swarm: str
     """
-    Whether pushes to branch trigger sync execution. Will always be false if managed is false.
+    Id or name
+    """
+    service: str
+    """
+    Select the swarm service to get logs for.
+    """
+    tail: U64
+    """
+    The number of lines of the log tail to include.
+    Default: 100.
+    Max: 5000.
+    """
+    timestamps: Optional[bool] = Field(default=None)
+    """
+    Enable `--timestamps`
+    """
+    no_task_ids: Optional[bool] = Field(default=None)
+    """
+    Enable `--no-task-ids`
+    """
+    no_resolve: Optional[bool] = Field(default=None)
+    """
+    Enable `--no-resolve`
+    """
+    details: Optional[bool] = Field(default=None)
+    """
+    Enable `--details`
+    """
+
+class GetSwarmsSummary(BaseModel):
+    """
+    Gets a summary of data relating to all swarms.
+    Response: [GetSwarmsSummaryResponse].
+    """
+    pass
+class GetSwarmsSummaryResponse(BaseModel):
+    """
+    Response for [GetSwarmsSummary]
+    """
+    total: int
+    """
+    The total number of Swarms
+    """
+    healthy: int
+    """
+    The number of Swarms with Healthy state.
+    """
+    unhealthy: int
+    """
+    The number of Swarms with Unhealthy state
+    """
+    down: int
+    """
+    The number of Swarms with Down state
+    """
+    unknown: int
+    """
+    The number of Swarms with Unknown state
     """
 
 class GetSystemInformation(BaseModel):
@@ -9506,12 +12028,6 @@ class GetUpdate(BaseModel):
     The update id.
     """
 
-class GetUser(BaseModel):
-    """
-    Get the user extracted from the request headers.
-    Response: [User].
-    """
-    pass
 class GetUserGroup(BaseModel):
     """
     Get a specific user group by name or id.
@@ -9560,7 +12076,7 @@ class GetVariable(BaseModel):
 
 class GetVersion(BaseModel):
     """
-    Get the version of the Komodo Core api.
+    Get the version of the Komodo Core API.
     Response: [GetVersionResponse].
     """
     pass
@@ -9570,23 +12086,41 @@ class GetVersionResponse(BaseModel):
     """
     version: str
     """
-    The version of the core api.
+    The version of the Komodo Core API.
     """
 
 class GlobalAutoUpdate(BaseModel):
     """
-    Trigger a global poll for image updates on Stacks and Deployments
+    **Admin only.** Trigger a global poll for image updates on Stacks and Deployments
     with `poll_for_updates` or `auto_update` enabled.
-    Admin only. Response: [Update]
+    Response: [Update]. Alias: `auto-update`.
     
-    1. `docker compose pull` any Stacks / Deployments with `poll_for_updates` or `auto_update` enabled. This will pick up any available updates.
+    1. Run CheckStackForUpdate / CheckDeploymentForUpdate any Stacks / Deployments with `poll_for_updates` or `auto_update` enabled.
+    This will pick up any available updates.
     2. Redeploy Stacks / Deployments that have updates found and 'auto_update' enabled.
+    - Skip this using 'skip_auto_update', preferring to only alert even for 'auto_update' resources.
     """
-    pass
+    skip_auto_update: Optional[bool] = Field(default=None)
+    """
+    Normally resources with 'auto_update' will be
+    redeployed immediately if updates are found.
+    With this enabled, convert this into an UpdateAvailable alert.
+    """
+
 class InspectDeploymentContainer(BaseModel):
     """
     Inspect the docker container associated with the Deployment.
     Response: [Container].
+    """
+    deployment: str
+    """
+    Id or name
+    """
+
+class InspectDeploymentSwarmService(BaseModel):
+    """
+    Inspect the swarm service associated with the Deployment.
+    Response: [SwarmService].
     """
     deployment: str
     """
@@ -9647,7 +12181,7 @@ class InspectDockerVolume(BaseModel):
 
 class InspectStackContainer(BaseModel):
     """
-    Inspect the docker container associated with the Stack.
+    Inspect a docker container associated with a Stack.
     Response: [Container].
     """
     stack: str
@@ -9657,6 +12191,124 @@ class InspectStackContainer(BaseModel):
     service: str
     """
     The service name to inspect
+    """
+
+class InspectStackSwarmInfo(BaseModel):
+    """
+    Inspect swarm info associated with a Stack.
+    Response: [SwarmStack].
+    """
+    stack: str
+    """
+    Id or name
+    """
+
+class InspectStackSwarmService(BaseModel):
+    """
+    Inspect a swarm service associated with a Stack.
+    Response: [SwarmService].
+    """
+    stack: str
+    """
+    Id or name
+    """
+    service: str
+    """
+    The service name to inspect
+    """
+
+class InspectSwarm(BaseModel):
+    """
+    Inspect information about the swarm.
+    Response: [SwarmInspectInfo].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class InspectSwarmConfig(BaseModel):
+    """
+    Inspect a config on the target Swarm.
+    Response: [InspectSwarmConfigResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    config: str
+    """
+    Swarm config ID or Name
+    """
+
+class InspectSwarmNode(BaseModel):
+    """
+    Inspect a Swarm node.
+    Response: [SwarmNode].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    node: str
+    """
+    Node id
+    """
+
+class InspectSwarmSecret(BaseModel):
+    """
+    Inspect a Swarm secret.
+    Response: [SwarmSecret].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    secret: str
+    """
+    Secret id
+    """
+
+class InspectSwarmService(BaseModel):
+    """
+    Inspect a Swarm service.
+    Response: [SwarmService].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    service: str
+    """
+    Service id
+    """
+
+class InspectSwarmStack(BaseModel):
+    """
+    Inspect a stack on the target Swarm.
+    Response: [SwarmStackLists].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    stack: str
+    """
+    Swarm stack name
+    """
+
+class InspectSwarmTask(BaseModel):
+    """
+    Inspect a Swarm task.
+    Response: [SwarmTask].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    task: str
+    """
+    Task id
     """
 
 class LatestCommit(BaseModel):
@@ -9733,12 +12385,16 @@ class ListAlertsResponse(BaseModel):
 
 class ListAllDockerContainers(BaseModel):
     """
-    List all docker containers on the target server.
+    List all docker containers on the target servers.
     Response: [ListDockerContainersResponse].
     """
     servers: Optional[List[str]] = Field(default=None)
     """
     Filter by server id or name.
+    """
+    containers: Optional[List[str]] = Field(default=None)
+    """
+    Filter by container name.
     """
 
 class ListApiKeys(BaseModel):
@@ -10031,6 +12687,15 @@ class ListFullStacks(BaseModel):
     optional structured query to filter stacks.
     """
 
+class ListFullSwarms(BaseModel):
+    """
+    List Swarms matching optional query. Response: [ListFullSwarmsResponse].
+    """
+    query: Optional[SwarmQuery] = Field(default=None)
+    """
+    optional structured query to filter swarms.
+    """
+
 class ListGitProviderAccounts(BaseModel):
     """
     List git provider accounts matching optional query.
@@ -10061,6 +12726,12 @@ class ListGitProvidersFromConfig(BaseModel):
     providers available on that specific resource.
     """
 
+class ListOnboardingKeys(BaseModel):
+    """
+    **Admin only.** Gets list of onboarding keys.
+    Response: [ListOnboardingKeysResponse]
+    """
+    pass
 class ListPermissions(BaseModel):
     """
     List permissions for the calling user.
@@ -10111,7 +12782,7 @@ class ListSchedules(BaseModel):
 
 class ListSecrets(BaseModel):
     """
-    List the available secrets from the core config.
+    List the secret keys (not values) in the core configuration file.
     Response: [ListSecretsResponse].
     """
     target: Optional[ResourceTarget] = Field(default=None)
@@ -10147,6 +12818,87 @@ class ListStacks(BaseModel):
     optional structured query to filter stacks.
     """
 
+class ListSwarmConfigs(BaseModel):
+    """
+    List configs on the target Swarm.
+    Response: [ListSwarmConfigsResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarmNetworks(BaseModel):
+    """
+    List the networks on the swarm. Response: [ListSwarmNetworksResponse].
+    
+    This only includes the overlay networks.
+    They will be the same across all nodes in the swarm.
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarmNodes(BaseModel):
+    """
+    List nodes part of the target Swarm.
+    Response: [ListSwarmNodesResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarmSecrets(BaseModel):
+    """
+    List secrets on the target Swarm.
+    Response: [ListSwarmSecretsResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarmServices(BaseModel):
+    """
+    List services on the target Swarm.
+    Response: [ListSwarmServicesResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarmStacks(BaseModel):
+    """
+    List stacks on the target Swarm.
+    Response: [ListSwarmStacksResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarmTasks(BaseModel):
+    """
+    List tasks on the target Swarm.
+    Response: [ListSwarmTasksResponse].
+    """
+    swarm: str
+    """
+    Id or name
+    """
+
+class ListSwarms(BaseModel):
+    """
+    List Swarms matching optional query. Response: [ListSwarmsResponse].
+    """
+    query: Optional[SwarmQuery] = Field(default=None)
+    """
+    Optional structured query to filter Swarms.
+    """
+
 class ListSystemProcesses(BaseModel):
     """
     List the processes running on the target server.
@@ -10171,17 +12923,16 @@ class ListTags(BaseModel):
 
 class ListTerminals(BaseModel):
     """
-    List the current terminals on specified server.
+    List Terminals.
     Response: [ListTerminalsResponse].
     """
-    server: str
+    target: Optional[TerminalTarget] = Field(default=None)
     """
-    Id or name
+    Filter the Terminals returned by the Target.
     """
-    fresh: Optional[bool] = Field(default=None)
+    use_names: Optional[bool] = Field(default=None)
     """
-    Force a fresh call to Periphery for the list.
-    Otherwise the response will be cached for 30s
+    Return results with resource names instead of ids.
     """
 
 class ListUpdates(BaseModel):
@@ -10284,13 +13035,33 @@ class ListUserTargetPermissions(BaseModel):
     Specify either a user or a user group.
     """
 
+class ServiceUserQueryBehavior(str, Enum):
+    INCLUDE = "Include"
+    """
+    Include service users in results. Default.
+    """
+    EXCLUDE = "Exclude"
+    """
+    Exclude service users from results.
+    """
+    ONLY = "Only"
+    """
+    Only include service users in results.
+    """
 class ListUsers(BaseModel):
     """
     **Admin only.**
     Gets list of Komodo users.
     Response: [ListUsersResponse]
     """
-    pass
+    service_users: Optional[ServiceUserQueryBehavior] = Field(default=None)
+    """
+    Service user query options:
+    - Include (default)
+    - Exclude
+    - Only
+    """
+
 class ListVariables(BaseModel):
     """
     List all available global variables.
@@ -10300,22 +13071,6 @@ class ListVariables(BaseModel):
     secret variables will have their values obscured.
     """
     pass
-class LoginLocalUser(BaseModel):
-    """
-    Login as a local user. Will fail if the users credentials don't match
-    any local user.
-    
-    Note. This method is only available if the core api has `local_auth` enabled.
-    """
-    username: str
-    """
-    The user's username
-    """
-    password: str
-    """
-    The user's password
-    """
-
 class NameAndId(BaseModel):
     name: str
     id: str
@@ -10383,26 +13138,6 @@ class PauseStack(BaseModel):
     If empty, will pause all services.
     """
 
-class PermissionToml(BaseModel):
-    target: ResourceTarget
-    """
-    Id can be:
-    - resource name. `id = "abcd-build"`
-    - regex matching resource names. `id = "\\^(.+)-build-([0-9]+)$\"`
-    """
-    level: Optional[PermissionLevel] = Field(default=None)
-    """
-    The permission level:
-    - None
-    - Read
-    - Execute
-    - Write
-    """
-    specific: Optional[Set[SpecificPermission]] = Field(default=None)
-    """
-    Any [SpecificPermissions](SpecificPermission) on the resource
-    """
-
 class PruneBuildx(BaseModel):
     """
     Prunes the docker buildx cache on the target server. Response: [Update].
@@ -10427,7 +13162,7 @@ class PruneContainers(BaseModel):
 
 class PruneDockerBuilders(BaseModel):
     """
-    Prunes the docker builders (build cache) on the target server. Response: [Update].
+    Prunes the docker builders on the target server. Response: [Update].
     
     1. Runs `docker builder prune -a -f`.
     """
@@ -10573,6 +13308,89 @@ class RefreshStackCache(BaseModel):
     stack: str
     """
     Id or name
+    """
+
+class RemoveSwarmConfigs(BaseModel):
+    """
+    `docker config rm CONFIG [CONFIG...]`
+    
+    https://docs.docker.com/reference/cli/docker/config/rm/
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    configs: List[str]
+    """
+    Config names or ids
+    """
+
+class RemoveSwarmNodes(BaseModel):
+    """
+    `docker node rm [OPTIONS] NODE [NODE...]`
+    
+    https://docs.docker.com/reference/cli/docker/node/rm/
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    nodes: List[str]
+    """
+    Node names or ids to remove
+    """
+    force: Optional[bool] = Field(default=None)
+    """
+    Force remove a node from the swarm
+    """
+
+class RemoveSwarmSecrets(BaseModel):
+    """
+    `docker secret rm SECRET [SECRET...]`
+    
+    https://docs.docker.com/reference/cli/docker/secret/rm/
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    secrets: List[str]
+    """
+    Secret names or ids
+    """
+
+class RemoveSwarmServices(BaseModel):
+    """
+    `docker service rm SERVICE [SERVICE...]`
+    
+    https://docs.docker.com/reference/cli/docker/service/rm/
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    services: List[str]
+    """
+    Service names or ids
+    """
+
+class RemoveSwarmStacks(BaseModel):
+    """
+    `docker stack rm [OPTIONS] STACK [STACK...]`
+    
+    https://docs.docker.com/reference/cli/docker/stack/rm/
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    stacks: List[str]
+    """
+    Node names to remove
+    """
+    detach: bool
+    """
+    Do not wait for stack removal
     """
 
 class RemoveUserFromUserGroup(BaseModel):
@@ -10729,6 +13547,20 @@ class RenameStack(BaseModel):
     The new name.
     """
 
+class RenameSwarm(BaseModel):
+    """
+    Rename the Swarm at id to the given name.
+    Response: [Update].
+    """
+    id: str
+    """
+    The id or name of the Swarm to rename.
+    """
+    name: str
+    """
+    The new name.
+    """
+
 class RenameTag(BaseModel):
     """
     Rename a tag at id. Response: [Tag].
@@ -10832,82 +13664,6 @@ class RepoExecutionResponse(BaseModel):
     Latest commit message, if it could be retrieved
     """
 
-class ResourceToml(BaseModel, Generic[PartialConfig]):
-    name: str
-    """
-    The resource name. Required
-    """
-    description: Optional[str] = Field(default=None)
-    """
-    The resource description. Optional.
-    """
-    template: Optional[bool] = Field(default=None)
-    """
-    Mark resource as a template
-    """
-    tags: Optional[List[str]] = Field(default=None)
-    """
-    Tag ids or names. Optional
-    """
-    deploy: Optional[bool] = Field(default=None)
-    """
-    Optional. Only relevant for deployments / stacks.
-    
-    Will ensure deployment / stack is running with the latest configuration.
-    Deploy actions to achieve this will be included in the sync.
-    Default is false.
-    """
-    after: Optional[List[str]] = Field(default=None)
-    """
-    Optional. Only relevant for deployments / stacks using the 'deploy' sync feature.
-    
-    Specify other deployments / stacks by name as dependencies.
-    The sync will ensure the deployment / stack will only be deployed 'after' its dependencies.
-    """
-    config: Optional[PartialConfig] = Field(default=None)
-    """
-    Resource specific configuration.
-    """
-
-class UserGroupToml(BaseModel):
-    name: str
-    """
-    User group name
-    """
-    everyone: Optional[bool] = Field(default=None)
-    """
-    Whether all users will implicitly have the permissions in this group.
-    """
-    users: Optional[List[str]] = Field(default=None)
-    """
-    Users in the group
-    """
-    all: Optional[Mapping[ResourceTargetTypes, PermissionLevelAndSpecifics]] = Field(default=None)
-    """
-    Give the user group elevated permissions on all resources of a certain type
-    """
-    permissions: Optional[List[PermissionToml]] = Field(default=None)
-    """
-    Permissions given to the group
-    """
-
-class ResourcesToml(BaseModel):
-    """
-    Specifies resources to sync on Komodo
-    """
-    servers: Optional[List[ResourceToml[_PartialServerConfig]]] = Field(default=None)
-    deployments: Optional[List[ResourceToml[_PartialDeploymentConfig]]] = Field(default=None)
-    stacks: Optional[List[ResourceToml[_PartialStackConfig]]] = Field(default=None)
-    builds: Optional[List[ResourceToml[_PartialBuildConfig]]] = Field(default=None)
-    repos: Optional[List[ResourceToml[_PartialRepoConfig]]] = Field(default=None)
-    procedures: Optional[List[ResourceToml[_PartialProcedureConfig]]] = Field(default=None)
-    actions: Optional[List[ResourceToml[_PartialActionConfig]]] = Field(default=None)
-    alerters: Optional[List[ResourceToml[_PartialAlerterConfig]]] = Field(default=None)
-    builders: Optional[List[ResourceToml[_PartialBuilderConfig]]] = Field(default=None)
-    resource_syncs: Optional[List[ResourceToml[_PartialResourceSyncConfig]]] = Field(default=None)
-    user_groups: Optional[List[UserGroupToml]] = Field(default=None)
-    variables: Optional[List[Variable]] = Field(default=None)
-
 class RestartAllContainers(BaseModel):
     """
     Restarts all containers on the target server. Response: [Update]
@@ -10955,6 +13711,96 @@ class RestartStack(BaseModel):
     """
     Filter to only restart specific services.
     If empty, will restart all services.
+    """
+
+class RotateAllServerKeys(BaseModel):
+    """
+    **Admin only.** Rotates all connected Server keys.
+    Response: [Update]. Alias: `rotate-keys`.
+    """
+    pass
+class RotateCoreKeys(BaseModel):
+    """
+    **Admin only.** Rotates the Core private key,
+    and all Server public keys.
+    Response: [Update].
+    
+    If any Server is `NotOk`, this will fail.
+    To proceed anyways, pass `force: true`.
+    """
+    force: Optional[bool] = Field(default=None)
+    """
+    Force the rotation to proceed even if a Server is `NotOk`.
+    The Core Public Key in Periphery config may have to be updated manually.
+    (alias: `f`)
+    """
+
+class RotateServerKeys(BaseModel):
+    """
+    Rotates the private / public keys for the server.
+    Response: [Update]
+    """
+    server: str
+    """
+    Server Id or name
+    """
+
+class RotateSwarmConfig(BaseModel):
+    """
+    https://docs.docker.com/engine/swarm/configs/#example-rotate-a-config
+    
+    Swarm configs / secrets are immutable after creation.
+    This making updating values awkward when you have services actively using them.
+    The following steps allows for config rotation while minimizing downtime.
+    
+    1. Query for all services using the config
+    - If not in use by any services, can simply `remove` and `create` the config.
+    - Otherwise, continue with following steps
+    2. `Create` config `{config}-tmp` using provided data
+    3. `Update` services to use `tmp` config
+    4. `Remove` and `create` the actual config. This is now possible because services are using the tmp config.
+    5. `Update` services to use actual (not `tmp`) config again.
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    config: str
+    """
+    Config name
+    """
+    data: str
+    """
+    The new config data as a string
+    """
+
+class RotateSwarmSecret(BaseModel):
+    """
+    https://docs.docker.com/engine/swarm/secrets/#example-rotate-a-secret
+    
+    Swarm configs / secrets are immutable after creation.
+    This making updating values awkward when you have services actively using them.
+    The following steps allows for secret rotation while minimizing downtime.
+    
+    1. Query for all services using the secret
+    - If not in use by any services, can simply `remove` and `create` the secret.
+    - Otherwise, continue with following steps
+    2. `Create` secret `{secret}-tmp` using provided data
+    3. `Update` services to use `tmp` secret
+    4. `Remove` and `create` the actual secret. This is now possible because services are using the tmp secret.
+    5. `Update` services to use actual (not `tmp`) secret again.
+    """
+    swarm: str
+    """
+    Name or id
+    """
+    secret: str
+    """
+    Secret name
+    """
+    data: str
+    """
+    The new secret data as a string
     """
 
 class RunAction(BaseModel):
@@ -11182,9 +14028,57 @@ class SearchStackLog(BaseModel):
     Enable `--timestamps`
     """
 
+class SearchSwarmServiceLog(BaseModel):
+    """
+    Search the swarm service log's tail using `grep`. All lines go to stdout.
+    Response: [SearchSwarmServiceLogResponse].
+    
+    Note. This call will hit the underlying server directly for most up to date log.
+    """
+    swarm: str
+    """
+    Id or name
+    """
+    service: str
+    """
+    Select the swarm service to get logs for.
+    """
+    terms: List[str]
+    """
+    The terms to search for.
+    """
+    combinator: Optional[SearchCombinator] = Field(default=None)
+    """
+    When searching for multiple terms, can use `AND` or `OR` combinator.
+    
+    - `AND`: Only include lines with **all** terms present in that line.
+    - `OR`: Include lines that have one or more matches in the terms.
+    """
+    invert: Optional[bool] = Field(default=None)
+    """
+    Invert the results, ie return all lines that DON'T match the terms / combinator.
+    """
+    timestamps: Optional[bool] = Field(default=None)
+    """
+    Enable `--timestamps`
+    """
+    no_task_ids: Optional[bool] = Field(default=None)
+    """
+    Enable `--no-task-ids`
+    """
+    no_resolve: Optional[bool] = Field(default=None)
+    """
+    Enable `--no-resolve`
+    """
+    details: Optional[bool] = Field(default=None)
+    """
+    Enable `--details`
+    """
+
 class SendAlert(BaseModel):
     """
-    Send a custom alert message to configured Alerters. Response: [Update]
+    Send a custom alert message to configured Alerters. Response: [Update].
+    Alias: `alert`
     """
     level: Optional[SeverityLevel] = Field(default=None)
     """
@@ -11248,7 +14142,7 @@ class SetEveryoneUserGroup(BaseModel):
 
 class SetLastSeenUpdate(BaseModel):
     """
-    Set the time the user last opened the UI updates.
+    Set the time the calling user most recently opened the UI updates dropdown.
     Used for unseen notification dot.
     Response: [NoData]
     """
@@ -11265,25 +14159,6 @@ class SetUsersInUserGroup(BaseModel):
     users: List[str]
     """
     The user ids or usernames to hard set as the group's users.
-    """
-
-class SignUpLocalUser(BaseModel):
-    """
-    Sign up a new local user account. Will fail if a user with the
-    given username already exists.
-    Response: [SignUpLocalUserResponse].
-    
-    Note. This method is only available if the core api has `local_auth` enabled,
-    and if user registration is not disabled (after the first user).
-    """
-    username: str
-    """
-    The username for the new user.
-    """
-    password: str
-    """
-    The password for the new user.
-    This cannot be retreived later.
     """
 
 class SingleNetworkInterfaceUsage(BaseModel):
@@ -11435,6 +14310,49 @@ class StopStack(BaseModel):
     Filter to only stop specific services.
     If empty, will stop all services.
     """
+
+class SwarmStackServiceListItem(BaseModel):
+    """
+    Swarm stack service list item.
+    Returned by `docker stack services --format json <NAME>`
+    
+    https://docs.docker.com/reference/cli/docker/stack/services/#format
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    """
+    The *short* swarm service ID
+    """
+
+class SwarmStackTaskListItem(BaseModel):
+    """
+    Swarm stack task list item.
+    Returned by `docker stack ps --format json <NAME>`
+    
+    https://docs.docker.com/reference/cli/docker/stack/ps/#format
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = Field(alias="ID", default=None)
+    """
+    The task ID
+    """
+    current_state: Optional[str] = Field(alias="CurrentState", default=None)
+    """
+    The task current state. Matches 'DesiredState' when healthy.
+    """
+    desired_state: Optional[str] = Field(alias="DesiredState", default=None)
+    """
+    The task desired state. Matches 'CurrentState' when healthy.
+    """
+
+class TerminalResizeMessage(BaseModel):
+    """
+    JSON structure to send new terminal window dimensions
+    """
+    rows: int
+    cols: int
 
 class TerminationSignalLabel(BaseModel):
     signal: TerminationSignal
@@ -11646,6 +14564,48 @@ class UpdateGitProviderAccount(BaseModel):
     The partial git provider account.
     """
 
+class UpdateOnboardingKey(BaseModel):
+    """
+    **Admin only.** Update an onboarding key.
+    Response: The updated [OnboardingKey].
+    """
+    public_key: str
+    """
+    The onboarding public key.
+    """
+    enabled: Optional[bool] = Field(default=None)
+    """
+    Update the key enabled state.
+    """
+    name: Optional[str] = Field(default=None)
+    """
+    Update the key name
+    """
+    expires: Optional[I64] = Field(default=None)
+    """
+    Update the onboarding key expire time.
+    """
+    tags: Optional[List[str]] = Field(default=None)
+    """
+    Update the tags
+    """
+    privileged: Optional[bool] = Field(default=None)
+    """
+    Allows the Onboarding Key to be used to:
+    
+    1. Enable a disabled Server
+    2. Remove Server 'address' configuration, allowing Periphery -> Core connection.
+    3. Update existing Server's public keys.
+    """
+    copy_server: Optional[str] = Field(default=None)
+    """
+    Update the copy server
+    """
+    create_builder: Optional[bool] = Field(default=None)
+    """
+    Update whether to create Builder
+    """
+
 class UpdatePermissionOnResourceType(BaseModel):
     """
     **Admin only.** Update a user or user groups base permission level on a resource type.
@@ -11793,6 +14753,20 @@ class UpdateServer(BaseModel):
     The partial config update to apply.
     """
 
+class UpdateServerPublicKey(BaseModel):
+    """
+    Updates the Server with an explicit Public Key.
+    Response: [Update]
+    """
+    server: str
+    """
+    Server Id or name
+    """
+    public_key: str
+    """
+    Spki base64 public key
+    """
+
 class UpdateServiceUserDescription(BaseModel):
     """
     **Admin only.** Update a service user's description.
@@ -11826,6 +14800,29 @@ class UpdateStack(BaseModel):
     The id of the Stack to update.
     """
     config: _PartialStackConfig
+    """
+    The partial config update to apply.
+    """
+
+class UpdateSwarm(BaseModel):
+    """
+    Update the Swarm at the given id, and return the updated Swarm.
+    Response: [Swarm].
+    
+    Note. If the attached server for the Swarm changes,
+    the Swarm will be deleted / cleaned up on the old server.
+    
+    Note. This method updates only the fields which are set in the [_PartialSwarmConfig],
+    effectively merging diffs into the final document.
+    This is helpful when multiple users are using
+    the same resources concurrently by ensuring no unintentional
+    field changes occur from out of date local state.
+    """
+    id: str
+    """
+    The id of the swarm to update.
+    """
+    config: _PartialSwarmConfig
     """
     The partial config update to apply.
     """
@@ -11879,20 +14876,6 @@ class UpdateUserBasePermissions(BaseModel):
     If specified, will update user's ability to create builds.
     """
 
-class UpdateUserPassword(BaseModel):
-    """
-    **Only for local users**. Update the calling users password.
-    Response: [NoData].
-    """
-    password: str
-
-class UpdateUserUsername(BaseModel):
-    """
-    **Only for local users**. Update the calling users username.
-    Response: [NoData].
-    """
-    username: str
-
 class UpdateVariableDescription(BaseModel):
     """
     **Admin only.** Update variable description. Response: [Variable].
@@ -11940,9 +14923,21 @@ class UrlBuilderConfig(BaseModel):
     """
     The address of the Periphery agent
     """
+    periphery_public_key: Optional[str] = Field(default=None)
+    """
+    An expected public key associated with Periphery private key.
+    If empty, doesn't validate Periphery public key.
+    """
+    insecure_tls: bool
+    """
+    Whether to validate the Periphery tls certificates.
+    """
     passkey: Optional[str] = Field(default=None)
     """
-    A custom passkey to use. Otherwise, use the default passkey.
+    Deprecated. Use private / public keys instead.
+    An optional override passkey to use
+    to authenticate with periphery agent.
+    If this is empty, will use passkey in core config.
     """
 
 class WriteBuildFileContents(BaseModel):
@@ -11978,7 +14973,7 @@ class WriteStackFileContents(BaseModel):
 
 class WriteSyncFileContents(BaseModel):
     """
-    Rename the stack at id to the given name. Response: [Update].
+    Write to the sync toml file contents. Response: [Update].
     """
     sync: str
     """
@@ -11998,34 +14993,6 @@ class WriteSyncFileContents(BaseModel):
     The contents to write.
     """
 
-class AuthRequestTypes(str, Enum):
-    GET_LOGIN_OPTIONS = "GetLoginOptions"
-    SIGN_UP_LOCAL_USER = "SignUpLocalUser"
-    LOGIN_LOCAL_USER = "LoginLocalUser"
-    EXCHANGE_FOR_JWT = "ExchangeForJwt"
-    GET_USER = "GetUser"
-
-class AuthRequestGetLoginOptions(BaseModel):
-    type: Literal[AuthRequestTypes.GET_LOGIN_OPTIONS] = AuthRequestTypes.GET_LOGIN_OPTIONS
-    params: GetLoginOptions
-
-class AuthRequestSignUpLocalUser(BaseModel):
-    type: Literal[AuthRequestTypes.SIGN_UP_LOCAL_USER] = AuthRequestTypes.SIGN_UP_LOCAL_USER
-    params: SignUpLocalUser
-
-class AuthRequestLoginLocalUser(BaseModel):
-    type: Literal[AuthRequestTypes.LOGIN_LOCAL_USER] = AuthRequestTypes.LOGIN_LOCAL_USER
-    params: LoginLocalUser
-
-class AuthRequestExchangeForJwt(BaseModel):
-    type: Literal[AuthRequestTypes.EXCHANGE_FOR_JWT] = AuthRequestTypes.EXCHANGE_FOR_JWT
-    params: ExchangeForJwt
-
-class AuthRequestGetUser(BaseModel):
-    type: Literal[AuthRequestTypes.GET_USER] = AuthRequestTypes.GET_USER
-    params: GetUser
-
-AuthRequest = Union[AuthRequestGetLoginOptions, AuthRequestSignUpLocalUser, AuthRequestLoginLocalUser, AuthRequestExchangeForJwt, AuthRequestGetUser]
 class DayOfWeek(str, Enum):
     """
     Days of the week
@@ -12038,27 +15005,6 @@ class DayOfWeek(str, Enum):
     SATURDAY = "Saturday"
     SUNDAY = "Sunday"
 class ExecuteRequestTypes(str, Enum):
-    START_CONTAINER = "StartContainer"
-    RESTART_CONTAINER = "RestartContainer"
-    PAUSE_CONTAINER = "PauseContainer"
-    UNPAUSE_CONTAINER = "UnpauseContainer"
-    STOP_CONTAINER = "StopContainer"
-    DESTROY_CONTAINER = "DestroyContainer"
-    START_ALL_CONTAINERS = "StartAllContainers"
-    RESTART_ALL_CONTAINERS = "RestartAllContainers"
-    PAUSE_ALL_CONTAINERS = "PauseAllContainers"
-    UNPAUSE_ALL_CONTAINERS = "UnpauseAllContainers"
-    STOP_ALL_CONTAINERS = "StopAllContainers"
-    PRUNE_CONTAINERS = "PruneContainers"
-    DELETE_NETWORK = "DeleteNetwork"
-    PRUNE_NETWORKS = "PruneNetworks"
-    DELETE_IMAGE = "DeleteImage"
-    PRUNE_IMAGES = "PruneImages"
-    DELETE_VOLUME = "DeleteVolume"
-    PRUNE_VOLUMES = "PruneVolumes"
-    PRUNE_DOCKER_BUILDERS = "PruneDockerBuilders"
-    PRUNE_BUILDX = "PruneBuildx"
-    PRUNE_SYSTEM = "PruneSystem"
     DEPLOY_STACK = "DeployStack"
     BATCH_DEPLOY_STACK = "BatchDeployStack"
     DEPLOY_STACK_IF_CHANGED = "DeployStackIfChanged"
@@ -12097,96 +15043,44 @@ class ExecuteRequestTypes(str, Enum):
     BATCH_RUN_PROCEDURE = "BatchRunProcedure"
     RUN_ACTION = "RunAction"
     BATCH_RUN_ACTION = "BatchRunAction"
+    RUN_SYNC = "RunSync"
     TEST_ALERTER = "TestAlerter"
     SEND_ALERT = "SendAlert"
-    RUN_SYNC = "RunSync"
+    START_CONTAINER = "StartContainer"
+    RESTART_CONTAINER = "RestartContainer"
+    PAUSE_CONTAINER = "PauseContainer"
+    UNPAUSE_CONTAINER = "UnpauseContainer"
+    STOP_CONTAINER = "StopContainer"
+    DESTROY_CONTAINER = "DestroyContainer"
+    START_ALL_CONTAINERS = "StartAllContainers"
+    RESTART_ALL_CONTAINERS = "RestartAllContainers"
+    PAUSE_ALL_CONTAINERS = "PauseAllContainers"
+    UNPAUSE_ALL_CONTAINERS = "UnpauseAllContainers"
+    STOP_ALL_CONTAINERS = "StopAllContainers"
+    PRUNE_CONTAINERS = "PruneContainers"
+    DELETE_NETWORK = "DeleteNetwork"
+    PRUNE_NETWORKS = "PruneNetworks"
+    DELETE_IMAGE = "DeleteImage"
+    PRUNE_IMAGES = "PruneImages"
+    DELETE_VOLUME = "DeleteVolume"
+    PRUNE_VOLUMES = "PruneVolumes"
+    PRUNE_DOCKER_BUILDERS = "PruneDockerBuilders"
+    PRUNE_BUILDX = "PruneBuildx"
+    PRUNE_SYSTEM = "PruneSystem"
+    REMOVE_SWARM_NODES = "RemoveSwarmNodes"
+    REMOVE_SWARM_STACKS = "RemoveSwarmStacks"
+    REMOVE_SWARM_SERVICES = "RemoveSwarmServices"
+    CREATE_SWARM_CONFIG = "CreateSwarmConfig"
+    ROTATE_SWARM_CONFIG = "RotateSwarmConfig"
+    REMOVE_SWARM_CONFIGS = "RemoveSwarmConfigs"
+    CREATE_SWARM_SECRET = "CreateSwarmSecret"
+    ROTATE_SWARM_SECRET = "RotateSwarmSecret"
+    REMOVE_SWARM_SECRETS = "RemoveSwarmSecrets"
     CLEAR_REPO_CACHE = "ClearRepoCache"
     BACKUP_CORE_DATABASE = "BackupCoreDatabase"
     GLOBAL_AUTO_UPDATE = "GlobalAutoUpdate"
-
-class ExecuteRequestStartContainer(BaseModel):
-    type: Literal[ExecuteRequestTypes.START_CONTAINER] = ExecuteRequestTypes.START_CONTAINER
-    params: StartContainer
-
-class ExecuteRequestRestartContainer(BaseModel):
-    type: Literal[ExecuteRequestTypes.RESTART_CONTAINER] = ExecuteRequestTypes.RESTART_CONTAINER
-    params: RestartContainer
-
-class ExecuteRequestPauseContainer(BaseModel):
-    type: Literal[ExecuteRequestTypes.PAUSE_CONTAINER] = ExecuteRequestTypes.PAUSE_CONTAINER
-    params: PauseContainer
-
-class ExecuteRequestUnpauseContainer(BaseModel):
-    type: Literal[ExecuteRequestTypes.UNPAUSE_CONTAINER] = ExecuteRequestTypes.UNPAUSE_CONTAINER
-    params: UnpauseContainer
-
-class ExecuteRequestStopContainer(BaseModel):
-    type: Literal[ExecuteRequestTypes.STOP_CONTAINER] = ExecuteRequestTypes.STOP_CONTAINER
-    params: StopContainer
-
-class ExecuteRequestDestroyContainer(BaseModel):
-    type: Literal[ExecuteRequestTypes.DESTROY_CONTAINER] = ExecuteRequestTypes.DESTROY_CONTAINER
-    params: DestroyContainer
-
-class ExecuteRequestStartAllContainers(BaseModel):
-    type: Literal[ExecuteRequestTypes.START_ALL_CONTAINERS] = ExecuteRequestTypes.START_ALL_CONTAINERS
-    params: StartAllContainers
-
-class ExecuteRequestRestartAllContainers(BaseModel):
-    type: Literal[ExecuteRequestTypes.RESTART_ALL_CONTAINERS] = ExecuteRequestTypes.RESTART_ALL_CONTAINERS
-    params: RestartAllContainers
-
-class ExecuteRequestPauseAllContainers(BaseModel):
-    type: Literal[ExecuteRequestTypes.PAUSE_ALL_CONTAINERS] = ExecuteRequestTypes.PAUSE_ALL_CONTAINERS
-    params: PauseAllContainers
-
-class ExecuteRequestUnpauseAllContainers(BaseModel):
-    type: Literal[ExecuteRequestTypes.UNPAUSE_ALL_CONTAINERS] = ExecuteRequestTypes.UNPAUSE_ALL_CONTAINERS
-    params: UnpauseAllContainers
-
-class ExecuteRequestStopAllContainers(BaseModel):
-    type: Literal[ExecuteRequestTypes.STOP_ALL_CONTAINERS] = ExecuteRequestTypes.STOP_ALL_CONTAINERS
-    params: StopAllContainers
-
-class ExecuteRequestPruneContainers(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_CONTAINERS] = ExecuteRequestTypes.PRUNE_CONTAINERS
-    params: PruneContainers
-
-class ExecuteRequestDeleteNetwork(BaseModel):
-    type: Literal[ExecuteRequestTypes.DELETE_NETWORK] = ExecuteRequestTypes.DELETE_NETWORK
-    params: DeleteNetwork
-
-class ExecuteRequestPruneNetworks(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_NETWORKS] = ExecuteRequestTypes.PRUNE_NETWORKS
-    params: PruneNetworks
-
-class ExecuteRequestDeleteImage(BaseModel):
-    type: Literal[ExecuteRequestTypes.DELETE_IMAGE] = ExecuteRequestTypes.DELETE_IMAGE
-    params: DeleteImage
-
-class ExecuteRequestPruneImages(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_IMAGES] = ExecuteRequestTypes.PRUNE_IMAGES
-    params: PruneImages
-
-class ExecuteRequestDeleteVolume(BaseModel):
-    type: Literal[ExecuteRequestTypes.DELETE_VOLUME] = ExecuteRequestTypes.DELETE_VOLUME
-    params: DeleteVolume
-
-class ExecuteRequestPruneVolumes(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_VOLUMES] = ExecuteRequestTypes.PRUNE_VOLUMES
-    params: PruneVolumes
-
-class ExecuteRequestPruneDockerBuilders(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_DOCKER_BUILDERS] = ExecuteRequestTypes.PRUNE_DOCKER_BUILDERS
-    params: PruneDockerBuilders
-
-class ExecuteRequestPruneBuildx(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_BUILDX] = ExecuteRequestTypes.PRUNE_BUILDX
-    params: PruneBuildx
-
-class ExecuteRequestPruneSystem(BaseModel):
-    type: Literal[ExecuteRequestTypes.PRUNE_SYSTEM] = ExecuteRequestTypes.PRUNE_SYSTEM
-    params: PruneSystem
+    ROTATE_ALL_SERVER_KEYS = "RotateAllServerKeys"
+    ROTATE_CORE_KEYS = "RotateCoreKeys"
 
 class ExecuteRequestDeployStack(BaseModel):
     type: Literal[ExecuteRequestTypes.DEPLOY_STACK] = ExecuteRequestTypes.DEPLOY_STACK
@@ -12340,6 +15234,10 @@ class ExecuteRequestBatchRunAction(BaseModel):
     type: Literal[ExecuteRequestTypes.BATCH_RUN_ACTION] = ExecuteRequestTypes.BATCH_RUN_ACTION
     params: BatchRunAction
 
+class ExecuteRequestRunSync(BaseModel):
+    type: Literal[ExecuteRequestTypes.RUN_SYNC] = ExecuteRequestTypes.RUN_SYNC
+    params: RunSync
+
 class ExecuteRequestTestAlerter(BaseModel):
     type: Literal[ExecuteRequestTypes.TEST_ALERTER] = ExecuteRequestTypes.TEST_ALERTER
     params: TestAlerter
@@ -12348,9 +15246,125 @@ class ExecuteRequestSendAlert(BaseModel):
     type: Literal[ExecuteRequestTypes.SEND_ALERT] = ExecuteRequestTypes.SEND_ALERT
     params: SendAlert
 
-class ExecuteRequestRunSync(BaseModel):
-    type: Literal[ExecuteRequestTypes.RUN_SYNC] = ExecuteRequestTypes.RUN_SYNC
-    params: RunSync
+class ExecuteRequestStartContainer(BaseModel):
+    type: Literal[ExecuteRequestTypes.START_CONTAINER] = ExecuteRequestTypes.START_CONTAINER
+    params: StartContainer
+
+class ExecuteRequestRestartContainer(BaseModel):
+    type: Literal[ExecuteRequestTypes.RESTART_CONTAINER] = ExecuteRequestTypes.RESTART_CONTAINER
+    params: RestartContainer
+
+class ExecuteRequestPauseContainer(BaseModel):
+    type: Literal[ExecuteRequestTypes.PAUSE_CONTAINER] = ExecuteRequestTypes.PAUSE_CONTAINER
+    params: PauseContainer
+
+class ExecuteRequestUnpauseContainer(BaseModel):
+    type: Literal[ExecuteRequestTypes.UNPAUSE_CONTAINER] = ExecuteRequestTypes.UNPAUSE_CONTAINER
+    params: UnpauseContainer
+
+class ExecuteRequestStopContainer(BaseModel):
+    type: Literal[ExecuteRequestTypes.STOP_CONTAINER] = ExecuteRequestTypes.STOP_CONTAINER
+    params: StopContainer
+
+class ExecuteRequestDestroyContainer(BaseModel):
+    type: Literal[ExecuteRequestTypes.DESTROY_CONTAINER] = ExecuteRequestTypes.DESTROY_CONTAINER
+    params: DestroyContainer
+
+class ExecuteRequestStartAllContainers(BaseModel):
+    type: Literal[ExecuteRequestTypes.START_ALL_CONTAINERS] = ExecuteRequestTypes.START_ALL_CONTAINERS
+    params: StartAllContainers
+
+class ExecuteRequestRestartAllContainers(BaseModel):
+    type: Literal[ExecuteRequestTypes.RESTART_ALL_CONTAINERS] = ExecuteRequestTypes.RESTART_ALL_CONTAINERS
+    params: RestartAllContainers
+
+class ExecuteRequestPauseAllContainers(BaseModel):
+    type: Literal[ExecuteRequestTypes.PAUSE_ALL_CONTAINERS] = ExecuteRequestTypes.PAUSE_ALL_CONTAINERS
+    params: PauseAllContainers
+
+class ExecuteRequestUnpauseAllContainers(BaseModel):
+    type: Literal[ExecuteRequestTypes.UNPAUSE_ALL_CONTAINERS] = ExecuteRequestTypes.UNPAUSE_ALL_CONTAINERS
+    params: UnpauseAllContainers
+
+class ExecuteRequestStopAllContainers(BaseModel):
+    type: Literal[ExecuteRequestTypes.STOP_ALL_CONTAINERS] = ExecuteRequestTypes.STOP_ALL_CONTAINERS
+    params: StopAllContainers
+
+class ExecuteRequestPruneContainers(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_CONTAINERS] = ExecuteRequestTypes.PRUNE_CONTAINERS
+    params: PruneContainers
+
+class ExecuteRequestDeleteNetwork(BaseModel):
+    type: Literal[ExecuteRequestTypes.DELETE_NETWORK] = ExecuteRequestTypes.DELETE_NETWORK
+    params: DeleteNetwork
+
+class ExecuteRequestPruneNetworks(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_NETWORKS] = ExecuteRequestTypes.PRUNE_NETWORKS
+    params: PruneNetworks
+
+class ExecuteRequestDeleteImage(BaseModel):
+    type: Literal[ExecuteRequestTypes.DELETE_IMAGE] = ExecuteRequestTypes.DELETE_IMAGE
+    params: DeleteImage
+
+class ExecuteRequestPruneImages(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_IMAGES] = ExecuteRequestTypes.PRUNE_IMAGES
+    params: PruneImages
+
+class ExecuteRequestDeleteVolume(BaseModel):
+    type: Literal[ExecuteRequestTypes.DELETE_VOLUME] = ExecuteRequestTypes.DELETE_VOLUME
+    params: DeleteVolume
+
+class ExecuteRequestPruneVolumes(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_VOLUMES] = ExecuteRequestTypes.PRUNE_VOLUMES
+    params: PruneVolumes
+
+class ExecuteRequestPruneDockerBuilders(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_DOCKER_BUILDERS] = ExecuteRequestTypes.PRUNE_DOCKER_BUILDERS
+    params: PruneDockerBuilders
+
+class ExecuteRequestPruneBuildx(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_BUILDX] = ExecuteRequestTypes.PRUNE_BUILDX
+    params: PruneBuildx
+
+class ExecuteRequestPruneSystem(BaseModel):
+    type: Literal[ExecuteRequestTypes.PRUNE_SYSTEM] = ExecuteRequestTypes.PRUNE_SYSTEM
+    params: PruneSystem
+
+class ExecuteRequestRemoveSwarmNodes(BaseModel):
+    type: Literal[ExecuteRequestTypes.REMOVE_SWARM_NODES] = ExecuteRequestTypes.REMOVE_SWARM_NODES
+    params: RemoveSwarmNodes
+
+class ExecuteRequestRemoveSwarmStacks(BaseModel):
+    type: Literal[ExecuteRequestTypes.REMOVE_SWARM_STACKS] = ExecuteRequestTypes.REMOVE_SWARM_STACKS
+    params: RemoveSwarmStacks
+
+class ExecuteRequestRemoveSwarmServices(BaseModel):
+    type: Literal[ExecuteRequestTypes.REMOVE_SWARM_SERVICES] = ExecuteRequestTypes.REMOVE_SWARM_SERVICES
+    params: RemoveSwarmServices
+
+class ExecuteRequestCreateSwarmConfig(BaseModel):
+    type: Literal[ExecuteRequestTypes.CREATE_SWARM_CONFIG] = ExecuteRequestTypes.CREATE_SWARM_CONFIG
+    params: CreateSwarmConfig
+
+class ExecuteRequestRotateSwarmConfig(BaseModel):
+    type: Literal[ExecuteRequestTypes.ROTATE_SWARM_CONFIG] = ExecuteRequestTypes.ROTATE_SWARM_CONFIG
+    params: RotateSwarmConfig
+
+class ExecuteRequestRemoveSwarmConfigs(BaseModel):
+    type: Literal[ExecuteRequestTypes.REMOVE_SWARM_CONFIGS] = ExecuteRequestTypes.REMOVE_SWARM_CONFIGS
+    params: RemoveSwarmConfigs
+
+class ExecuteRequestCreateSwarmSecret(BaseModel):
+    type: Literal[ExecuteRequestTypes.CREATE_SWARM_SECRET] = ExecuteRequestTypes.CREATE_SWARM_SECRET
+    params: CreateSwarmSecret
+
+class ExecuteRequestRotateSwarmSecret(BaseModel):
+    type: Literal[ExecuteRequestTypes.ROTATE_SWARM_SECRET] = ExecuteRequestTypes.ROTATE_SWARM_SECRET
+    params: RotateSwarmSecret
+
+class ExecuteRequestRemoveSwarmSecrets(BaseModel):
+    type: Literal[ExecuteRequestTypes.REMOVE_SWARM_SECRETS] = ExecuteRequestTypes.REMOVE_SWARM_SECRETS
+    params: RemoveSwarmSecrets
 
 class ExecuteRequestClearRepoCache(BaseModel):
     type: Literal[ExecuteRequestTypes.CLEAR_REPO_CACHE] = ExecuteRequestTypes.CLEAR_REPO_CACHE
@@ -12364,7 +15378,15 @@ class ExecuteRequestGlobalAutoUpdate(BaseModel):
     type: Literal[ExecuteRequestTypes.GLOBAL_AUTO_UPDATE] = ExecuteRequestTypes.GLOBAL_AUTO_UPDATE
     params: GlobalAutoUpdate
 
-ExecuteRequest = Union[ExecuteRequestStartContainer, ExecuteRequestRestartContainer, ExecuteRequestPauseContainer, ExecuteRequestUnpauseContainer, ExecuteRequestStopContainer, ExecuteRequestDestroyContainer, ExecuteRequestStartAllContainers, ExecuteRequestRestartAllContainers, ExecuteRequestPauseAllContainers, ExecuteRequestUnpauseAllContainers, ExecuteRequestStopAllContainers, ExecuteRequestPruneContainers, ExecuteRequestDeleteNetwork, ExecuteRequestPruneNetworks, ExecuteRequestDeleteImage, ExecuteRequestPruneImages, ExecuteRequestDeleteVolume, ExecuteRequestPruneVolumes, ExecuteRequestPruneDockerBuilders, ExecuteRequestPruneBuildx, ExecuteRequestPruneSystem, ExecuteRequestDeployStack, ExecuteRequestBatchDeployStack, ExecuteRequestDeployStackIfChanged, ExecuteRequestBatchDeployStackIfChanged, ExecuteRequestPullStack, ExecuteRequestBatchPullStack, ExecuteRequestStartStack, ExecuteRequestRestartStack, ExecuteRequestStopStack, ExecuteRequestPauseStack, ExecuteRequestUnpauseStack, ExecuteRequestDestroyStack, ExecuteRequestBatchDestroyStack, ExecuteRequestRunStackService, ExecuteRequestDeploy, ExecuteRequestBatchDeploy, ExecuteRequestPullDeployment, ExecuteRequestStartDeployment, ExecuteRequestRestartDeployment, ExecuteRequestPauseDeployment, ExecuteRequestUnpauseDeployment, ExecuteRequestStopDeployment, ExecuteRequestDestroyDeployment, ExecuteRequestBatchDestroyDeployment, ExecuteRequestRunBuild, ExecuteRequestBatchRunBuild, ExecuteRequestCancelBuild, ExecuteRequestCloneRepo, ExecuteRequestBatchCloneRepo, ExecuteRequestPullRepo, ExecuteRequestBatchPullRepo, ExecuteRequestBuildRepo, ExecuteRequestBatchBuildRepo, ExecuteRequestCancelRepoBuild, ExecuteRequestRunProcedure, ExecuteRequestBatchRunProcedure, ExecuteRequestRunAction, ExecuteRequestBatchRunAction, ExecuteRequestTestAlerter, ExecuteRequestSendAlert, ExecuteRequestRunSync, ExecuteRequestClearRepoCache, ExecuteRequestBackupCoreDatabase, ExecuteRequestGlobalAutoUpdate]
+class ExecuteRequestRotateAllServerKeys(BaseModel):
+    type: Literal[ExecuteRequestTypes.ROTATE_ALL_SERVER_KEYS] = ExecuteRequestTypes.ROTATE_ALL_SERVER_KEYS
+    params: RotateAllServerKeys
+
+class ExecuteRequestRotateCoreKeys(BaseModel):
+    type: Literal[ExecuteRequestTypes.ROTATE_CORE_KEYS] = ExecuteRequestTypes.ROTATE_CORE_KEYS
+    params: RotateCoreKeys
+
+ExecuteRequest = Union[ExecuteRequestDeployStack, ExecuteRequestBatchDeployStack, ExecuteRequestDeployStackIfChanged, ExecuteRequestBatchDeployStackIfChanged, ExecuteRequestPullStack, ExecuteRequestBatchPullStack, ExecuteRequestStartStack, ExecuteRequestRestartStack, ExecuteRequestStopStack, ExecuteRequestPauseStack, ExecuteRequestUnpauseStack, ExecuteRequestDestroyStack, ExecuteRequestBatchDestroyStack, ExecuteRequestRunStackService, ExecuteRequestDeploy, ExecuteRequestBatchDeploy, ExecuteRequestPullDeployment, ExecuteRequestStartDeployment, ExecuteRequestRestartDeployment, ExecuteRequestPauseDeployment, ExecuteRequestUnpauseDeployment, ExecuteRequestStopDeployment, ExecuteRequestDestroyDeployment, ExecuteRequestBatchDestroyDeployment, ExecuteRequestRunBuild, ExecuteRequestBatchRunBuild, ExecuteRequestCancelBuild, ExecuteRequestCloneRepo, ExecuteRequestBatchCloneRepo, ExecuteRequestPullRepo, ExecuteRequestBatchPullRepo, ExecuteRequestBuildRepo, ExecuteRequestBatchBuildRepo, ExecuteRequestCancelRepoBuild, ExecuteRequestRunProcedure, ExecuteRequestBatchRunProcedure, ExecuteRequestRunAction, ExecuteRequestBatchRunAction, ExecuteRequestRunSync, ExecuteRequestTestAlerter, ExecuteRequestSendAlert, ExecuteRequestStartContainer, ExecuteRequestRestartContainer, ExecuteRequestPauseContainer, ExecuteRequestUnpauseContainer, ExecuteRequestStopContainer, ExecuteRequestDestroyContainer, ExecuteRequestStartAllContainers, ExecuteRequestRestartAllContainers, ExecuteRequestPauseAllContainers, ExecuteRequestUnpauseAllContainers, ExecuteRequestStopAllContainers, ExecuteRequestPruneContainers, ExecuteRequestDeleteNetwork, ExecuteRequestPruneNetworks, ExecuteRequestDeleteImage, ExecuteRequestPruneImages, ExecuteRequestDeleteVolume, ExecuteRequestPruneVolumes, ExecuteRequestPruneDockerBuilders, ExecuteRequestPruneBuildx, ExecuteRequestPruneSystem, ExecuteRequestRemoveSwarmNodes, ExecuteRequestRemoveSwarmStacks, ExecuteRequestRemoveSwarmServices, ExecuteRequestCreateSwarmConfig, ExecuteRequestRotateSwarmConfig, ExecuteRequestRemoveSwarmConfigs, ExecuteRequestCreateSwarmSecret, ExecuteRequestRotateSwarmSecret, ExecuteRequestRemoveSwarmSecrets, ExecuteRequestClearRepoCache, ExecuteRequestBackupCoreDatabase, ExecuteRequestGlobalAutoUpdate, ExecuteRequestRotateAllServerKeys, ExecuteRequestRotateCoreKeys]
 class IanaTimezone(str, Enum):
     """
     One representative IANA zone for each distinct base UTC offset in the tz database.
@@ -12531,61 +15553,61 @@ class ReadRequestTypes(str, Enum):
     LIST_SECRETS = "ListSecrets"
     LIST_GIT_PROVIDERS_FROM_CONFIG = "ListGitProvidersFromConfig"
     LIST_DOCKER_REGISTRIES_FROM_CONFIG = "ListDockerRegistriesFromConfig"
-    GET_USERNAME = "GetUsername"
-    GET_PERMISSION = "GetPermission"
-    FIND_USER = "FindUser"
-    LIST_USERS = "ListUsers"
-    LIST_API_KEYS = "ListApiKeys"
-    LIST_API_KEYS_FOR_SERVICE_USER = "ListApiKeysForServiceUser"
-    LIST_PERMISSIONS = "ListPermissions"
-    LIST_USER_TARGET_PERMISSIONS = "ListUserTargetPermissions"
-    GET_USER_GROUP = "GetUserGroup"
-    LIST_USER_GROUPS = "ListUserGroups"
-    GET_PROCEDURES_SUMMARY = "GetProceduresSummary"
-    GET_PROCEDURE = "GetProcedure"
-    GET_PROCEDURE_ACTION_STATE = "GetProcedureActionState"
-    LIST_PROCEDURES = "ListProcedures"
-    LIST_FULL_PROCEDURES = "ListFullProcedures"
-    GET_ACTIONS_SUMMARY = "GetActionsSummary"
-    GET_ACTION = "GetAction"
-    GET_ACTION_ACTION_STATE = "GetActionActionState"
-    LIST_ACTIONS = "ListActions"
-    LIST_FULL_ACTIONS = "ListFullActions"
-    LIST_SCHEDULES = "ListSchedules"
+    GET_SWARMS_SUMMARY = "GetSwarmsSummary"
+    GET_SWARM = "GetSwarm"
+    GET_SWARM_ACTION_STATE = "GetSwarmActionState"
+    LIST_SWARMS = "ListSwarms"
+    INSPECT_SWARM = "InspectSwarm"
+    LIST_FULL_SWARMS = "ListFullSwarms"
+    LIST_SWARM_NODES = "ListSwarmNodes"
+    INSPECT_SWARM_NODE = "InspectSwarmNode"
+    LIST_SWARM_CONFIGS = "ListSwarmConfigs"
+    INSPECT_SWARM_CONFIG = "InspectSwarmConfig"
+    LIST_SWARM_SECRETS = "ListSwarmSecrets"
+    INSPECT_SWARM_SECRET = "InspectSwarmSecret"
+    LIST_SWARM_STACKS = "ListSwarmStacks"
+    INSPECT_SWARM_STACK = "InspectSwarmStack"
+    LIST_SWARM_TASKS = "ListSwarmTasks"
+    INSPECT_SWARM_TASK = "InspectSwarmTask"
+    LIST_SWARM_SERVICES = "ListSwarmServices"
+    INSPECT_SWARM_SERVICE = "InspectSwarmService"
+    GET_SWARM_SERVICE_LOG = "GetSwarmServiceLog"
+    SEARCH_SWARM_SERVICE_LOG = "SearchSwarmServiceLog"
+    LIST_SWARM_NETWORKS = "ListSwarmNetworks"
     GET_SERVERS_SUMMARY = "GetServersSummary"
     GET_SERVER = "GetServer"
     GET_SERVER_STATE = "GetServerState"
-    GET_PERIPHERY_VERSION = "GetPeripheryVersion"
+    GET_PERIPHERY_INFORMATION = "GetPeripheryInformation"
     GET_SERVER_ACTION_STATE = "GetServerActionState"
-    GET_HISTORICAL_SERVER_STATS = "GetHistoricalServerStats"
     LIST_SERVERS = "ListServers"
     LIST_FULL_SERVERS = "ListFullServers"
+    LIST_TERMINALS = "ListTerminals"
+    GET_DOCKER_CONTAINERS_SUMMARY = "GetDockerContainersSummary"
+    LIST_ALL_DOCKER_CONTAINERS = "ListAllDockerContainers"
+    LIST_DOCKER_CONTAINERS = "ListDockerContainers"
     INSPECT_DOCKER_CONTAINER = "InspectDockerContainer"
     GET_RESOURCE_MATCHING_CONTAINER = "GetResourceMatchingContainer"
     GET_CONTAINER_LOG = "GetContainerLog"
     SEARCH_CONTAINER_LOG = "SearchContainerLog"
+    LIST_COMPOSE_PROJECTS = "ListComposeProjects"
+    LIST_DOCKER_NETWORKS = "ListDockerNetworks"
     INSPECT_DOCKER_NETWORK = "InspectDockerNetwork"
+    LIST_DOCKER_IMAGES = "ListDockerImages"
     INSPECT_DOCKER_IMAGE = "InspectDockerImage"
     LIST_DOCKER_IMAGE_HISTORY = "ListDockerImageHistory"
-    INSPECT_DOCKER_VOLUME = "InspectDockerVolume"
-    GET_DOCKER_CONTAINERS_SUMMARY = "GetDockerContainersSummary"
-    LIST_ALL_DOCKER_CONTAINERS = "ListAllDockerContainers"
-    LIST_DOCKER_CONTAINERS = "ListDockerContainers"
-    LIST_DOCKER_NETWORKS = "ListDockerNetworks"
-    LIST_DOCKER_IMAGES = "ListDockerImages"
     LIST_DOCKER_VOLUMES = "ListDockerVolumes"
-    LIST_COMPOSE_PROJECTS = "ListComposeProjects"
-    LIST_TERMINALS = "ListTerminals"
+    INSPECT_DOCKER_VOLUME = "InspectDockerVolume"
     GET_SYSTEM_INFORMATION = "GetSystemInformation"
     GET_SYSTEM_STATS = "GetSystemStats"
+    GET_HISTORICAL_SERVER_STATS = "GetHistoricalServerStats"
     LIST_SYSTEM_PROCESSES = "ListSystemProcesses"
     GET_STACKS_SUMMARY = "GetStacksSummary"
     GET_STACK = "GetStack"
     GET_STACK_ACTION_STATE = "GetStackActionState"
-    GET_STACK_WEBHOOKS_ENABLED = "GetStackWebhooksEnabled"
     GET_STACK_LOG = "GetStackLog"
     SEARCH_STACK_LOG = "SearchStackLog"
     INSPECT_STACK_CONTAINER = "InspectStackContainer"
+    INSPECT_STACK_SWARM_SERVICE = "InspectStackSwarmService"
     LIST_STACKS = "ListStacks"
     LIST_FULL_STACKS = "ListFullStacks"
     LIST_STACK_SERVICES = "ListStackServices"
@@ -12599,6 +15621,7 @@ class ReadRequestTypes(str, Enum):
     GET_DEPLOYMENT_LOG = "GetDeploymentLog"
     SEARCH_DEPLOYMENT_LOG = "SearchDeploymentLog"
     INSPECT_DEPLOYMENT_CONTAINER = "InspectDeploymentContainer"
+    INSPECT_DEPLOYMENT_SWARM_SERVICE = "InspectDeploymentSwarmService"
     LIST_DEPLOYMENTS = "ListDeployments"
     LIST_FULL_DEPLOYMENTS = "ListFullDeployments"
     LIST_COMMON_DEPLOYMENT_EXTRA_ARGS = "ListCommonDeploymentExtraArgs"
@@ -12607,20 +15630,28 @@ class ReadRequestTypes(str, Enum):
     GET_BUILD_ACTION_STATE = "GetBuildActionState"
     GET_BUILD_MONTHLY_STATS = "GetBuildMonthlyStats"
     LIST_BUILD_VERSIONS = "ListBuildVersions"
-    GET_BUILD_WEBHOOK_ENABLED = "GetBuildWebhookEnabled"
     LIST_BUILDS = "ListBuilds"
     LIST_FULL_BUILDS = "ListFullBuilds"
     LIST_COMMON_BUILD_EXTRA_ARGS = "ListCommonBuildExtraArgs"
     GET_REPOS_SUMMARY = "GetReposSummary"
     GET_REPO = "GetRepo"
     GET_REPO_ACTION_STATE = "GetRepoActionState"
-    GET_REPO_WEBHOOKS_ENABLED = "GetRepoWebhooksEnabled"
     LIST_REPOS = "ListRepos"
     LIST_FULL_REPOS = "ListFullRepos"
+    GET_PROCEDURES_SUMMARY = "GetProceduresSummary"
+    GET_PROCEDURE = "GetProcedure"
+    GET_PROCEDURE_ACTION_STATE = "GetProcedureActionState"
+    LIST_PROCEDURES = "ListProcedures"
+    LIST_FULL_PROCEDURES = "ListFullProcedures"
+    GET_ACTIONS_SUMMARY = "GetActionsSummary"
+    GET_ACTION = "GetAction"
+    GET_ACTION_ACTION_STATE = "GetActionActionState"
+    LIST_ACTIONS = "ListActions"
+    LIST_FULL_ACTIONS = "ListFullActions"
+    LIST_SCHEDULES = "ListSchedules"
     GET_RESOURCE_SYNCS_SUMMARY = "GetResourceSyncsSummary"
     GET_RESOURCE_SYNC = "GetResourceSync"
     GET_RESOURCE_SYNC_ACTION_STATE = "GetResourceSyncActionState"
-    GET_SYNC_WEBHOOKS_ENABLED = "GetSyncWebhooksEnabled"
     LIST_RESOURCE_SYNCS = "ListResourceSyncs"
     LIST_FULL_RESOURCE_SYNCS = "ListFullResourceSyncs"
     GET_BUILDERS_SUMMARY = "GetBuildersSummary"
@@ -12635,6 +15666,16 @@ class ReadRequestTypes(str, Enum):
     EXPORT_RESOURCES_TO_TOML = "ExportResourcesToToml"
     GET_TAG = "GetTag"
     LIST_TAGS = "ListTags"
+    GET_USERNAME = "GetUsername"
+    GET_PERMISSION = "GetPermission"
+    FIND_USER = "FindUser"
+    LIST_USERS = "ListUsers"
+    LIST_API_KEYS = "ListApiKeys"
+    LIST_API_KEYS_FOR_SERVICE_USER = "ListApiKeysForServiceUser"
+    LIST_PERMISSIONS = "ListPermissions"
+    LIST_USER_TARGET_PERMISSIONS = "ListUserTargetPermissions"
+    GET_USER_GROUP = "GetUserGroup"
+    LIST_USER_GROUPS = "ListUserGroups"
     GET_UPDATE = "GetUpdate"
     LIST_UPDATES = "ListUpdates"
     LIST_ALERTS = "ListAlerts"
@@ -12645,6 +15686,7 @@ class ReadRequestTypes(str, Enum):
     LIST_GIT_PROVIDER_ACCOUNTS = "ListGitProviderAccounts"
     GET_DOCKER_REGISTRY_ACCOUNT = "GetDockerRegistryAccount"
     LIST_DOCKER_REGISTRY_ACCOUNTS = "ListDockerRegistryAccounts"
+    LIST_ONBOARDING_KEYS = "ListOnboardingKeys"
 
 class ReadRequestGetVersion(BaseModel):
     type: Literal[ReadRequestTypes.GET_VERSION] = ReadRequestTypes.GET_VERSION
@@ -12666,89 +15708,89 @@ class ReadRequestListDockerRegistriesFromConfig(BaseModel):
     type: Literal[ReadRequestTypes.LIST_DOCKER_REGISTRIES_FROM_CONFIG] = ReadRequestTypes.LIST_DOCKER_REGISTRIES_FROM_CONFIG
     params: ListDockerRegistriesFromConfig
 
-class ReadRequestGetUsername(BaseModel):
-    type: Literal[ReadRequestTypes.GET_USERNAME] = ReadRequestTypes.GET_USERNAME
-    params: GetUsername
+class ReadRequestGetSwarmsSummary(BaseModel):
+    type: Literal[ReadRequestTypes.GET_SWARMS_SUMMARY] = ReadRequestTypes.GET_SWARMS_SUMMARY
+    params: GetSwarmsSummary
 
-class ReadRequestGetPermission(BaseModel):
-    type: Literal[ReadRequestTypes.GET_PERMISSION] = ReadRequestTypes.GET_PERMISSION
-    params: GetPermission
+class ReadRequestGetSwarm(BaseModel):
+    type: Literal[ReadRequestTypes.GET_SWARM] = ReadRequestTypes.GET_SWARM
+    params: GetSwarm
 
-class ReadRequestFindUser(BaseModel):
-    type: Literal[ReadRequestTypes.FIND_USER] = ReadRequestTypes.FIND_USER
-    params: FindUser
+class ReadRequestGetSwarmActionState(BaseModel):
+    type: Literal[ReadRequestTypes.GET_SWARM_ACTION_STATE] = ReadRequestTypes.GET_SWARM_ACTION_STATE
+    params: GetSwarmActionState
 
-class ReadRequestListUsers(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_USERS] = ReadRequestTypes.LIST_USERS
-    params: ListUsers
+class ReadRequestListSwarms(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARMS] = ReadRequestTypes.LIST_SWARMS
+    params: ListSwarms
 
-class ReadRequestListApiKeys(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_API_KEYS] = ReadRequestTypes.LIST_API_KEYS
-    params: ListApiKeys
+class ReadRequestInspectSwarm(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM] = ReadRequestTypes.INSPECT_SWARM
+    params: InspectSwarm
 
-class ReadRequestListApiKeysForServiceUser(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_API_KEYS_FOR_SERVICE_USER] = ReadRequestTypes.LIST_API_KEYS_FOR_SERVICE_USER
-    params: ListApiKeysForServiceUser
+class ReadRequestListFullSwarms(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_FULL_SWARMS] = ReadRequestTypes.LIST_FULL_SWARMS
+    params: ListFullSwarms
 
-class ReadRequestListPermissions(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_PERMISSIONS] = ReadRequestTypes.LIST_PERMISSIONS
-    params: ListPermissions
+class ReadRequestListSwarmNodes(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_NODES] = ReadRequestTypes.LIST_SWARM_NODES
+    params: ListSwarmNodes
 
-class ReadRequestListUserTargetPermissions(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_USER_TARGET_PERMISSIONS] = ReadRequestTypes.LIST_USER_TARGET_PERMISSIONS
-    params: ListUserTargetPermissions
+class ReadRequestInspectSwarmNode(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM_NODE] = ReadRequestTypes.INSPECT_SWARM_NODE
+    params: InspectSwarmNode
 
-class ReadRequestGetUserGroup(BaseModel):
-    type: Literal[ReadRequestTypes.GET_USER_GROUP] = ReadRequestTypes.GET_USER_GROUP
-    params: GetUserGroup
+class ReadRequestListSwarmConfigs(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_CONFIGS] = ReadRequestTypes.LIST_SWARM_CONFIGS
+    params: ListSwarmConfigs
 
-class ReadRequestListUserGroups(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_USER_GROUPS] = ReadRequestTypes.LIST_USER_GROUPS
-    params: ListUserGroups
+class ReadRequestInspectSwarmConfig(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM_CONFIG] = ReadRequestTypes.INSPECT_SWARM_CONFIG
+    params: InspectSwarmConfig
 
-class ReadRequestGetProceduresSummary(BaseModel):
-    type: Literal[ReadRequestTypes.GET_PROCEDURES_SUMMARY] = ReadRequestTypes.GET_PROCEDURES_SUMMARY
-    params: GetProceduresSummary
+class ReadRequestListSwarmSecrets(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_SECRETS] = ReadRequestTypes.LIST_SWARM_SECRETS
+    params: ListSwarmSecrets
 
-class ReadRequestGetProcedure(BaseModel):
-    type: Literal[ReadRequestTypes.GET_PROCEDURE] = ReadRequestTypes.GET_PROCEDURE
-    params: GetProcedure
+class ReadRequestInspectSwarmSecret(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM_SECRET] = ReadRequestTypes.INSPECT_SWARM_SECRET
+    params: InspectSwarmSecret
 
-class ReadRequestGetProcedureActionState(BaseModel):
-    type: Literal[ReadRequestTypes.GET_PROCEDURE_ACTION_STATE] = ReadRequestTypes.GET_PROCEDURE_ACTION_STATE
-    params: GetProcedureActionState
+class ReadRequestListSwarmStacks(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_STACKS] = ReadRequestTypes.LIST_SWARM_STACKS
+    params: ListSwarmStacks
 
-class ReadRequestListProcedures(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_PROCEDURES] = ReadRequestTypes.LIST_PROCEDURES
-    params: ListProcedures
+class ReadRequestInspectSwarmStack(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM_STACK] = ReadRequestTypes.INSPECT_SWARM_STACK
+    params: InspectSwarmStack
 
-class ReadRequestListFullProcedures(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_FULL_PROCEDURES] = ReadRequestTypes.LIST_FULL_PROCEDURES
-    params: ListFullProcedures
+class ReadRequestListSwarmTasks(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_TASKS] = ReadRequestTypes.LIST_SWARM_TASKS
+    params: ListSwarmTasks
 
-class ReadRequestGetActionsSummary(BaseModel):
-    type: Literal[ReadRequestTypes.GET_ACTIONS_SUMMARY] = ReadRequestTypes.GET_ACTIONS_SUMMARY
-    params: GetActionsSummary
+class ReadRequestInspectSwarmTask(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM_TASK] = ReadRequestTypes.INSPECT_SWARM_TASK
+    params: InspectSwarmTask
 
-class ReadRequestGetAction(BaseModel):
-    type: Literal[ReadRequestTypes.GET_ACTION] = ReadRequestTypes.GET_ACTION
-    params: GetAction
+class ReadRequestListSwarmServices(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_SERVICES] = ReadRequestTypes.LIST_SWARM_SERVICES
+    params: ListSwarmServices
 
-class ReadRequestGetActionActionState(BaseModel):
-    type: Literal[ReadRequestTypes.GET_ACTION_ACTION_STATE] = ReadRequestTypes.GET_ACTION_ACTION_STATE
-    params: GetActionActionState
+class ReadRequestInspectSwarmService(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_SWARM_SERVICE] = ReadRequestTypes.INSPECT_SWARM_SERVICE
+    params: InspectSwarmService
 
-class ReadRequestListActions(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_ACTIONS] = ReadRequestTypes.LIST_ACTIONS
-    params: ListActions
+class ReadRequestGetSwarmServiceLog(BaseModel):
+    type: Literal[ReadRequestTypes.GET_SWARM_SERVICE_LOG] = ReadRequestTypes.GET_SWARM_SERVICE_LOG
+    params: GetSwarmServiceLog
 
-class ReadRequestListFullActions(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_FULL_ACTIONS] = ReadRequestTypes.LIST_FULL_ACTIONS
-    params: ListFullActions
+class ReadRequestSearchSwarmServiceLog(BaseModel):
+    type: Literal[ReadRequestTypes.SEARCH_SWARM_SERVICE_LOG] = ReadRequestTypes.SEARCH_SWARM_SERVICE_LOG
+    params: SearchSwarmServiceLog
 
-class ReadRequestListSchedules(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_SCHEDULES] = ReadRequestTypes.LIST_SCHEDULES
-    params: ListSchedules
+class ReadRequestListSwarmNetworks(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SWARM_NETWORKS] = ReadRequestTypes.LIST_SWARM_NETWORKS
+    params: ListSwarmNetworks
 
 class ReadRequestGetServersSummary(BaseModel):
     type: Literal[ReadRequestTypes.GET_SERVERS_SUMMARY] = ReadRequestTypes.GET_SERVERS_SUMMARY
@@ -12762,17 +15804,13 @@ class ReadRequestGetServerState(BaseModel):
     type: Literal[ReadRequestTypes.GET_SERVER_STATE] = ReadRequestTypes.GET_SERVER_STATE
     params: GetServerState
 
-class ReadRequestGetPeripheryVersion(BaseModel):
-    type: Literal[ReadRequestTypes.GET_PERIPHERY_VERSION] = ReadRequestTypes.GET_PERIPHERY_VERSION
-    params: GetPeripheryVersion
+class ReadRequestGetPeripheryInformation(BaseModel):
+    type: Literal[ReadRequestTypes.GET_PERIPHERY_INFORMATION] = ReadRequestTypes.GET_PERIPHERY_INFORMATION
+    params: GetPeripheryInformation
 
 class ReadRequestGetServerActionState(BaseModel):
     type: Literal[ReadRequestTypes.GET_SERVER_ACTION_STATE] = ReadRequestTypes.GET_SERVER_ACTION_STATE
     params: GetServerActionState
-
-class ReadRequestGetHistoricalServerStats(BaseModel):
-    type: Literal[ReadRequestTypes.GET_HISTORICAL_SERVER_STATS] = ReadRequestTypes.GET_HISTORICAL_SERVER_STATS
-    params: GetHistoricalServerStats
 
 class ReadRequestListServers(BaseModel):
     type: Literal[ReadRequestTypes.LIST_SERVERS] = ReadRequestTypes.LIST_SERVERS
@@ -12781,6 +15819,22 @@ class ReadRequestListServers(BaseModel):
 class ReadRequestListFullServers(BaseModel):
     type: Literal[ReadRequestTypes.LIST_FULL_SERVERS] = ReadRequestTypes.LIST_FULL_SERVERS
     params: ListFullServers
+
+class ReadRequestListTerminals(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_TERMINALS] = ReadRequestTypes.LIST_TERMINALS
+    params: ListTerminals
+
+class ReadRequestGetDockerContainersSummary(BaseModel):
+    type: Literal[ReadRequestTypes.GET_DOCKER_CONTAINERS_SUMMARY] = ReadRequestTypes.GET_DOCKER_CONTAINERS_SUMMARY
+    params: GetDockerContainersSummary
+
+class ReadRequestListAllDockerContainers(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_ALL_DOCKER_CONTAINERS] = ReadRequestTypes.LIST_ALL_DOCKER_CONTAINERS
+    params: ListAllDockerContainers
+
+class ReadRequestListDockerContainers(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_DOCKER_CONTAINERS] = ReadRequestTypes.LIST_DOCKER_CONTAINERS
+    params: ListDockerContainers
 
 class ReadRequestInspectDockerContainer(BaseModel):
     type: Literal[ReadRequestTypes.INSPECT_DOCKER_CONTAINER] = ReadRequestTypes.INSPECT_DOCKER_CONTAINER
@@ -12798,9 +15852,21 @@ class ReadRequestSearchContainerLog(BaseModel):
     type: Literal[ReadRequestTypes.SEARCH_CONTAINER_LOG] = ReadRequestTypes.SEARCH_CONTAINER_LOG
     params: SearchContainerLog
 
+class ReadRequestListComposeProjects(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_COMPOSE_PROJECTS] = ReadRequestTypes.LIST_COMPOSE_PROJECTS
+    params: ListComposeProjects
+
+class ReadRequestListDockerNetworks(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_DOCKER_NETWORKS] = ReadRequestTypes.LIST_DOCKER_NETWORKS
+    params: ListDockerNetworks
+
 class ReadRequestInspectDockerNetwork(BaseModel):
     type: Literal[ReadRequestTypes.INSPECT_DOCKER_NETWORK] = ReadRequestTypes.INSPECT_DOCKER_NETWORK
     params: InspectDockerNetwork
+
+class ReadRequestListDockerImages(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_DOCKER_IMAGES] = ReadRequestTypes.LIST_DOCKER_IMAGES
+    params: ListDockerImages
 
 class ReadRequestInspectDockerImage(BaseModel):
     type: Literal[ReadRequestTypes.INSPECT_DOCKER_IMAGE] = ReadRequestTypes.INSPECT_DOCKER_IMAGE
@@ -12810,41 +15876,13 @@ class ReadRequestListDockerImageHistory(BaseModel):
     type: Literal[ReadRequestTypes.LIST_DOCKER_IMAGE_HISTORY] = ReadRequestTypes.LIST_DOCKER_IMAGE_HISTORY
     params: ListDockerImageHistory
 
-class ReadRequestInspectDockerVolume(BaseModel):
-    type: Literal[ReadRequestTypes.INSPECT_DOCKER_VOLUME] = ReadRequestTypes.INSPECT_DOCKER_VOLUME
-    params: InspectDockerVolume
-
-class ReadRequestGetDockerContainersSummary(BaseModel):
-    type: Literal[ReadRequestTypes.GET_DOCKER_CONTAINERS_SUMMARY] = ReadRequestTypes.GET_DOCKER_CONTAINERS_SUMMARY
-    params: GetDockerContainersSummary
-
-class ReadRequestListAllDockerContainers(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_ALL_DOCKER_CONTAINERS] = ReadRequestTypes.LIST_ALL_DOCKER_CONTAINERS
-    params: ListAllDockerContainers
-
-class ReadRequestListDockerContainers(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_DOCKER_CONTAINERS] = ReadRequestTypes.LIST_DOCKER_CONTAINERS
-    params: ListDockerContainers
-
-class ReadRequestListDockerNetworks(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_DOCKER_NETWORKS] = ReadRequestTypes.LIST_DOCKER_NETWORKS
-    params: ListDockerNetworks
-
-class ReadRequestListDockerImages(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_DOCKER_IMAGES] = ReadRequestTypes.LIST_DOCKER_IMAGES
-    params: ListDockerImages
-
 class ReadRequestListDockerVolumes(BaseModel):
     type: Literal[ReadRequestTypes.LIST_DOCKER_VOLUMES] = ReadRequestTypes.LIST_DOCKER_VOLUMES
     params: ListDockerVolumes
 
-class ReadRequestListComposeProjects(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_COMPOSE_PROJECTS] = ReadRequestTypes.LIST_COMPOSE_PROJECTS
-    params: ListComposeProjects
-
-class ReadRequestListTerminals(BaseModel):
-    type: Literal[ReadRequestTypes.LIST_TERMINALS] = ReadRequestTypes.LIST_TERMINALS
-    params: ListTerminals
+class ReadRequestInspectDockerVolume(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_DOCKER_VOLUME] = ReadRequestTypes.INSPECT_DOCKER_VOLUME
+    params: InspectDockerVolume
 
 class ReadRequestGetSystemInformation(BaseModel):
     type: Literal[ReadRequestTypes.GET_SYSTEM_INFORMATION] = ReadRequestTypes.GET_SYSTEM_INFORMATION
@@ -12853,6 +15891,10 @@ class ReadRequestGetSystemInformation(BaseModel):
 class ReadRequestGetSystemStats(BaseModel):
     type: Literal[ReadRequestTypes.GET_SYSTEM_STATS] = ReadRequestTypes.GET_SYSTEM_STATS
     params: GetSystemStats
+
+class ReadRequestGetHistoricalServerStats(BaseModel):
+    type: Literal[ReadRequestTypes.GET_HISTORICAL_SERVER_STATS] = ReadRequestTypes.GET_HISTORICAL_SERVER_STATS
+    params: GetHistoricalServerStats
 
 class ReadRequestListSystemProcesses(BaseModel):
     type: Literal[ReadRequestTypes.LIST_SYSTEM_PROCESSES] = ReadRequestTypes.LIST_SYSTEM_PROCESSES
@@ -12870,10 +15912,6 @@ class ReadRequestGetStackActionState(BaseModel):
     type: Literal[ReadRequestTypes.GET_STACK_ACTION_STATE] = ReadRequestTypes.GET_STACK_ACTION_STATE
     params: GetStackActionState
 
-class ReadRequestGetStackWebhooksEnabled(BaseModel):
-    type: Literal[ReadRequestTypes.GET_STACK_WEBHOOKS_ENABLED] = ReadRequestTypes.GET_STACK_WEBHOOKS_ENABLED
-    params: GetStackWebhooksEnabled
-
 class ReadRequestGetStackLog(BaseModel):
     type: Literal[ReadRequestTypes.GET_STACK_LOG] = ReadRequestTypes.GET_STACK_LOG
     params: GetStackLog
@@ -12885,6 +15923,10 @@ class ReadRequestSearchStackLog(BaseModel):
 class ReadRequestInspectStackContainer(BaseModel):
     type: Literal[ReadRequestTypes.INSPECT_STACK_CONTAINER] = ReadRequestTypes.INSPECT_STACK_CONTAINER
     params: InspectStackContainer
+
+class ReadRequestInspectStackSwarmService(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_STACK_SWARM_SERVICE] = ReadRequestTypes.INSPECT_STACK_SWARM_SERVICE
+    params: InspectStackSwarmService
 
 class ReadRequestListStacks(BaseModel):
     type: Literal[ReadRequestTypes.LIST_STACKS] = ReadRequestTypes.LIST_STACKS
@@ -12938,6 +15980,10 @@ class ReadRequestInspectDeploymentContainer(BaseModel):
     type: Literal[ReadRequestTypes.INSPECT_DEPLOYMENT_CONTAINER] = ReadRequestTypes.INSPECT_DEPLOYMENT_CONTAINER
     params: InspectDeploymentContainer
 
+class ReadRequestInspectDeploymentSwarmService(BaseModel):
+    type: Literal[ReadRequestTypes.INSPECT_DEPLOYMENT_SWARM_SERVICE] = ReadRequestTypes.INSPECT_DEPLOYMENT_SWARM_SERVICE
+    params: InspectDeploymentSwarmService
+
 class ReadRequestListDeployments(BaseModel):
     type: Literal[ReadRequestTypes.LIST_DEPLOYMENTS] = ReadRequestTypes.LIST_DEPLOYMENTS
     params: ListDeployments
@@ -12970,10 +16016,6 @@ class ReadRequestListBuildVersions(BaseModel):
     type: Literal[ReadRequestTypes.LIST_BUILD_VERSIONS] = ReadRequestTypes.LIST_BUILD_VERSIONS
     params: ListBuildVersions
 
-class ReadRequestGetBuildWebhookEnabled(BaseModel):
-    type: Literal[ReadRequestTypes.GET_BUILD_WEBHOOK_ENABLED] = ReadRequestTypes.GET_BUILD_WEBHOOK_ENABLED
-    params: GetBuildWebhookEnabled
-
 class ReadRequestListBuilds(BaseModel):
     type: Literal[ReadRequestTypes.LIST_BUILDS] = ReadRequestTypes.LIST_BUILDS
     params: ListBuilds
@@ -12998,10 +16040,6 @@ class ReadRequestGetRepoActionState(BaseModel):
     type: Literal[ReadRequestTypes.GET_REPO_ACTION_STATE] = ReadRequestTypes.GET_REPO_ACTION_STATE
     params: GetRepoActionState
 
-class ReadRequestGetRepoWebhooksEnabled(BaseModel):
-    type: Literal[ReadRequestTypes.GET_REPO_WEBHOOKS_ENABLED] = ReadRequestTypes.GET_REPO_WEBHOOKS_ENABLED
-    params: GetRepoWebhooksEnabled
-
 class ReadRequestListRepos(BaseModel):
     type: Literal[ReadRequestTypes.LIST_REPOS] = ReadRequestTypes.LIST_REPOS
     params: ListRepos
@@ -13009,6 +16047,50 @@ class ReadRequestListRepos(BaseModel):
 class ReadRequestListFullRepos(BaseModel):
     type: Literal[ReadRequestTypes.LIST_FULL_REPOS] = ReadRequestTypes.LIST_FULL_REPOS
     params: ListFullRepos
+
+class ReadRequestGetProceduresSummary(BaseModel):
+    type: Literal[ReadRequestTypes.GET_PROCEDURES_SUMMARY] = ReadRequestTypes.GET_PROCEDURES_SUMMARY
+    params: GetProceduresSummary
+
+class ReadRequestGetProcedure(BaseModel):
+    type: Literal[ReadRequestTypes.GET_PROCEDURE] = ReadRequestTypes.GET_PROCEDURE
+    params: GetProcedure
+
+class ReadRequestGetProcedureActionState(BaseModel):
+    type: Literal[ReadRequestTypes.GET_PROCEDURE_ACTION_STATE] = ReadRequestTypes.GET_PROCEDURE_ACTION_STATE
+    params: GetProcedureActionState
+
+class ReadRequestListProcedures(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_PROCEDURES] = ReadRequestTypes.LIST_PROCEDURES
+    params: ListProcedures
+
+class ReadRequestListFullProcedures(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_FULL_PROCEDURES] = ReadRequestTypes.LIST_FULL_PROCEDURES
+    params: ListFullProcedures
+
+class ReadRequestGetActionsSummary(BaseModel):
+    type: Literal[ReadRequestTypes.GET_ACTIONS_SUMMARY] = ReadRequestTypes.GET_ACTIONS_SUMMARY
+    params: GetActionsSummary
+
+class ReadRequestGetAction(BaseModel):
+    type: Literal[ReadRequestTypes.GET_ACTION] = ReadRequestTypes.GET_ACTION
+    params: GetAction
+
+class ReadRequestGetActionActionState(BaseModel):
+    type: Literal[ReadRequestTypes.GET_ACTION_ACTION_STATE] = ReadRequestTypes.GET_ACTION_ACTION_STATE
+    params: GetActionActionState
+
+class ReadRequestListActions(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_ACTIONS] = ReadRequestTypes.LIST_ACTIONS
+    params: ListActions
+
+class ReadRequestListFullActions(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_FULL_ACTIONS] = ReadRequestTypes.LIST_FULL_ACTIONS
+    params: ListFullActions
+
+class ReadRequestListSchedules(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_SCHEDULES] = ReadRequestTypes.LIST_SCHEDULES
+    params: ListSchedules
 
 class ReadRequestGetResourceSyncsSummary(BaseModel):
     type: Literal[ReadRequestTypes.GET_RESOURCE_SYNCS_SUMMARY] = ReadRequestTypes.GET_RESOURCE_SYNCS_SUMMARY
@@ -13021,10 +16103,6 @@ class ReadRequestGetResourceSync(BaseModel):
 class ReadRequestGetResourceSyncActionState(BaseModel):
     type: Literal[ReadRequestTypes.GET_RESOURCE_SYNC_ACTION_STATE] = ReadRequestTypes.GET_RESOURCE_SYNC_ACTION_STATE
     params: GetResourceSyncActionState
-
-class ReadRequestGetSyncWebhooksEnabled(BaseModel):
-    type: Literal[ReadRequestTypes.GET_SYNC_WEBHOOKS_ENABLED] = ReadRequestTypes.GET_SYNC_WEBHOOKS_ENABLED
-    params: GetSyncWebhooksEnabled
 
 class ReadRequestListResourceSyncs(BaseModel):
     type: Literal[ReadRequestTypes.LIST_RESOURCE_SYNCS] = ReadRequestTypes.LIST_RESOURCE_SYNCS
@@ -13082,6 +16160,46 @@ class ReadRequestListTags(BaseModel):
     type: Literal[ReadRequestTypes.LIST_TAGS] = ReadRequestTypes.LIST_TAGS
     params: ListTags
 
+class ReadRequestGetUsername(BaseModel):
+    type: Literal[ReadRequestTypes.GET_USERNAME] = ReadRequestTypes.GET_USERNAME
+    params: GetUsername
+
+class ReadRequestGetPermission(BaseModel):
+    type: Literal[ReadRequestTypes.GET_PERMISSION] = ReadRequestTypes.GET_PERMISSION
+    params: GetPermission
+
+class ReadRequestFindUser(BaseModel):
+    type: Literal[ReadRequestTypes.FIND_USER] = ReadRequestTypes.FIND_USER
+    params: FindUser
+
+class ReadRequestListUsers(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_USERS] = ReadRequestTypes.LIST_USERS
+    params: ListUsers
+
+class ReadRequestListApiKeys(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_API_KEYS] = ReadRequestTypes.LIST_API_KEYS
+    params: ListApiKeys
+
+class ReadRequestListApiKeysForServiceUser(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_API_KEYS_FOR_SERVICE_USER] = ReadRequestTypes.LIST_API_KEYS_FOR_SERVICE_USER
+    params: ListApiKeysForServiceUser
+
+class ReadRequestListPermissions(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_PERMISSIONS] = ReadRequestTypes.LIST_PERMISSIONS
+    params: ListPermissions
+
+class ReadRequestListUserTargetPermissions(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_USER_TARGET_PERMISSIONS] = ReadRequestTypes.LIST_USER_TARGET_PERMISSIONS
+    params: ListUserTargetPermissions
+
+class ReadRequestGetUserGroup(BaseModel):
+    type: Literal[ReadRequestTypes.GET_USER_GROUP] = ReadRequestTypes.GET_USER_GROUP
+    params: GetUserGroup
+
+class ReadRequestListUserGroups(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_USER_GROUPS] = ReadRequestTypes.LIST_USER_GROUPS
+    params: ListUserGroups
+
 class ReadRequestGetUpdate(BaseModel):
     type: Literal[ReadRequestTypes.GET_UPDATE] = ReadRequestTypes.GET_UPDATE
     params: GetUpdate
@@ -13122,7 +16240,15 @@ class ReadRequestListDockerRegistryAccounts(BaseModel):
     type: Literal[ReadRequestTypes.LIST_DOCKER_REGISTRY_ACCOUNTS] = ReadRequestTypes.LIST_DOCKER_REGISTRY_ACCOUNTS
     params: ListDockerRegistryAccounts
 
-ReadRequest = Union[ReadRequestGetVersion, ReadRequestGetCoreInfo, ReadRequestListSecrets, ReadRequestListGitProvidersFromConfig, ReadRequestListDockerRegistriesFromConfig, ReadRequestGetUsername, ReadRequestGetPermission, ReadRequestFindUser, ReadRequestListUsers, ReadRequestListApiKeys, ReadRequestListApiKeysForServiceUser, ReadRequestListPermissions, ReadRequestListUserTargetPermissions, ReadRequestGetUserGroup, ReadRequestListUserGroups, ReadRequestGetProceduresSummary, ReadRequestGetProcedure, ReadRequestGetProcedureActionState, ReadRequestListProcedures, ReadRequestListFullProcedures, ReadRequestGetActionsSummary, ReadRequestGetAction, ReadRequestGetActionActionState, ReadRequestListActions, ReadRequestListFullActions, ReadRequestListSchedules, ReadRequestGetServersSummary, ReadRequestGetServer, ReadRequestGetServerState, ReadRequestGetPeripheryVersion, ReadRequestGetServerActionState, ReadRequestGetHistoricalServerStats, ReadRequestListServers, ReadRequestListFullServers, ReadRequestInspectDockerContainer, ReadRequestGetResourceMatchingContainer, ReadRequestGetContainerLog, ReadRequestSearchContainerLog, ReadRequestInspectDockerNetwork, ReadRequestInspectDockerImage, ReadRequestListDockerImageHistory, ReadRequestInspectDockerVolume, ReadRequestGetDockerContainersSummary, ReadRequestListAllDockerContainers, ReadRequestListDockerContainers, ReadRequestListDockerNetworks, ReadRequestListDockerImages, ReadRequestListDockerVolumes, ReadRequestListComposeProjects, ReadRequestListTerminals, ReadRequestGetSystemInformation, ReadRequestGetSystemStats, ReadRequestListSystemProcesses, ReadRequestGetStacksSummary, ReadRequestGetStack, ReadRequestGetStackActionState, ReadRequestGetStackWebhooksEnabled, ReadRequestGetStackLog, ReadRequestSearchStackLog, ReadRequestInspectStackContainer, ReadRequestListStacks, ReadRequestListFullStacks, ReadRequestListStackServices, ReadRequestListCommonStackExtraArgs, ReadRequestListCommonStackBuildExtraArgs, ReadRequestGetDeploymentsSummary, ReadRequestGetDeployment, ReadRequestGetDeploymentContainer, ReadRequestGetDeploymentActionState, ReadRequestGetDeploymentStats, ReadRequestGetDeploymentLog, ReadRequestSearchDeploymentLog, ReadRequestInspectDeploymentContainer, ReadRequestListDeployments, ReadRequestListFullDeployments, ReadRequestListCommonDeploymentExtraArgs, ReadRequestGetBuildsSummary, ReadRequestGetBuild, ReadRequestGetBuildActionState, ReadRequestGetBuildMonthlyStats, ReadRequestListBuildVersions, ReadRequestGetBuildWebhookEnabled, ReadRequestListBuilds, ReadRequestListFullBuilds, ReadRequestListCommonBuildExtraArgs, ReadRequestGetReposSummary, ReadRequestGetRepo, ReadRequestGetRepoActionState, ReadRequestGetRepoWebhooksEnabled, ReadRequestListRepos, ReadRequestListFullRepos, ReadRequestGetResourceSyncsSummary, ReadRequestGetResourceSync, ReadRequestGetResourceSyncActionState, ReadRequestGetSyncWebhooksEnabled, ReadRequestListResourceSyncs, ReadRequestListFullResourceSyncs, ReadRequestGetBuildersSummary, ReadRequestGetBuilder, ReadRequestListBuilders, ReadRequestListFullBuilders, ReadRequestGetAlertersSummary, ReadRequestGetAlerter, ReadRequestListAlerters, ReadRequestListFullAlerters, ReadRequestExportAllResourcesToToml, ReadRequestExportResourcesToToml, ReadRequestGetTag, ReadRequestListTags, ReadRequestGetUpdate, ReadRequestListUpdates, ReadRequestListAlerts, ReadRequestGetAlert, ReadRequestGetVariable, ReadRequestListVariables, ReadRequestGetGitProviderAccount, ReadRequestListGitProviderAccounts, ReadRequestGetDockerRegistryAccount, ReadRequestListDockerRegistryAccounts]
+class ReadRequestListOnboardingKeys(BaseModel):
+    type: Literal[ReadRequestTypes.LIST_ONBOARDING_KEYS] = ReadRequestTypes.LIST_ONBOARDING_KEYS
+    params: ListOnboardingKeys
+
+ReadRequest = Union[ReadRequestGetVersion, ReadRequestGetCoreInfo, ReadRequestListSecrets, ReadRequestListGitProvidersFromConfig, ReadRequestListDockerRegistriesFromConfig, ReadRequestGetSwarmsSummary, ReadRequestGetSwarm, ReadRequestGetSwarmActionState, ReadRequestListSwarms, ReadRequestInspectSwarm, ReadRequestListFullSwarms, ReadRequestListSwarmNodes, ReadRequestInspectSwarmNode, ReadRequestListSwarmConfigs, ReadRequestInspectSwarmConfig, ReadRequestListSwarmSecrets, ReadRequestInspectSwarmSecret, ReadRequestListSwarmStacks, ReadRequestInspectSwarmStack, ReadRequestListSwarmTasks, ReadRequestInspectSwarmTask, ReadRequestListSwarmServices, ReadRequestInspectSwarmService, ReadRequestGetSwarmServiceLog, ReadRequestSearchSwarmServiceLog, ReadRequestListSwarmNetworks, ReadRequestGetServersSummary, ReadRequestGetServer, ReadRequestGetServerState, ReadRequestGetPeripheryInformation, ReadRequestGetServerActionState, ReadRequestListServers, ReadRequestListFullServers, ReadRequestListTerminals, ReadRequestGetDockerContainersSummary, ReadRequestListAllDockerContainers, ReadRequestListDockerContainers, ReadRequestInspectDockerContainer, ReadRequestGetResourceMatchingContainer, ReadRequestGetContainerLog, ReadRequestSearchContainerLog, ReadRequestListComposeProjects, ReadRequestListDockerNetworks, ReadRequestInspectDockerNetwork, ReadRequestListDockerImages, ReadRequestInspectDockerImage, ReadRequestListDockerImageHistory, ReadRequestListDockerVolumes, ReadRequestInspectDockerVolume, ReadRequestGetSystemInformation, ReadRequestGetSystemStats, ReadRequestGetHistoricalServerStats, ReadRequestListSystemProcesses, ReadRequestGetStacksSummary, ReadRequestGetStack, ReadRequestGetStackActionState, ReadRequestGetStackLog, ReadRequestSearchStackLog, ReadRequestInspectStackContainer, ReadRequestInspectStackSwarmService, ReadRequestListStacks, ReadRequestListFullStacks, ReadRequestListStackServices, ReadRequestListCommonStackExtraArgs, ReadRequestListCommonStackBuildExtraArgs, ReadRequestGetDeploymentsSummary, ReadRequestGetDeployment, ReadRequestGetDeploymentContainer, ReadRequestGetDeploymentActionState, ReadRequestGetDeploymentStats, ReadRequestGetDeploymentLog, ReadRequestSearchDeploymentLog, ReadRequestInspectDeploymentContainer, ReadRequestInspectDeploymentSwarmService, ReadRequestListDeployments, ReadRequestListFullDeployments, ReadRequestListCommonDeploymentExtraArgs, ReadRequestGetBuildsSummary, ReadRequestGetBuild, ReadRequestGetBuildActionState, ReadRequestGetBuildMonthlyStats, ReadRequestListBuildVersions, ReadRequestListBuilds, ReadRequestListFullBuilds, ReadRequestListCommonBuildExtraArgs, ReadRequestGetReposSummary, ReadRequestGetRepo, ReadRequestGetRepoActionState, ReadRequestListRepos, ReadRequestListFullRepos, ReadRequestGetProceduresSummary, ReadRequestGetProcedure, ReadRequestGetProcedureActionState, ReadRequestListProcedures, ReadRequestListFullProcedures, ReadRequestGetActionsSummary, ReadRequestGetAction, ReadRequestGetActionActionState, ReadRequestListActions, ReadRequestListFullActions, ReadRequestListSchedules, ReadRequestGetResourceSyncsSummary, ReadRequestGetResourceSync, ReadRequestGetResourceSyncActionState, ReadRequestListResourceSyncs, ReadRequestListFullResourceSyncs, ReadRequestGetBuildersSummary, ReadRequestGetBuilder, ReadRequestListBuilders, ReadRequestListFullBuilders, ReadRequestGetAlertersSummary, ReadRequestGetAlerter, ReadRequestListAlerters, ReadRequestListFullAlerters, ReadRequestExportAllResourcesToToml, ReadRequestExportResourcesToToml, ReadRequestGetTag, ReadRequestListTags, ReadRequestGetUsername, ReadRequestGetPermission, ReadRequestFindUser, ReadRequestListUsers, ReadRequestListApiKeys, ReadRequestListApiKeysForServiceUser, ReadRequestListPermissions, ReadRequestListUserTargetPermissions, ReadRequestGetUserGroup, ReadRequestListUserGroups, ReadRequestGetUpdate, ReadRequestListUpdates, ReadRequestListAlerts, ReadRequestGetAlert, ReadRequestGetVariable, ReadRequestListVariables, ReadRequestGetGitProviderAccount, ReadRequestListGitProviderAccounts, ReadRequestGetDockerRegistryAccount, ReadRequestListDockerRegistryAccounts, ReadRequestListOnboardingKeys]
+class RepoWebhookAction(str, Enum):
+    CLONE = "Clone"
+    PULL = "Pull"
+    BUILD = "Build"
 class SpecificPermission(str, Enum):
     """
     The specific types of permission that a User or UserGroup can have on a resource.
@@ -13162,59 +16288,31 @@ class SpecificPermission(str, Enum):
     On **Server**
     - Read all the processes on the host
     """
-class UserRequestTypes(str, Enum):
-    PUSH_RECENTLY_VIEWED = "PushRecentlyViewed"
-    SET_LAST_SEEN_UPDATE = "SetLastSeenUpdate"
-    CREATE_API_KEY = "CreateApiKey"
-    DELETE_API_KEY = "DeleteApiKey"
-
-class UserRequestPushRecentlyViewed(BaseModel):
-    type: Literal[UserRequestTypes.PUSH_RECENTLY_VIEWED] = UserRequestTypes.PUSH_RECENTLY_VIEWED
-    params: PushRecentlyViewed
-
-class UserRequestSetLastSeenUpdate(BaseModel):
-    type: Literal[UserRequestTypes.SET_LAST_SEEN_UPDATE] = UserRequestTypes.SET_LAST_SEEN_UPDATE
-    params: SetLastSeenUpdate
-
-class UserRequestCreateApiKey(BaseModel):
-    type: Literal[UserRequestTypes.CREATE_API_KEY] = UserRequestTypes.CREATE_API_KEY
-    params: CreateApiKey
-
-class UserRequestDeleteApiKey(BaseModel):
-    type: Literal[UserRequestTypes.DELETE_API_KEY] = UserRequestTypes.DELETE_API_KEY
-    params: DeleteApiKey
-
-UserRequest = Union[UserRequestPushRecentlyViewed, UserRequestSetLastSeenUpdate, UserRequestCreateApiKey, UserRequestDeleteApiKey]
+class StackWebhookAction(str, Enum):
+    REFRESH = "Refresh"
+    DEPLOY = "Deploy"
+class SyncWebhookAction(str, Enum):
+    REFRESH = "Refresh"
+    SYNC = "Sync"
 class WriteRequestTypes(str, Enum):
-    CREATE_LOCAL_USER = "CreateLocalUser"
-    UPDATE_USER_USERNAME = "UpdateUserUsername"
-    UPDATE_USER_PASSWORD = "UpdateUserPassword"
-    DELETE_USER = "DeleteUser"
-    CREATE_SERVICE_USER = "CreateServiceUser"
-    UPDATE_SERVICE_USER_DESCRIPTION = "UpdateServiceUserDescription"
-    CREATE_API_KEY_FOR_SERVICE_USER = "CreateApiKeyForServiceUser"
-    DELETE_API_KEY_FOR_SERVICE_USER = "DeleteApiKeyForServiceUser"
-    CREATE_USER_GROUP = "CreateUserGroup"
-    RENAME_USER_GROUP = "RenameUserGroup"
-    DELETE_USER_GROUP = "DeleteUserGroup"
-    ADD_USER_TO_USER_GROUP = "AddUserToUserGroup"
-    REMOVE_USER_FROM_USER_GROUP = "RemoveUserFromUserGroup"
-    SET_USERS_IN_USER_GROUP = "SetUsersInUserGroup"
-    SET_EVERYONE_USER_GROUP = "SetEveryoneUserGroup"
-    UPDATE_USER_ADMIN = "UpdateUserAdmin"
-    UPDATE_USER_BASE_PERMISSIONS = "UpdateUserBasePermissions"
-    UPDATE_PERMISSION_ON_RESOURCE_TYPE = "UpdatePermissionOnResourceType"
-    UPDATE_PERMISSION_ON_TARGET = "UpdatePermissionOnTarget"
     UPDATE_RESOURCE_META = "UpdateResourceMeta"
+    CREATE_SWARM = "CreateSwarm"
+    COPY_SWARM = "CopySwarm"
+    DELETE_SWARM = "DeleteSwarm"
+    UPDATE_SWARM = "UpdateSwarm"
+    RENAME_SWARM = "RenameSwarm"
     CREATE_SERVER = "CreateServer"
     COPY_SERVER = "CopyServer"
     DELETE_SERVER = "DeleteServer"
     UPDATE_SERVER = "UpdateServer"
     RENAME_SERVER = "RenameServer"
     CREATE_NETWORK = "CreateNetwork"
+    UPDATE_SERVER_PUBLIC_KEY = "UpdateServerPublicKey"
+    ROTATE_SERVER_KEYS = "RotateServerKeys"
     CREATE_TERMINAL = "CreateTerminal"
     DELETE_TERMINAL = "DeleteTerminal"
     DELETE_ALL_TERMINALS = "DeleteAllTerminals"
+    BATCH_DELETE_ALL_TERMINALS = "BatchDeleteAllTerminals"
     CREATE_STACK = "CreateStack"
     COPY_STACK = "CopyStack"
     DELETE_STACK = "DeleteStack"
@@ -13222,14 +16320,16 @@ class WriteRequestTypes(str, Enum):
     RENAME_STACK = "RenameStack"
     WRITE_STACK_FILE_CONTENTS = "WriteStackFileContents"
     REFRESH_STACK_CACHE = "RefreshStackCache"
-    CREATE_STACK_WEBHOOK = "CreateStackWebhook"
-    DELETE_STACK_WEBHOOK = "DeleteStackWebhook"
+    CHECK_STACK_FOR_UPDATE = "CheckStackForUpdate"
+    BATCH_CHECK_STACK_FOR_UPDATE = "BatchCheckStackForUpdate"
     CREATE_DEPLOYMENT = "CreateDeployment"
     COPY_DEPLOYMENT = "CopyDeployment"
     CREATE_DEPLOYMENT_FROM_CONTAINER = "CreateDeploymentFromContainer"
     DELETE_DEPLOYMENT = "DeleteDeployment"
     UPDATE_DEPLOYMENT = "UpdateDeployment"
     RENAME_DEPLOYMENT = "RenameDeployment"
+    CHECK_DEPLOYMENT_FOR_UPDATE = "CheckDeploymentForUpdate"
+    BATCH_CHECK_DEPLOYMENT_FOR_UPDATE = "BatchCheckDeploymentForUpdate"
     CREATE_BUILD = "CreateBuild"
     COPY_BUILD = "CopyBuild"
     DELETE_BUILD = "DeleteBuild"
@@ -13237,26 +16337,12 @@ class WriteRequestTypes(str, Enum):
     RENAME_BUILD = "RenameBuild"
     WRITE_BUILD_FILE_CONTENTS = "WriteBuildFileContents"
     REFRESH_BUILD_CACHE = "RefreshBuildCache"
-    CREATE_BUILD_WEBHOOK = "CreateBuildWebhook"
-    DELETE_BUILD_WEBHOOK = "DeleteBuildWebhook"
-    CREATE_BUILDER = "CreateBuilder"
-    COPY_BUILDER = "CopyBuilder"
-    DELETE_BUILDER = "DeleteBuilder"
-    UPDATE_BUILDER = "UpdateBuilder"
-    RENAME_BUILDER = "RenameBuilder"
     CREATE_REPO = "CreateRepo"
     COPY_REPO = "CopyRepo"
     DELETE_REPO = "DeleteRepo"
     UPDATE_REPO = "UpdateRepo"
     RENAME_REPO = "RenameRepo"
     REFRESH_REPO_CACHE = "RefreshRepoCache"
-    CREATE_REPO_WEBHOOK = "CreateRepoWebhook"
-    DELETE_REPO_WEBHOOK = "DeleteRepoWebhook"
-    CREATE_ALERTER = "CreateAlerter"
-    COPY_ALERTER = "CopyAlerter"
-    DELETE_ALERTER = "DeleteAlerter"
-    UPDATE_ALERTER = "UpdateAlerter"
-    RENAME_ALERTER = "RenameAlerter"
     CREATE_PROCEDURE = "CreateProcedure"
     COPY_PROCEDURE = "CopyProcedure"
     DELETE_PROCEDURE = "DeleteProcedure"
@@ -13275,8 +16361,38 @@ class WriteRequestTypes(str, Enum):
     WRITE_SYNC_FILE_CONTENTS = "WriteSyncFileContents"
     COMMIT_SYNC = "CommitSync"
     REFRESH_RESOURCE_SYNC_PENDING = "RefreshResourceSyncPending"
-    CREATE_SYNC_WEBHOOK = "CreateSyncWebhook"
-    DELETE_SYNC_WEBHOOK = "DeleteSyncWebhook"
+    CREATE_BUILDER = "CreateBuilder"
+    COPY_BUILDER = "CopyBuilder"
+    DELETE_BUILDER = "DeleteBuilder"
+    UPDATE_BUILDER = "UpdateBuilder"
+    RENAME_BUILDER = "RenameBuilder"
+    CREATE_ALERTER = "CreateAlerter"
+    COPY_ALERTER = "CopyAlerter"
+    DELETE_ALERTER = "DeleteAlerter"
+    UPDATE_ALERTER = "UpdateAlerter"
+    RENAME_ALERTER = "RenameAlerter"
+    CREATE_ONBOARDING_KEY = "CreateOnboardingKey"
+    UPDATE_ONBOARDING_KEY = "UpdateOnboardingKey"
+    DELETE_ONBOARDING_KEY = "DeleteOnboardingKey"
+    PUSH_RECENTLY_VIEWED = "PushRecentlyViewed"
+    SET_LAST_SEEN_UPDATE = "SetLastSeenUpdate"
+    CREATE_LOCAL_USER = "CreateLocalUser"
+    DELETE_USER = "DeleteUser"
+    CREATE_SERVICE_USER = "CreateServiceUser"
+    UPDATE_SERVICE_USER_DESCRIPTION = "UpdateServiceUserDescription"
+    CREATE_API_KEY_FOR_SERVICE_USER = "CreateApiKeyForServiceUser"
+    DELETE_API_KEY_FOR_SERVICE_USER = "DeleteApiKeyForServiceUser"
+    CREATE_USER_GROUP = "CreateUserGroup"
+    RENAME_USER_GROUP = "RenameUserGroup"
+    DELETE_USER_GROUP = "DeleteUserGroup"
+    ADD_USER_TO_USER_GROUP = "AddUserToUserGroup"
+    REMOVE_USER_FROM_USER_GROUP = "RemoveUserFromUserGroup"
+    SET_USERS_IN_USER_GROUP = "SetUsersInUserGroup"
+    SET_EVERYONE_USER_GROUP = "SetEveryoneUserGroup"
+    UPDATE_USER_ADMIN = "UpdateUserAdmin"
+    UPDATE_USER_BASE_PERMISSIONS = "UpdateUserBasePermissions"
+    UPDATE_PERMISSION_ON_RESOURCE_TYPE = "UpdatePermissionOnResourceType"
+    UPDATE_PERMISSION_ON_TARGET = "UpdatePermissionOnTarget"
     CREATE_TAG = "CreateTag"
     DELETE_TAG = "DeleteTag"
     RENAME_TAG = "RenameTag"
@@ -13292,86 +16408,31 @@ class WriteRequestTypes(str, Enum):
     CREATE_DOCKER_REGISTRY_ACCOUNT = "CreateDockerRegistryAccount"
     UPDATE_DOCKER_REGISTRY_ACCOUNT = "UpdateDockerRegistryAccount"
     DELETE_DOCKER_REGISTRY_ACCOUNT = "DeleteDockerRegistryAccount"
-
-class WriteRequestCreateLocalUser(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_LOCAL_USER] = WriteRequestTypes.CREATE_LOCAL_USER
-    params: CreateLocalUser
-
-class WriteRequestUpdateUserUsername(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_USER_USERNAME] = WriteRequestTypes.UPDATE_USER_USERNAME
-    params: UpdateUserUsername
-
-class WriteRequestUpdateUserPassword(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_USER_PASSWORD] = WriteRequestTypes.UPDATE_USER_PASSWORD
-    params: UpdateUserPassword
-
-class WriteRequestDeleteUser(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_USER] = WriteRequestTypes.DELETE_USER
-    params: DeleteUser
-
-class WriteRequestCreateServiceUser(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_SERVICE_USER] = WriteRequestTypes.CREATE_SERVICE_USER
-    params: CreateServiceUser
-
-class WriteRequestUpdateServiceUserDescription(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_SERVICE_USER_DESCRIPTION] = WriteRequestTypes.UPDATE_SERVICE_USER_DESCRIPTION
-    params: UpdateServiceUserDescription
-
-class WriteRequestCreateApiKeyForServiceUser(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_API_KEY_FOR_SERVICE_USER] = WriteRequestTypes.CREATE_API_KEY_FOR_SERVICE_USER
-    params: CreateApiKeyForServiceUser
-
-class WriteRequestDeleteApiKeyForServiceUser(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_API_KEY_FOR_SERVICE_USER] = WriteRequestTypes.DELETE_API_KEY_FOR_SERVICE_USER
-    params: DeleteApiKeyForServiceUser
-
-class WriteRequestCreateUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_USER_GROUP] = WriteRequestTypes.CREATE_USER_GROUP
-    params: CreateUserGroup
-
-class WriteRequestRenameUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.RENAME_USER_GROUP] = WriteRequestTypes.RENAME_USER_GROUP
-    params: RenameUserGroup
-
-class WriteRequestDeleteUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_USER_GROUP] = WriteRequestTypes.DELETE_USER_GROUP
-    params: DeleteUserGroup
-
-class WriteRequestAddUserToUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.ADD_USER_TO_USER_GROUP] = WriteRequestTypes.ADD_USER_TO_USER_GROUP
-    params: AddUserToUserGroup
-
-class WriteRequestRemoveUserFromUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.REMOVE_USER_FROM_USER_GROUP] = WriteRequestTypes.REMOVE_USER_FROM_USER_GROUP
-    params: RemoveUserFromUserGroup
-
-class WriteRequestSetUsersInUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.SET_USERS_IN_USER_GROUP] = WriteRequestTypes.SET_USERS_IN_USER_GROUP
-    params: SetUsersInUserGroup
-
-class WriteRequestSetEveryoneUserGroup(BaseModel):
-    type: Literal[WriteRequestTypes.SET_EVERYONE_USER_GROUP] = WriteRequestTypes.SET_EVERYONE_USER_GROUP
-    params: SetEveryoneUserGroup
-
-class WriteRequestUpdateUserAdmin(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_USER_ADMIN] = WriteRequestTypes.UPDATE_USER_ADMIN
-    params: UpdateUserAdmin
-
-class WriteRequestUpdateUserBasePermissions(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_USER_BASE_PERMISSIONS] = WriteRequestTypes.UPDATE_USER_BASE_PERMISSIONS
-    params: UpdateUserBasePermissions
-
-class WriteRequestUpdatePermissionOnResourceType(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_PERMISSION_ON_RESOURCE_TYPE] = WriteRequestTypes.UPDATE_PERMISSION_ON_RESOURCE_TYPE
-    params: UpdatePermissionOnResourceType
-
-class WriteRequestUpdatePermissionOnTarget(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_PERMISSION_ON_TARGET] = WriteRequestTypes.UPDATE_PERMISSION_ON_TARGET
-    params: UpdatePermissionOnTarget
+    CLOSE_ALERT = "CloseAlert"
 
 class WriteRequestUpdateResourceMeta(BaseModel):
     type: Literal[WriteRequestTypes.UPDATE_RESOURCE_META] = WriteRequestTypes.UPDATE_RESOURCE_META
     params: UpdateResourceMeta
+
+class WriteRequestCreateSwarm(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_SWARM] = WriteRequestTypes.CREATE_SWARM
+    params: CreateSwarm
+
+class WriteRequestCopySwarm(BaseModel):
+    type: Literal[WriteRequestTypes.COPY_SWARM] = WriteRequestTypes.COPY_SWARM
+    params: CopySwarm
+
+class WriteRequestDeleteSwarm(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_SWARM] = WriteRequestTypes.DELETE_SWARM
+    params: DeleteSwarm
+
+class WriteRequestUpdateSwarm(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_SWARM] = WriteRequestTypes.UPDATE_SWARM
+    params: UpdateSwarm
+
+class WriteRequestRenameSwarm(BaseModel):
+    type: Literal[WriteRequestTypes.RENAME_SWARM] = WriteRequestTypes.RENAME_SWARM
+    params: RenameSwarm
 
 class WriteRequestCreateServer(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_SERVER] = WriteRequestTypes.CREATE_SERVER
@@ -13397,6 +16458,14 @@ class WriteRequestCreateNetwork(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_NETWORK] = WriteRequestTypes.CREATE_NETWORK
     params: CreateNetwork
 
+class WriteRequestUpdateServerPublicKey(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_SERVER_PUBLIC_KEY] = WriteRequestTypes.UPDATE_SERVER_PUBLIC_KEY
+    params: UpdateServerPublicKey
+
+class WriteRequestRotateServerKeys(BaseModel):
+    type: Literal[WriteRequestTypes.ROTATE_SERVER_KEYS] = WriteRequestTypes.ROTATE_SERVER_KEYS
+    params: RotateServerKeys
+
 class WriteRequestCreateTerminal(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_TERMINAL] = WriteRequestTypes.CREATE_TERMINAL
     params: CreateTerminal
@@ -13408,6 +16477,10 @@ class WriteRequestDeleteTerminal(BaseModel):
 class WriteRequestDeleteAllTerminals(BaseModel):
     type: Literal[WriteRequestTypes.DELETE_ALL_TERMINALS] = WriteRequestTypes.DELETE_ALL_TERMINALS
     params: DeleteAllTerminals
+
+class WriteRequestBatchDeleteAllTerminals(BaseModel):
+    type: Literal[WriteRequestTypes.BATCH_DELETE_ALL_TERMINALS] = WriteRequestTypes.BATCH_DELETE_ALL_TERMINALS
+    params: BatchDeleteAllTerminals
 
 class WriteRequestCreateStack(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_STACK] = WriteRequestTypes.CREATE_STACK
@@ -13437,13 +16510,13 @@ class WriteRequestRefreshStackCache(BaseModel):
     type: Literal[WriteRequestTypes.REFRESH_STACK_CACHE] = WriteRequestTypes.REFRESH_STACK_CACHE
     params: RefreshStackCache
 
-class WriteRequestCreateStackWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_STACK_WEBHOOK] = WriteRequestTypes.CREATE_STACK_WEBHOOK
-    params: CreateStackWebhook
+class WriteRequestCheckStackForUpdate(BaseModel):
+    type: Literal[WriteRequestTypes.CHECK_STACK_FOR_UPDATE] = WriteRequestTypes.CHECK_STACK_FOR_UPDATE
+    params: CheckStackForUpdate
 
-class WriteRequestDeleteStackWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_STACK_WEBHOOK] = WriteRequestTypes.DELETE_STACK_WEBHOOK
-    params: DeleteStackWebhook
+class WriteRequestBatchCheckStackForUpdate(BaseModel):
+    type: Literal[WriteRequestTypes.BATCH_CHECK_STACK_FOR_UPDATE] = WriteRequestTypes.BATCH_CHECK_STACK_FOR_UPDATE
+    params: BatchCheckStackForUpdate
 
 class WriteRequestCreateDeployment(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_DEPLOYMENT] = WriteRequestTypes.CREATE_DEPLOYMENT
@@ -13468,6 +16541,14 @@ class WriteRequestUpdateDeployment(BaseModel):
 class WriteRequestRenameDeployment(BaseModel):
     type: Literal[WriteRequestTypes.RENAME_DEPLOYMENT] = WriteRequestTypes.RENAME_DEPLOYMENT
     params: RenameDeployment
+
+class WriteRequestCheckDeploymentForUpdate(BaseModel):
+    type: Literal[WriteRequestTypes.CHECK_DEPLOYMENT_FOR_UPDATE] = WriteRequestTypes.CHECK_DEPLOYMENT_FOR_UPDATE
+    params: CheckDeploymentForUpdate
+
+class WriteRequestBatchCheckDeploymentForUpdate(BaseModel):
+    type: Literal[WriteRequestTypes.BATCH_CHECK_DEPLOYMENT_FOR_UPDATE] = WriteRequestTypes.BATCH_CHECK_DEPLOYMENT_FOR_UPDATE
+    params: BatchCheckDeploymentForUpdate
 
 class WriteRequestCreateBuild(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_BUILD] = WriteRequestTypes.CREATE_BUILD
@@ -13497,34 +16578,6 @@ class WriteRequestRefreshBuildCache(BaseModel):
     type: Literal[WriteRequestTypes.REFRESH_BUILD_CACHE] = WriteRequestTypes.REFRESH_BUILD_CACHE
     params: RefreshBuildCache
 
-class WriteRequestCreateBuildWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_BUILD_WEBHOOK] = WriteRequestTypes.CREATE_BUILD_WEBHOOK
-    params: CreateBuildWebhook
-
-class WriteRequestDeleteBuildWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_BUILD_WEBHOOK] = WriteRequestTypes.DELETE_BUILD_WEBHOOK
-    params: DeleteBuildWebhook
-
-class WriteRequestCreateBuilder(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_BUILDER] = WriteRequestTypes.CREATE_BUILDER
-    params: CreateBuilder
-
-class WriteRequestCopyBuilder(BaseModel):
-    type: Literal[WriteRequestTypes.COPY_BUILDER] = WriteRequestTypes.COPY_BUILDER
-    params: CopyBuilder
-
-class WriteRequestDeleteBuilder(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_BUILDER] = WriteRequestTypes.DELETE_BUILDER
-    params: DeleteBuilder
-
-class WriteRequestUpdateBuilder(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_BUILDER] = WriteRequestTypes.UPDATE_BUILDER
-    params: UpdateBuilder
-
-class WriteRequestRenameBuilder(BaseModel):
-    type: Literal[WriteRequestTypes.RENAME_BUILDER] = WriteRequestTypes.RENAME_BUILDER
-    params: RenameBuilder
-
 class WriteRequestCreateRepo(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_REPO] = WriteRequestTypes.CREATE_REPO
     params: CreateRepo
@@ -13548,34 +16601,6 @@ class WriteRequestRenameRepo(BaseModel):
 class WriteRequestRefreshRepoCache(BaseModel):
     type: Literal[WriteRequestTypes.REFRESH_REPO_CACHE] = WriteRequestTypes.REFRESH_REPO_CACHE
     params: RefreshRepoCache
-
-class WriteRequestCreateRepoWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_REPO_WEBHOOK] = WriteRequestTypes.CREATE_REPO_WEBHOOK
-    params: CreateRepoWebhook
-
-class WriteRequestDeleteRepoWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_REPO_WEBHOOK] = WriteRequestTypes.DELETE_REPO_WEBHOOK
-    params: DeleteRepoWebhook
-
-class WriteRequestCreateAlerter(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_ALERTER] = WriteRequestTypes.CREATE_ALERTER
-    params: CreateAlerter
-
-class WriteRequestCopyAlerter(BaseModel):
-    type: Literal[WriteRequestTypes.COPY_ALERTER] = WriteRequestTypes.COPY_ALERTER
-    params: CopyAlerter
-
-class WriteRequestDeleteAlerter(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_ALERTER] = WriteRequestTypes.DELETE_ALERTER
-    params: DeleteAlerter
-
-class WriteRequestUpdateAlerter(BaseModel):
-    type: Literal[WriteRequestTypes.UPDATE_ALERTER] = WriteRequestTypes.UPDATE_ALERTER
-    params: UpdateAlerter
-
-class WriteRequestRenameAlerter(BaseModel):
-    type: Literal[WriteRequestTypes.RENAME_ALERTER] = WriteRequestTypes.RENAME_ALERTER
-    params: RenameAlerter
 
 class WriteRequestCreateProcedure(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_PROCEDURE] = WriteRequestTypes.CREATE_PROCEDURE
@@ -13649,13 +16674,133 @@ class WriteRequestRefreshResourceSyncPending(BaseModel):
     type: Literal[WriteRequestTypes.REFRESH_RESOURCE_SYNC_PENDING] = WriteRequestTypes.REFRESH_RESOURCE_SYNC_PENDING
     params: RefreshResourceSyncPending
 
-class WriteRequestCreateSyncWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.CREATE_SYNC_WEBHOOK] = WriteRequestTypes.CREATE_SYNC_WEBHOOK
-    params: CreateSyncWebhook
+class WriteRequestCreateBuilder(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_BUILDER] = WriteRequestTypes.CREATE_BUILDER
+    params: CreateBuilder
 
-class WriteRequestDeleteSyncWebhook(BaseModel):
-    type: Literal[WriteRequestTypes.DELETE_SYNC_WEBHOOK] = WriteRequestTypes.DELETE_SYNC_WEBHOOK
-    params: DeleteSyncWebhook
+class WriteRequestCopyBuilder(BaseModel):
+    type: Literal[WriteRequestTypes.COPY_BUILDER] = WriteRequestTypes.COPY_BUILDER
+    params: CopyBuilder
+
+class WriteRequestDeleteBuilder(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_BUILDER] = WriteRequestTypes.DELETE_BUILDER
+    params: DeleteBuilder
+
+class WriteRequestUpdateBuilder(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_BUILDER] = WriteRequestTypes.UPDATE_BUILDER
+    params: UpdateBuilder
+
+class WriteRequestRenameBuilder(BaseModel):
+    type: Literal[WriteRequestTypes.RENAME_BUILDER] = WriteRequestTypes.RENAME_BUILDER
+    params: RenameBuilder
+
+class WriteRequestCreateAlerter(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_ALERTER] = WriteRequestTypes.CREATE_ALERTER
+    params: CreateAlerter
+
+class WriteRequestCopyAlerter(BaseModel):
+    type: Literal[WriteRequestTypes.COPY_ALERTER] = WriteRequestTypes.COPY_ALERTER
+    params: CopyAlerter
+
+class WriteRequestDeleteAlerter(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_ALERTER] = WriteRequestTypes.DELETE_ALERTER
+    params: DeleteAlerter
+
+class WriteRequestUpdateAlerter(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_ALERTER] = WriteRequestTypes.UPDATE_ALERTER
+    params: UpdateAlerter
+
+class WriteRequestRenameAlerter(BaseModel):
+    type: Literal[WriteRequestTypes.RENAME_ALERTER] = WriteRequestTypes.RENAME_ALERTER
+    params: RenameAlerter
+
+class WriteRequestCreateOnboardingKey(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_ONBOARDING_KEY] = WriteRequestTypes.CREATE_ONBOARDING_KEY
+    params: CreateOnboardingKey
+
+class WriteRequestUpdateOnboardingKey(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_ONBOARDING_KEY] = WriteRequestTypes.UPDATE_ONBOARDING_KEY
+    params: UpdateOnboardingKey
+
+class WriteRequestDeleteOnboardingKey(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_ONBOARDING_KEY] = WriteRequestTypes.DELETE_ONBOARDING_KEY
+    params: DeleteOnboardingKey
+
+class WriteRequestPushRecentlyViewed(BaseModel):
+    type: Literal[WriteRequestTypes.PUSH_RECENTLY_VIEWED] = WriteRequestTypes.PUSH_RECENTLY_VIEWED
+    params: PushRecentlyViewed
+
+class WriteRequestSetLastSeenUpdate(BaseModel):
+    type: Literal[WriteRequestTypes.SET_LAST_SEEN_UPDATE] = WriteRequestTypes.SET_LAST_SEEN_UPDATE
+    params: SetLastSeenUpdate
+
+class WriteRequestCreateLocalUser(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_LOCAL_USER] = WriteRequestTypes.CREATE_LOCAL_USER
+    params: CreateLocalUser
+
+class WriteRequestDeleteUser(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_USER] = WriteRequestTypes.DELETE_USER
+    params: DeleteUser
+
+class WriteRequestCreateServiceUser(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_SERVICE_USER] = WriteRequestTypes.CREATE_SERVICE_USER
+    params: CreateServiceUser
+
+class WriteRequestUpdateServiceUserDescription(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_SERVICE_USER_DESCRIPTION] = WriteRequestTypes.UPDATE_SERVICE_USER_DESCRIPTION
+    params: UpdateServiceUserDescription
+
+class WriteRequestCreateApiKeyForServiceUser(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_API_KEY_FOR_SERVICE_USER] = WriteRequestTypes.CREATE_API_KEY_FOR_SERVICE_USER
+    params: CreateApiKeyForServiceUser
+
+class WriteRequestDeleteApiKeyForServiceUser(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_API_KEY_FOR_SERVICE_USER] = WriteRequestTypes.DELETE_API_KEY_FOR_SERVICE_USER
+    params: DeleteApiKeyForServiceUser
+
+class WriteRequestCreateUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.CREATE_USER_GROUP] = WriteRequestTypes.CREATE_USER_GROUP
+    params: CreateUserGroup
+
+class WriteRequestRenameUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.RENAME_USER_GROUP] = WriteRequestTypes.RENAME_USER_GROUP
+    params: RenameUserGroup
+
+class WriteRequestDeleteUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.DELETE_USER_GROUP] = WriteRequestTypes.DELETE_USER_GROUP
+    params: DeleteUserGroup
+
+class WriteRequestAddUserToUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.ADD_USER_TO_USER_GROUP] = WriteRequestTypes.ADD_USER_TO_USER_GROUP
+    params: AddUserToUserGroup
+
+class WriteRequestRemoveUserFromUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.REMOVE_USER_FROM_USER_GROUP] = WriteRequestTypes.REMOVE_USER_FROM_USER_GROUP
+    params: RemoveUserFromUserGroup
+
+class WriteRequestSetUsersInUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.SET_USERS_IN_USER_GROUP] = WriteRequestTypes.SET_USERS_IN_USER_GROUP
+    params: SetUsersInUserGroup
+
+class WriteRequestSetEveryoneUserGroup(BaseModel):
+    type: Literal[WriteRequestTypes.SET_EVERYONE_USER_GROUP] = WriteRequestTypes.SET_EVERYONE_USER_GROUP
+    params: SetEveryoneUserGroup
+
+class WriteRequestUpdateUserAdmin(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_USER_ADMIN] = WriteRequestTypes.UPDATE_USER_ADMIN
+    params: UpdateUserAdmin
+
+class WriteRequestUpdateUserBasePermissions(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_USER_BASE_PERMISSIONS] = WriteRequestTypes.UPDATE_USER_BASE_PERMISSIONS
+    params: UpdateUserBasePermissions
+
+class WriteRequestUpdatePermissionOnResourceType(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_PERMISSION_ON_RESOURCE_TYPE] = WriteRequestTypes.UPDATE_PERMISSION_ON_RESOURCE_TYPE
+    params: UpdatePermissionOnResourceType
+
+class WriteRequestUpdatePermissionOnTarget(BaseModel):
+    type: Literal[WriteRequestTypes.UPDATE_PERMISSION_ON_TARGET] = WriteRequestTypes.UPDATE_PERMISSION_ON_TARGET
+    params: UpdatePermissionOnTarget
 
 class WriteRequestCreateTag(BaseModel):
     type: Literal[WriteRequestTypes.CREATE_TAG] = WriteRequestTypes.CREATE_TAG
@@ -13717,7 +16862,11 @@ class WriteRequestDeleteDockerRegistryAccount(BaseModel):
     type: Literal[WriteRequestTypes.DELETE_DOCKER_REGISTRY_ACCOUNT] = WriteRequestTypes.DELETE_DOCKER_REGISTRY_ACCOUNT
     params: DeleteDockerRegistryAccount
 
-WriteRequest = Union[WriteRequestCreateLocalUser, WriteRequestUpdateUserUsername, WriteRequestUpdateUserPassword, WriteRequestDeleteUser, WriteRequestCreateServiceUser, WriteRequestUpdateServiceUserDescription, WriteRequestCreateApiKeyForServiceUser, WriteRequestDeleteApiKeyForServiceUser, WriteRequestCreateUserGroup, WriteRequestRenameUserGroup, WriteRequestDeleteUserGroup, WriteRequestAddUserToUserGroup, WriteRequestRemoveUserFromUserGroup, WriteRequestSetUsersInUserGroup, WriteRequestSetEveryoneUserGroup, WriteRequestUpdateUserAdmin, WriteRequestUpdateUserBasePermissions, WriteRequestUpdatePermissionOnResourceType, WriteRequestUpdatePermissionOnTarget, WriteRequestUpdateResourceMeta, WriteRequestCreateServer, WriteRequestCopyServer, WriteRequestDeleteServer, WriteRequestUpdateServer, WriteRequestRenameServer, WriteRequestCreateNetwork, WriteRequestCreateTerminal, WriteRequestDeleteTerminal, WriteRequestDeleteAllTerminals, WriteRequestCreateStack, WriteRequestCopyStack, WriteRequestDeleteStack, WriteRequestUpdateStack, WriteRequestRenameStack, WriteRequestWriteStackFileContents, WriteRequestRefreshStackCache, WriteRequestCreateStackWebhook, WriteRequestDeleteStackWebhook, WriteRequestCreateDeployment, WriteRequestCopyDeployment, WriteRequestCreateDeploymentFromContainer, WriteRequestDeleteDeployment, WriteRequestUpdateDeployment, WriteRequestRenameDeployment, WriteRequestCreateBuild, WriteRequestCopyBuild, WriteRequestDeleteBuild, WriteRequestUpdateBuild, WriteRequestRenameBuild, WriteRequestWriteBuildFileContents, WriteRequestRefreshBuildCache, WriteRequestCreateBuildWebhook, WriteRequestDeleteBuildWebhook, WriteRequestCreateBuilder, WriteRequestCopyBuilder, WriteRequestDeleteBuilder, WriteRequestUpdateBuilder, WriteRequestRenameBuilder, WriteRequestCreateRepo, WriteRequestCopyRepo, WriteRequestDeleteRepo, WriteRequestUpdateRepo, WriteRequestRenameRepo, WriteRequestRefreshRepoCache, WriteRequestCreateRepoWebhook, WriteRequestDeleteRepoWebhook, WriteRequestCreateAlerter, WriteRequestCopyAlerter, WriteRequestDeleteAlerter, WriteRequestUpdateAlerter, WriteRequestRenameAlerter, WriteRequestCreateProcedure, WriteRequestCopyProcedure, WriteRequestDeleteProcedure, WriteRequestUpdateProcedure, WriteRequestRenameProcedure, WriteRequestCreateAction, WriteRequestCopyAction, WriteRequestDeleteAction, WriteRequestUpdateAction, WriteRequestRenameAction, WriteRequestCreateResourceSync, WriteRequestCopyResourceSync, WriteRequestDeleteResourceSync, WriteRequestUpdateResourceSync, WriteRequestRenameResourceSync, WriteRequestWriteSyncFileContents, WriteRequestCommitSync, WriteRequestRefreshResourceSyncPending, WriteRequestCreateSyncWebhook, WriteRequestDeleteSyncWebhook, WriteRequestCreateTag, WriteRequestDeleteTag, WriteRequestRenameTag, WriteRequestUpdateTagColor, WriteRequestCreateVariable, WriteRequestUpdateVariableValue, WriteRequestUpdateVariableDescription, WriteRequestUpdateVariableIsSecret, WriteRequestDeleteVariable, WriteRequestCreateGitProviderAccount, WriteRequestUpdateGitProviderAccount, WriteRequestDeleteGitProviderAccount, WriteRequestCreateDockerRegistryAccount, WriteRequestUpdateDockerRegistryAccount, WriteRequestDeleteDockerRegistryAccount]
+class WriteRequestCloseAlert(BaseModel):
+    type: Literal[WriteRequestTypes.CLOSE_ALERT] = WriteRequestTypes.CLOSE_ALERT
+    params: CloseAlert
+
+WriteRequest = Union[WriteRequestUpdateResourceMeta, WriteRequestCreateSwarm, WriteRequestCopySwarm, WriteRequestDeleteSwarm, WriteRequestUpdateSwarm, WriteRequestRenameSwarm, WriteRequestCreateServer, WriteRequestCopyServer, WriteRequestDeleteServer, WriteRequestUpdateServer, WriteRequestRenameServer, WriteRequestCreateNetwork, WriteRequestUpdateServerPublicKey, WriteRequestRotateServerKeys, WriteRequestCreateTerminal, WriteRequestDeleteTerminal, WriteRequestDeleteAllTerminals, WriteRequestBatchDeleteAllTerminals, WriteRequestCreateStack, WriteRequestCopyStack, WriteRequestDeleteStack, WriteRequestUpdateStack, WriteRequestRenameStack, WriteRequestWriteStackFileContents, WriteRequestRefreshStackCache, WriteRequestCheckStackForUpdate, WriteRequestBatchCheckStackForUpdate, WriteRequestCreateDeployment, WriteRequestCopyDeployment, WriteRequestCreateDeploymentFromContainer, WriteRequestDeleteDeployment, WriteRequestUpdateDeployment, WriteRequestRenameDeployment, WriteRequestCheckDeploymentForUpdate, WriteRequestBatchCheckDeploymentForUpdate, WriteRequestCreateBuild, WriteRequestCopyBuild, WriteRequestDeleteBuild, WriteRequestUpdateBuild, WriteRequestRenameBuild, WriteRequestWriteBuildFileContents, WriteRequestRefreshBuildCache, WriteRequestCreateRepo, WriteRequestCopyRepo, WriteRequestDeleteRepo, WriteRequestUpdateRepo, WriteRequestRenameRepo, WriteRequestRefreshRepoCache, WriteRequestCreateProcedure, WriteRequestCopyProcedure, WriteRequestDeleteProcedure, WriteRequestUpdateProcedure, WriteRequestRenameProcedure, WriteRequestCreateAction, WriteRequestCopyAction, WriteRequestDeleteAction, WriteRequestUpdateAction, WriteRequestRenameAction, WriteRequestCreateResourceSync, WriteRequestCopyResourceSync, WriteRequestDeleteResourceSync, WriteRequestUpdateResourceSync, WriteRequestRenameResourceSync, WriteRequestWriteSyncFileContents, WriteRequestCommitSync, WriteRequestRefreshResourceSyncPending, WriteRequestCreateBuilder, WriteRequestCopyBuilder, WriteRequestDeleteBuilder, WriteRequestUpdateBuilder, WriteRequestRenameBuilder, WriteRequestCreateAlerter, WriteRequestCopyAlerter, WriteRequestDeleteAlerter, WriteRequestUpdateAlerter, WriteRequestRenameAlerter, WriteRequestCreateOnboardingKey, WriteRequestUpdateOnboardingKey, WriteRequestDeleteOnboardingKey, WriteRequestPushRecentlyViewed, WriteRequestSetLastSeenUpdate, WriteRequestCreateLocalUser, WriteRequestDeleteUser, WriteRequestCreateServiceUser, WriteRequestUpdateServiceUserDescription, WriteRequestCreateApiKeyForServiceUser, WriteRequestDeleteApiKeyForServiceUser, WriteRequestCreateUserGroup, WriteRequestRenameUserGroup, WriteRequestDeleteUserGroup, WriteRequestAddUserToUserGroup, WriteRequestRemoveUserFromUserGroup, WriteRequestSetUsersInUserGroup, WriteRequestSetEveryoneUserGroup, WriteRequestUpdateUserAdmin, WriteRequestUpdateUserBasePermissions, WriteRequestUpdatePermissionOnResourceType, WriteRequestUpdatePermissionOnTarget, WriteRequestCreateTag, WriteRequestDeleteTag, WriteRequestRenameTag, WriteRequestUpdateTagColor, WriteRequestCreateVariable, WriteRequestUpdateVariableValue, WriteRequestUpdateVariableDescription, WriteRequestUpdateVariableIsSecret, WriteRequestDeleteVariable, WriteRequestCreateGitProviderAccount, WriteRequestUpdateGitProviderAccount, WriteRequestDeleteGitProviderAccount, WriteRequestCreateDockerRegistryAccount, WriteRequestUpdateDockerRegistryAccount, WriteRequestDeleteDockerRegistryAccount, WriteRequestCloseAlert]
 class WsLoginMessageJwtInner(BaseModel):
     """
     Generated type representing the anonymous struct variant `Jwt` of the `WsLoginMessage` Rust enum
