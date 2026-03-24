@@ -60,6 +60,7 @@ function fix_types() {
     .replaceAll("UserConfigVariant", "UserConfigTypes")
     .replaceAll("PathBuf", "str")
     .replaceAll(" = any", " = Any")
+    .replaceAll("_for_", "for_")
     // TODO look into proper Partial
     .replace(/Partial\[(\w+)\]/g, '$1')
     .split("\n");
