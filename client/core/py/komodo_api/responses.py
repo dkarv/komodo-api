@@ -4,65 +4,6 @@ from typing import TypeVar, Callable
 Res = TypeVar("Res")
 
 
-class AuthApi:
-    def __init__(self, request: Callable[[str, any, type[Res]], Res]):
-        self.request = request
-
-    async def _auth(self, request: AuthRequest, clz: type[Res]) -> Res:
-        return await self.request("auth", request, clz)
-
-    def getLoginOptions(self, params: GetLoginOptions) -> GetLoginOptionsResponse:
-        return self._auth(
-            AuthRequestGetLoginOptions(params=params), GetLoginOptionsResponse
-        )
-
-    def signUpLocalUser(self, params: SignUpLocalUser) -> SignUpLocalUserResponse:
-        return self._auth(
-            AuthRequestSignUpLocalUser(params=params), SignUpLocalUserResponse
-        )
-
-    def loginLocalUser(self, params: LoginLocalUser) -> LoginLocalUserResponse:
-        return self._auth(
-            AuthRequestLoginLocalUser(params=params), LoginLocalUserResponse
-        )
-
-    def exchangeForJwt(self, params: ExchangeForJwt) -> ExchangeForJwtResponse:
-        return self._auth(
-            AuthRequestExchangeForJwt(params=params), ExchangeForJwtResponse
-        )
-
-    def getUser(self, params: GetUser) -> GetUserResponse:
-        return self._auth(AuthRequestGetUser(params=params), GetUserResponse)
-
-
-class UserApi:
-    def __init__(self, request: Callable[[str, any, type[Res]], Res]):
-        self.request = request
-
-    async def _user(self, request: UserRequest, clz: type[Res]) -> Res:
-        return await self.request("user", request, clz)
-
-    def userPushRecentlyViewed(
-        self, params: PushRecentlyViewed
-    ) -> PushRecentlyViewedResponse:
-        return self._user(
-            UserRequestPushRecentlyViewed(params=params), PushRecentlyViewedResponse
-        )
-
-    def userSetLastSeenUpdate(
-        self, params: SetLastSeenUpdate
-    ) -> SetLastSeenUpdateResponse:
-        return self._user(
-            UserRequestSetLastSeenUpdate(params=params), SetLastSeenUpdateResponse
-        )
-
-    def userCreateApiKey(self, params: CreateApiKey) -> CreateApiKeyResponse:
-        return self._user(UserRequestCreateApiKey(params=params), CreateApiKeyResponse)
-
-    def userDeleteApiKey(self, params: DeleteApiKey) -> DeleteApiKeyResponse:
-        return self._user(UserRequestDeleteApiKey(params=params), DeleteApiKeyResponse)
-
-
 class ReadApi:
     def __init__(self, request: Callable[[str, any, type[Res]], Res]):
         self.request = request

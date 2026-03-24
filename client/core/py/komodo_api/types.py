@@ -1875,7 +1875,7 @@ class UserConfigService(BaseModel):
     data: UserConfigServiceInner
 
 UserConfig = Union[UserConfigLocal, UserConfigGoogle, UserConfigGithub, UserConfigOidc, UserConfigService]
-LinkedLoginsMap = Dict[UserConfigVariant, UserConfig]
+LinkedLoginsMap = Dict[UserConfigTypes, UserConfig]
 
 class UserTotpConfig(BaseModel):
     secret: str

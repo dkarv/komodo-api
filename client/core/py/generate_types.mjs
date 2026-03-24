@@ -57,6 +57,7 @@ function fix_types() {
     .replaceAll("AlertDataVariant", "AlertDataTypes")
     .replaceAll("AlerterEndpointVariant", "AlerterEndpointTypes")
     .replaceAll("ResourceTargetVariant", "ResourceTargetTypes")
+    .replaceAll("UserConfigVariant", "UserConfigTypes")
     .replaceAll("PathBuf", "str")
     .replaceAll(" = any", " = Any")
     // TODO look into proper Partial
