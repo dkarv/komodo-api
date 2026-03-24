@@ -159,12 +159,12 @@ class ReadApi:
             ReadRequestGetServerState(params=params), GetServerStateResponse
         )
 
-    def getPeripheryVersion(
-        self, params: GetPeripheryVersion
-    ) -> GetPeripheryVersionResponse:
-        return self._read(
-            ReadRequestGetPeripheryVersion(params=params), GetPeripheryVersionResponse
-        )
+#    def getPeripheryVersion(
+#        self, params: GetPeripheryVersion
+#    ) -> GetPeripheryVersionResponse:
+#        return self._read(
+#            ReadRequestGetPeripheryVersion(params=params), GetPeripheryVersionResponse
+#        )
 
     def getDockerContainersSummary(
         self, params: GetDockerContainersSummary
@@ -314,13 +314,13 @@ class ReadApi:
             ReadRequestGetStackActionState(params=params), GetStackActionStateResponse
         )
 
-    def getStackWebhooksEnabled(
-        self, params: GetStackWebhooksEnabled
-    ) -> GetStackWebhooksEnabledResponse:
-        return self._read(
-            ReadRequestGetStackWebhooksEnabled(params=params),
-            GetStackWebhooksEnabledResponse,
-        )
+#    def getStackWebhooksEnabled(
+#        self, params: GetStackWebhooksEnabled
+#    ) -> GetStackWebhooksEnabledResponse:
+#        return self._read(
+#            ReadRequestGetStackWebhooksEnabled(params=params),
+#            GetStackWebhooksEnabledResponse,
+#        )
 
     def getStackLog(self, params: GetStackLog) -> GetStackLogResponse:
         return self._read(ReadRequestGetStackLog(params=params), GetStackLogResponse)
@@ -467,13 +467,13 @@ class ReadApi:
             ReadRequestGetBuildMonthlyStats(params=params), GetBuildMonthlyStatsResponse
         )
 
-    def getBuildWebhookEnabled(
-        self, params: GetBuildWebhookEnabled
-    ) -> GetBuildWebhookEnabledResponse:
-        return self._read(
-            ReadRequestGetBuildWebhookEnabled(params=params),
-            GetBuildWebhookEnabledResponse,
-        )
+#    def getBuildWebhookEnabled(
+#        self, params: GetBuildWebhookEnabled
+#    ) -> GetBuildWebhookEnabledResponse:
+#        return self._read(
+#            ReadRequestGetBuildWebhookEnabled(params=params),
+#            GetBuildWebhookEnabledResponse,
+#        )
 
     def listBuilds(self, params: ListBuilds) -> ListBuildsResponse:
         return self._read(ReadRequestListBuilds(params=params), ListBuildsResponse)
@@ -512,13 +512,13 @@ class ReadApi:
             ReadRequestGetRepoActionState(params=params), GetRepoActionStateResponse
         )
 
-    def getRepoWebhooksEnabled(
-        self, params: GetRepoWebhooksEnabled
-    ) -> GetRepoWebhooksEnabledResponse:
-        return self._read(
-            ReadRequestGetRepoWebhooksEnabled(params=params),
-            GetRepoWebhooksEnabledResponse,
-        )
+#    def getRepoWebhooksEnabled(
+#        self, params: GetRepoWebhooksEnabled
+#    ) -> GetRepoWebhooksEnabledResponse:
+#        return self._read(
+#            ReadRequestGetRepoWebhooksEnabled(params=params),
+#            GetRepoWebhooksEnabledResponse,
+#        )
 
     def listRepos(self, params: ListRepos) -> ListReposResponse:
         return self._read(ReadRequestListRepos(params=params), ListReposResponse)
@@ -550,13 +550,13 @@ class ReadApi:
             GetResourceSyncActionStateResponse,
         )
 
-    def getSyncWebhooksEnabled(
-        self, params: GetSyncWebhooksEnabled
-    ) -> GetSyncWebhooksEnabledResponse:
-        return self._read(
-            ReadRequestGetSyncWebhooksEnabled(params=params),
-            GetSyncWebhooksEnabledResponse,
-        )
+#    def getSyncWebhooksEnabled(
+#        self, params: GetSyncWebhooksEnabled
+#    ) -> GetSyncWebhooksEnabledResponse:
+#        return self._read(
+#            ReadRequestGetSyncWebhooksEnabled(params=params),
+#            GetSyncWebhooksEnabledResponse,
+#        )
 
     def listResourceSyncs(self, params: ListResourceSyncs) -> ListResourceSyncsResponse:
         return self._read(
@@ -723,19 +723,19 @@ class WriteApi:
             WriteRequestCreateLocalUser(params=params), CreateLocalUserResponse
         )
 
-    def updateUserUsername(
-        self, params: UpdateUserUsername
-    ) -> UpdateUserUsernameResponse:
-        return self._write(
-            WriteRequestUpdateUserUsername(params=params), UpdateUserUsernameResponse
-        )
+#    def updateUserUsername(
+#        self, params: UpdateUserUsername
+#    ) -> UpdateUserUsernameResponse:
+#        return self._write(
+#            WriteRequestUpdateUserUsername(params=params), UpdateUserUsernameResponse
+#        )
 
-    def updateUserPassword(
-        self, params: UpdateUserPassword
-    ) -> UpdateUserPasswordResponse:
-        return self._write(
-            WriteRequestUpdateUserPassword(params=params), UpdateUserPasswordResponse
-        )
+#    def updateUserPassword(
+#        self, params: UpdateUserPassword
+#    ) -> UpdateUserPasswordResponse:
+#        return self._write(
+#            WriteRequestUpdateUserPassword(params=params), UpdateUserPasswordResponse
+#        )
 
     def deleteUser(self, params: DeleteUser) -> DeleteUserResponse:
         return self._write(WriteRequestDeleteUser(params=params), DeleteUserResponse)
@@ -880,19 +880,19 @@ class WriteApi:
     def refreshStackCache(self, params: RefreshStackCache) -> NoData:
         return self._write(WriteRequestRefreshStackCache(params=params), NoData)
 
-    def createStackWebhook(
-        self, params: CreateStackWebhook
-    ) -> CreateStackWebhookResponse:
-        return self._write(
-            WriteRequestCreateStackWebhook(params=params), CreateStackWebhookResponse
-        )
+#    def createStackWebhook(
+#        self, params: CreateStackWebhook
+#    ) -> CreateStackWebhookResponse:
+#        return self._write(
+#            WriteRequestCreateStackWebhook(params=params), CreateStackWebhookResponse
+#        )
 
-    def deleteStackWebhook(
-        self, params: DeleteStackWebhook
-    ) -> DeleteStackWebhookResponse:
-        return self._write(
-            WriteRequestDeleteStackWebhook(params=params), DeleteStackWebhookResponse
-        )
+#    def deleteStackWebhook(
+#        self, params: DeleteStackWebhook
+#    ) -> DeleteStackWebhookResponse:
+#        return self._write(
+#            WriteRequestDeleteStackWebhook(params=params), DeleteStackWebhookResponse
+#        )
 
     # ==== DEPLOYMENT ====
     def createDeployment(self, params: CreateDeployment) -> Deployment:
@@ -933,19 +933,19 @@ class WriteApi:
     def refreshBuildCache(self, params: RefreshBuildCache) -> NoData:
         return self._write(WriteRequestRefreshBuildCache(params=params), NoData)
 
-    def createBuildWebhook(
-        self, params: CreateBuildWebhook
-    ) -> CreateBuildWebhookResponse:
-        return self._write(
-            WriteRequestCreateBuildWebhook(params=params), CreateBuildWebhookResponse
-        )
+#    def createBuildWebhook(
+#        self, params: CreateBuildWebhook
+#    ) -> CreateBuildWebhookResponse:
+#        return self._write(
+#            WriteRequestCreateBuildWebhook(params=params), CreateBuildWebhookResponse
+#        )
 
-    def deleteBuildWebhook(
-        self, params: DeleteBuildWebhook
-    ) -> DeleteBuildWebhookResponse:
-        return self._write(
-            WriteRequestDeleteBuildWebhook(params=params), DeleteBuildWebhookResponse
-        )
+#    def deleteBuildWebhook(
+#        self, params: DeleteBuildWebhook
+#    ) -> DeleteBuildWebhookResponse:
+#        return self._write(
+#            WriteRequestDeleteBuildWebhook(params=params), DeleteBuildWebhookResponse
+#        )
 
     # ==== BUILDER ====
     def createBuilder(self, params: CreateBuilder) -> Builder:
@@ -982,15 +982,15 @@ class WriteApi:
     def refreshRepoCache(self, params: RefreshRepoCache) -> NoData:
         return self._write(WriteRequestRefreshRepoCache(params=params), NoData)
 
-    def createRepoWebhook(self, params: CreateRepoWebhook) -> CreateRepoWebhookResponse:
-        return self._write(
-            WriteRequestCreateRepoWebhook(params=params), CreateRepoWebhookResponse
-        )
+#    def createRepoWebhook(self, params: CreateRepoWebhook) -> CreateRepoWebhookResponse:
+#        return self._write(
+#            WriteRequestCreateRepoWebhook(params=params), CreateRepoWebhookResponse
+#        )
 
-    def deleteRepoWebhook(self, params: DeleteRepoWebhook) -> DeleteRepoWebhookResponse:
-        return self._write(
-            WriteRequestDeleteRepoWebhook(params=params), DeleteRepoWebhookResponse
-        )
+#    def deleteRepoWebhook(self, params: DeleteRepoWebhook) -> DeleteRepoWebhookResponse:
+#        return self._write(
+#            WriteRequestDeleteRepoWebhook(params=params), DeleteRepoWebhookResponse
+#        )
 
     # ==== ALERTER ====
     def createAlerter(self, params: CreateAlerter) -> Alerter:
@@ -1069,15 +1069,15 @@ class WriteApi:
             WriteRequestRefreshResourceSyncPending(params=params), ResourceSync
         )
 
-    def createSyncWebhook(self, params: CreateSyncWebhook) -> CreateSyncWebhookResponse:
-        return self._write(
-            WriteRequestCreateSyncWebhook(params=params), CreateSyncWebhookResponse
-        )
+#    def createSyncWebhook(self, params: CreateSyncWebhook) -> CreateSyncWebhookResponse:
+#        return self._write(
+#            WriteRequestCreateSyncWebhook(params=params), CreateSyncWebhookResponse
+#        )
 
-    def deleteSyncWebhook(self, params: DeleteSyncWebhook) -> DeleteSyncWebhookResponse:
-        return self._write(
-            WriteRequestDeleteSyncWebhook(params=params), DeleteSyncWebhookResponse
-        )
+#    def deleteSyncWebhook(self, params: DeleteSyncWebhook) -> DeleteSyncWebhookResponse:
+#        return self._write(
+#            WriteRequestDeleteSyncWebhook(params=params), DeleteSyncWebhookResponse
+#        )
 
     # ==== TAG ====
     def createTag(self, params: CreateTag) -> Tag:
