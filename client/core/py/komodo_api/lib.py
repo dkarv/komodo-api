@@ -1,16 +1,15 @@
 from .responses import (
-    AuthApi,
     ExecuteApi,
     ReadApi,
-    UserApi,
+#    UserApi,
     WriteApi,
 )
 
 from .types import (
-    AuthRequest,
+#    AuthRequest,
     ExecuteRequest,
     ReadRequest,
-    UserRequest,
+#    UserRequest,
     WriteRequest,
     WsLoginMessage,
     WsLoginMessageJwt,
@@ -66,11 +65,11 @@ class CancelToken:
         self.cancelled = True
 
 
-class KomodoClient(AuthApi):
-    auth: AuthApi
+class KomodoClient:
+#    auth: AuthApi
     read: ReadApi
     write: WriteApi
-    user: UserApi
+#    user: UserApi
     execute: ExecuteApi
     url: str
     _session: aiohttp.ClientSession
@@ -93,10 +92,10 @@ class KomodoClient(AuthApi):
         
         self._session = aiohttp.ClientSession(headers=headers)
 
-        self.auth = AuthApi(self.request)
+#        self.auth = AuthApi(self.request)
         self.read = ReadApi(self.request)
         self.write = WriteApi(self.request)
-        self.user = UserApi(self.request)
+#        self.user = UserApi(self.request)
         self.execute = ExecuteApi(self.request)
 
     async def __aenter__(self):
