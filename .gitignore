@@ -6,9 +6,5 @@ deno.lock
 .env.development
 .DS_Store
 .idea
-
-/frontend/build
-/lib/ts_client/build
-
 .dev
 package-lock.json
