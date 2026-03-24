@@ -6506,7 +6506,7 @@ class ImageManifestSummaryAttestationData(BaseModel):
     """
     model_config = ConfigDict(populate_by_name=True)
 
-    _for_: str = Field(alias="For")
+    for_: str = Field(alias="For")
     """
     The digest of the image manifest that this attestation is for.
     """
