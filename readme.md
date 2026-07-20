@@ -1,5 +1,7 @@
 # Komodo Python API
 
+I changed the approach how to maintain and build this api. The new repository can be found here: https://github.com/dkarv/komodo-py-api
+
 Python client API for [Komodo](https://komo.do).
 
 https://pypi.org/project/komodo-api/
